@@ -27,6 +27,7 @@
 - Frontend: acceso al host configurado
 - Login y flujo setup inicial funcionando
 - Verificar routers Traefik para `WEB_HOST` y `API_HOST`
+- Verificar checklist de salida en `docs/go-live-checklist.md`
 
 ## Rollback
 - Cambiar tags de imagen a una version estable previa.
