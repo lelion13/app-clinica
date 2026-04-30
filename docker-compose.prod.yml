@@ -10,8 +10,6 @@ services:
       TZ: ${TZ}
     volumes:
       - pgdata:/var/lib/postgresql/data
-    networks:
-      - internal
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER} -d ${POSTGRES_DB}"]
       interval: 10s
@@ -23,19 +21,18 @@ services:
     container_name: app-clinica-backend
     restart: unless-stopped
     env_file:
-      - .env
+      - .env.prod
     depends_on:
       db:
         condition: service_healthy
-    networks:
-      - internal
-      - traefik-public
+    expose:
+      - "8000"
     labels:
       - "traefik.enable=true"
-      - "traefik.docker.network=traefik-public"
       - "traefik.http.routers.app-clinica-api.rule=Host(`${API_HOST}`)"
       - "traefik.http.routers.app-clinica-api.entrypoints=websecure"
       - "traefik.http.routers.app-clinica-api.tls=true"
+      - "traefik.http.routers.app-clinica-api.tls.certresolver=letsencrypt"
       - "traefik.http.services.app-clinica-api.loadbalancer.server.port=8000"
     healthcheck:
       test: ["CMD-SHELL", "python -c \"import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/health')\""]
@@ -50,14 +47,14 @@ services:
     depends_on:
       backend:
         condition: service_healthy
-    networks:
-      - traefik-public
+    expose:
+      - "80"
     labels:
       - "traefik.enable=true"
-      - "traefik.docker.network=traefik-public"
       - "traefik.http.routers.app-clinica-web.rule=Host(`${WEB_HOST}`)"
       - "traefik.http.routers.app-clinica-web.entrypoints=websecure"
       - "traefik.http.routers.app-clinica-web.tls=true"
+      - "traefik.http.routers.app-clinica-web.tls.certresolver=letsencrypt"
       - "traefik.http.services.app-clinica-web.loadbalancer.server.port=80"
     healthcheck:
       test: ["CMD-SHELL", "wget --spider --quiet http://127.0.0.1 || exit 1"]
@@ -67,9 +64,3 @@ services:
 
 volumes:
   pgdata:
-
-networks:
-  internal:
-    driver: bridge
-  traefik-public:
-    external: true

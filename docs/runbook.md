@@ -1,10 +1,9 @@
 # Runbook de despliegue
 
 ## Preparacion
-- Copiar `.env.example` a `.env`.
+- Copiar `.env.prod.example` a `.env.prod`.
 - Completar secretos reales (especialmente `JWT_SECRET`).
-- Crear red de Traefik en el VPS (una sola vez): `docker network create traefik-public`.
-- Confirmar que Traefik ya esta conectado a `traefik-public`.
+- Confirmar que Traefik del VPS este corriendo (en tu VPS corre como proyecto `traefik-wpez`).
 
 ## Build y publicacion de imagenes
 - Backend: `docker build -t ghcr.io/<owner>/app-clinica-backend:latest ./backend`
@@ -15,12 +14,12 @@
   - `docker push ghcr.io/<owner>/app-clinica-frontend:latest`
 
 ## Deploy
-- `docker compose -f docker-compose.prod.yml pull`
-- `docker compose -f docker-compose.prod.yml up -d`
+- `docker compose --env-file .env.prod -f docker-compose.prod.yml pull`
+- `docker compose --env-file .env.prod -f docker-compose.prod.yml up -d`
 
 ## Migraciones
 - Ejecutar migraciones despues de levantar backend:
-- `docker compose -f docker-compose.prod.yml exec backend alembic upgrade head`
+- `docker compose --env-file .env.prod -f docker-compose.prod.yml exec backend alembic upgrade head`
 
 ## Verificacion
 - Backend: `GET /health`
@@ -31,4 +30,4 @@
 
 ## Rollback
 - Cambiar tags de imagen a una version estable previa.
-- Ejecutar nuevamente `docker compose -f docker-compose.prod.yml up -d`.
+- Ejecutar nuevamente `docker compose --env-file .env.prod -f docker-compose.prod.yml up -d`.

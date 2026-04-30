@@ -16,11 +16,11 @@ Sistema para gestion de carga de consultorios con React + FastAPI + PostgreSQL.
 
 ## Deploy en VPS (Hostinger)
 
-1. Configurar `.env` en el servidor.
-2. Asegurar red `traefik-public`.
+1. Configurar `.env.prod` en el servidor.
+2. Verificar que Traefik este corriendo (proyecto `traefik-wpez`).
 3. Ejecutar:
-  - `docker compose -f docker-compose.prod.yml pull`
-  - `docker compose -f docker-compose.prod.yml up -d`
+  - `docker compose --env-file .env.prod -f docker-compose.prod.yml pull`
+  - `docker compose --env-file .env.prod -f docker-compose.prod.yml up -d`
 4. Ejecutar migraciones:
-  - `docker compose -f docker-compose.prod.yml exec backend alembic upgrade head`
+  - `docker compose --env-file .env.prod -f docker-compose.prod.yml exec backend alembic upgrade head`
 
