@@ -10,12 +10,14 @@ const API_BASE_URL =
 
 async function parseError(response) {
   let message = "Error inesperado";
-  try {
-    const data = await response.json();
-    message = data.detail || data.message || message;
-  } catch {
-    const text = await response.text();
-    if (text) message = text;
+  const raw = await response.text();
+  if (raw) {
+    try {
+      const data = JSON.parse(raw);
+      message = data.detail || data.message || message;
+    } catch {
+      message = raw;
+    }
   }
   const error = new Error(message);
   error.status = response.status;
