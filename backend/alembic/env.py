@@ -1,7 +1,12 @@
 from logging.config import fileConfig
+from pathlib import Path
+import sys
 
 from alembic import context
 from sqlalchemy import engine_from_config, pool
+
+# Ensure `/app` is available when Alembic runs inside containers.
+sys.path.append(str(Path(__file__).resolve().parents[1]))
 
 from app.models import Booking, ConsultingRoom, Location, Professional, RoomOperatingHour, User
 from app.models.base import Base
