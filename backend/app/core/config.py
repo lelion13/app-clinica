@@ -1,6 +1,4 @@
 import json
-
-from pydantic import field_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
@@ -15,29 +13,26 @@ class Settings(BaseSettings):
     bcrypt_rounds: int = 12
     cookie_secure: bool = False
     cookie_samesite: str = "lax"
-    cors_origins: list[str] = ["http://localhost:5173"]
+    # Use a raw string to avoid pydantic-settings JSON parsing issues for env vars.
+    # Accepted formats:
+    # - CSV: "https://a.com,https://b.com"
+    # - JSON: ["https://a.com","https://b.com"]
+    cors_origins: str = "http://localhost:5173"
 
-    @field_validator("cors_origins", mode="before")
-    @classmethod
-    def parse_cors_origins(cls, value):
-        if value is None:
+    @property
+    def cors_origins_list(self) -> list[str]:
+        raw = (self.cors_origins or "").strip()
+        if not raw:
             return ["http://localhost:5173"]
-        if isinstance(value, list):
-            return [str(item).strip() for item in value if str(item).strip()]
-        if isinstance(value, str):
-            raw = value.strip()
-            if not raw:
-                return ["http://localhost:5173"]
-            if raw.startswith("["):
-                try:
-                    parsed = json.loads(raw)
-                except json.JSONDecodeError as exc:
-                    raise ValueError("CORS_ORIGINS invalido: JSON mal formado") from exc
-                if not isinstance(parsed, list):
-                    raise ValueError("CORS_ORIGINS invalido: debe ser una lista JSON")
-                return [str(item).strip() for item in parsed if str(item).strip()]
-            return [item.strip() for item in raw.split(",") if item.strip()]
-        raise ValueError("CORS_ORIGINS invalido")
+        if raw.startswith("["):
+            try:
+                parsed = json.loads(raw)
+            except json.JSONDecodeError as exc:
+                raise ValueError("CORS_ORIGINS invalido: JSON mal formado") from exc
+            if not isinstance(parsed, list):
+                raise ValueError("CORS_ORIGINS invalido: debe ser una lista JSON")
+            return [str(item).strip() for item in parsed if str(item).strip()]
+        return [item.strip() for item in raw.split(",") if item.strip()]
 
 
 settings = Settings()
