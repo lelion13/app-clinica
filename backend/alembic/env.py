@@ -8,10 +8,12 @@ from sqlalchemy import engine_from_config, pool
 # Ensure `/app` is available when Alembic runs inside containers.
 sys.path.append(str(Path(__file__).resolve().parents[1]))
 
+from app.core.config import settings
 from app.models import Booking, ConsultingRoom, Location, Professional, RoomOperatingHour, User
 from app.models.base import Base
 
 config = context.config
+config.set_main_option("sqlalchemy.url", settings.database_url)
 
 if config.config_file_name is not None:
     fileConfig(config.config_file_name)
