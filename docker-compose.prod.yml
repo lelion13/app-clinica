@@ -27,13 +27,6 @@ services:
         condition: service_healthy
     expose:
       - "8000"
-    labels:
-      - "traefik.enable=true"
-      - "traefik.http.routers.app-clinica-api.rule=Host(`${API_HOST}`)"
-      - "traefik.http.routers.app-clinica-api.entrypoints=websecure"
-      - "traefik.http.routers.app-clinica-api.tls=true"
-      - "traefik.http.routers.app-clinica-api.tls.certresolver=letsencrypt"
-      - "traefik.http.services.app-clinica-api.loadbalancer.server.port=8000"
     healthcheck:
       test: ["CMD-SHELL", "python -c \"import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/health')\""]
       interval: 15s

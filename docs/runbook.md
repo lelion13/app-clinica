@@ -7,7 +7,8 @@
 
 ## Build y publicacion de imagenes
 - Backend: `docker build -t ghcr.io/<owner>/app-clinica-backend:latest ./backend`
-- Frontend: `docker build -t ghcr.io/<owner>/app-clinica-frontend:latest --build-arg VITE_API_BASE_URL=https://api.tudominio.com/api/v1 ./frontend`
+- Frontend (mismo dominio, recomendado): `docker build -t ghcr.io/<owner>/app-clinica-frontend:latest ./frontend`
+- Frontend (dev / dominio separado, opcional): `docker build -t ghcr.io/<owner>/app-clinica-frontend:latest --build-arg VITE_API_BASE_URL=http://localhost:8000/api/v1 ./frontend`
 - Login GHCR: `echo <token> | docker login ghcr.io -u <owner> --password-stdin`
 - Push:
   - `docker push ghcr.io/<owner>/app-clinica-backend:latest`
@@ -22,10 +23,11 @@
 - `docker compose --env-file .env.prod -f docker-compose.prod.yml exec backend alembic upgrade head`
 
 ## Verificacion
-- Backend: `GET /health`
+- App (mismo dominio): `GET https://<WEB_HOST>/health`
+- App (mismo dominio): `GET https://<WEB_HOST>/api/v1/auth/me` (debe fallar 401 si no hay cookie, pero debe responder)
 - Frontend: acceso al host configurado
 - Login y flujo setup inicial funcionando
-- Verificar routers Traefik para `WEB_HOST` y `API_HOST`
+- Verificar router Traefik para `WEB_HOST`
 - Verificar checklist de salida en `docs/go-live-checklist.md`
 
 ## Rollback

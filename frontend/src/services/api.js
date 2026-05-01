@@ -1,4 +1,12 @@
-const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || "http://localhost:8000/api/v1";
+function normalizeApiBaseUrl(raw) {
+  if (!raw) return "";
+  return String(raw).replace(/\/+$/, "");
+}
+
+// Produccion (mismo dominio): dejar VITE_API_BASE_URL vacio => usa `/api/v1` (same-origin).
+// Desarrollo: `VITE_API_BASE_URL=http://localhost:8000/api/v1`
+const API_BASE_URL =
+  normalizeApiBaseUrl(import.meta.env.VITE_API_BASE_URL) || "/api/v1";
 
 async function parseError(response) {
   let message = "Error inesperado";

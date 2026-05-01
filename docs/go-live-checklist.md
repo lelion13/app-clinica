@@ -20,7 +20,7 @@
 - [ ] Agenda permite alta, edicion y baja de reservas sin solapamientos.
 
 ## Infraestructura
-- [ ] Traefik rutea `WEB_HOST` y `API_HOST` por HTTPS.
+- [ ] Traefik rutea `WEB_HOST` por HTTPS (API via `https://<WEB_HOST>/api/...`).
 - [ ] Contenedores con healthchecks en estado healthy.
 - [ ] Imagenes fijadas por tag estable.
 - [ ] Plan de rollback validado.

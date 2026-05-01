@@ -9,8 +9,7 @@ Sistema para gestion de carga de consultorios con React + FastAPI + PostgreSQL.
 
 ## Variables importantes
 
-- `WEB_HOST`: host publico del frontend (ej. `app.midominio.com`).
-- `API_HOST`: host publico del backend (ej. `api.midominio.com`)
+- `WEB_HOST`: host publico unico (frontend + API via `/api`, ej. `clinica.lionapp.cloud`).
 - `GHCR_OWNER`: owner de GitHub para resolver imagenes de GHCR
 - `BACKEND_IMAGE_TAG` y `FRONTEND_IMAGE_TAG`: tag a desplegar
 
