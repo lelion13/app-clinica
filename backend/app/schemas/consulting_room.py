@@ -23,7 +23,7 @@ class ConsultingRoomResponse(BaseModel):
 
 class RoomOperatingHourCreateRequest(BaseModel):
     room_id: int
-    weekday: int = Field(ge=0, le=6)
+    weekday: int = Field(ge=0, le=6, description="0=domingo … 6=sabado (como JavaScript Date.getDay)")
     start_time: time
     end_time: time
 

@@ -1,14 +1,28 @@
 from datetime import datetime
+from zoneinfo import ZoneInfo
 
 from fastapi import HTTPException, status
 from sqlalchemy import and_, select
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
+from app.core.config import settings
 from app.models.booking import Booking
 from app.models.consulting_room import ConsultingRoom, RoomOperatingHour
 from app.models.professional import Professional
 from app.schemas.booking import BookingCreateRequest, BookingUpdateRequest
+
+
+def _to_business_local(dt: datetime) -> datetime:
+    """Interpret booking instants in the clinic timezone for hour/weekday checks."""
+    if dt.tzinfo is None:
+        dt = dt.replace(tzinfo=ZoneInfo("UTC"))
+    return dt.astimezone(ZoneInfo(settings.business_tz))
+
+
+def _weekday_like_js_get_day(local_dt: datetime) -> int:
+    """Same numbering as JavaScript `Date.getDay()` / dashboard weekday select: 0=Sun .. 6=Sat."""
+    return (local_dt.weekday() + 1) % 7
 
 
 def _ensure_room_and_professional(db: Session, room_id: int, professional_id: int) -> None:
@@ -23,20 +37,22 @@ def _ensure_room_and_professional(db: Session, room_id: int, professional_id: in
 
 
 def _validate_operating_hours(db: Session, room_id: int, start_at: datetime, end_at: datetime) -> None:
-    if start_at >= end_at:
+    start_local = _to_business_local(start_at)
+    end_local = _to_business_local(end_at)
+    if start_local >= end_local:
         raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail="Rango horario invalido")
-    if start_at.date() != end_at.date():
+    if start_local.date() != end_local.date():
         raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail="La reserva debe iniciar y terminar el mismo dia")
 
-    weekday = start_at.weekday()
+    weekday = _weekday_like_js_get_day(start_local)
     schedule = db.execute(
         select(RoomOperatingHour).where(
             and_(
                 RoomOperatingHour.room_id == room_id,
                 RoomOperatingHour.weekday == weekday,
                 RoomOperatingHour.deleted_at.is_(None),
-                RoomOperatingHour.start_time <= start_at.time(),
-                RoomOperatingHour.end_time >= end_at.time(),
+                RoomOperatingHour.start_time <= start_local.time(),
+                RoomOperatingHour.end_time >= end_local.time(),
             )
         )
     ).scalar_one_or_none()
