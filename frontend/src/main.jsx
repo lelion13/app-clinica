@@ -3,9 +3,15 @@ import { createRoot } from "react-dom/client";
 import { BrowserRouter, Navigate, Route, Routes } from "react-router-dom";
 
 import { AuthProvider } from "./auth/AuthContext";
-import { DashboardPage } from "./pages/DashboardPage";
+import { AppLayout } from "./layouts/AppLayout";
+import { AgendaPage } from "./pages/AgendaPage";
+import { ConsultingRoomsPage } from "./pages/ConsultingRoomsPage";
+import { LocationsPage } from "./pages/LocationsPage";
 import { LoginPage } from "./pages/LoginPage";
+import { ProfessionalsPage } from "./pages/ProfessionalsPage";
+import { RoomHoursPage } from "./pages/RoomHoursPage";
 import { SetupPage } from "./pages/SetupPage";
+import { UsersPage } from "./pages/UsersPage";
 import { ProtectedRoute } from "./router/ProtectedRoute";
 
 function AppRouter() {
@@ -17,10 +23,24 @@ function AppRouter() {
         path="/"
         element={
           <ProtectedRoute>
-            <DashboardPage />
+            <AppLayout />
           </ProtectedRoute>
         }
-      />
+      >
+        <Route index element={<AgendaPage />} />
+        <Route path="ubicaciones" element={<LocationsPage />} />
+        <Route path="profesionales" element={<ProfessionalsPage />} />
+        <Route path="consultorios" element={<ConsultingRoomsPage />} />
+        <Route path="horarios-consultorio" element={<RoomHoursPage />} />
+        <Route
+          path="usuarios"
+          element={
+            <ProtectedRoute adminOnly>
+              <UsersPage />
+            </ProtectedRoute>
+          }
+        />
+      </Route>
       <Route path="*" element={<Navigate to="/" replace />} />
     </Routes>
   );
