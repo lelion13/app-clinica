@@ -83,6 +83,9 @@ export function AppLayout() {
             <NavLink to="/horarios-consultorio" style={navLinkStyle}>
               Horarios consultorio
             </NavLink>
+            <NavLink to="/estadisticas" style={navLinkStyle}>
+              Estadística
+            </NavLink>
             {isAdmin ? (
               <NavLink to="/usuarios" style={navLinkStyle}>
                 Usuarios

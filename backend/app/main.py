@@ -8,6 +8,7 @@ from app.api.routers.consulting_rooms import router as consulting_rooms_router
 from app.api.routers.locations import router as locations_router
 from app.api.routers.professionals import router as professionals_router
 from app.api.routers.setup import router as setup_router
+from app.api.routers.stats import router as stats_router
 from app.api.routers.users import router as users_router
 from app.core.config import settings
 
@@ -45,3 +46,4 @@ app.include_router(locations_router, prefix="/api/v1/locations", tags=["location
 app.include_router(consulting_rooms_router, prefix="/api/v1/consulting-rooms", tags=["consulting-rooms"])
 app.include_router(professionals_router, prefix="/api/v1/professionals", tags=["professionals"])
 app.include_router(bookings_router, prefix="/api/v1/bookings", tags=["bookings"])
+app.include_router(stats_router, prefix="/api/v1/stats", tags=["stats"])

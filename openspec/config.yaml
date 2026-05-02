@@ -1,0 +1,38 @@
+# Spec-Driven Development — configuración del proyecto app-clinica
+# Ver openspec/README.md y openspec/GUIA-SDD.md para el flujo humano.
+
+schema: spec-driven
+
+context: |
+  Stack:
+    - Frontend: React + Vite + Tailwind (mobile-first), React Router, FullCalendar.
+    - Backend: FastAPI + Pydantic + SQLAlchemy + Alembic + PostgreSQL (psycopg).
+    - Auth: JWT en cookies HttpOnly; roles admin / operador; contraseñas solo bcrypt.
+    - Infra: Docker Compose; imágenes GHCR; VPS + Traefik; dominio único con Nginx del frontend proxando /api.
+  Convenciones del repo: AGENTS.md (raíz), capas backend api/schemas/services/repositories.
+  Producción: .env.prod (no commitear secretos), BUSINESS_TIMEZONE para validación de horarios de consultorio.
+
+rules:
+  proposal:
+    - Declarar alcance, no-objetivos y riesgos (auth, datos, migraciones).
+    - Listar módulos o paquetes afectados (frontend/src/..., backend/app/...).
+  specs:
+    - Usar escenarios Given / When / Then cuando aplique.
+    - Usar lenguaje RFC 2119 (MUST / SHOULD / MAY) para requisitos normativos.
+    - Cubrir fallos de validación y errores genéricos en auth (sin enumerar usuarios).
+  design:
+    - Decisiones de arquitectura con una línea de rationale.
+    - Si hay flujo distribuido (login, reserva, proxy), un diagrama breve es suficiente.
+  tasks:
+    - Agrupar por fase: datos/migración, backend, frontend, infra, verificación.
+    - Numeración jerárquica (1.1, 1.2); tareas cerrables en una sesión.
+  apply:
+    - Respetar patrones existentes en routers, schemas y api.js.
+    - Sin refactors colaterales fuera del cambio.
+  verify:
+    - Ejecutar tests backend cuando existan para el área tocada.
+    - Comprobar rutas protegidas con JWT y límites de rol.
+    - Tras cambios de API o env: actualizar .env.prod.example si corresponde (sin secretos).
+  archive:
+    - Mover el cambio completado a openspec/changes/archive/<nombre>/ con fecha o referencia de PR.
+    - No borrar specs delta sin fusionar lo estable a openspec/specs/ cuando aplique.

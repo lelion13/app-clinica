@@ -6,6 +6,7 @@ import { AuthProvider } from "./auth/AuthContext";
 import { AppLayout } from "./layouts/AppLayout";
 import { AgendaPage } from "./pages/AgendaPage";
 import { ConsultingRoomsPage } from "./pages/ConsultingRoomsPage";
+import { EstadisticasPage } from "./pages/EstadisticasPage";
 import { LocationsPage } from "./pages/LocationsPage";
 import { LoginPage } from "./pages/LoginPage";
 import { ProfessionalsPage } from "./pages/ProfessionalsPage";
@@ -32,6 +33,7 @@ function AppRouter() {
         <Route path="profesionales" element={<ProfessionalsPage />} />
         <Route path="consultorios" element={<ConsultingRoomsPage />} />
         <Route path="horarios-consultorio" element={<RoomHoursPage />} />
+        <Route path="estadisticas" element={<EstadisticasPage />} />
         <Route
           path="usuarios"
           element={
