@@ -117,8 +117,10 @@ export function EstadisticasPage() {
       <section style={{ border: "1px solid #ddd", borderRadius: 8, padding: 16, background: "#fff" }}>
         <h1 style={{ marginTop: 0, fontSize: "1.35rem" }}>Estadísticas</h1>
         <p style={{ color: "#64748b", marginTop: -8 }}>
-          Filtrá por ubicación, profesional y/o consultorio. Sin selección en un grupo = todos en ese grupo. Los KPI usan
-          la zona horaria de negocio del servidor.
+          Filtrá por ubicación y/o consultorio para delimitar el alcance. El % de ocupación es{" "}
+          <strong>horas reservadas (toda la agenda en ese alcance) ÷ horas habilitadas</strong> según los horarios de
+          consultorio en el período. Si marcás profesionales, se muestran además horas y cantidad solo de ellos. Zona
+          horaria: negocio del servidor.
         </p>
 
         <div style={{ display: "flex", flexWrap: "wrap", gap: 16, alignItems: "flex-end", marginBottom: 16 }}>
@@ -211,6 +213,18 @@ export function EstadisticasPage() {
               <div style={{ fontSize: "0.75rem", color: "#64748b" }}>Cantidad reservas</div>
               <div style={{ fontSize: "1.5rem", fontWeight: 700 }}>{stats.bookings_count}</div>
             </div>
+            {stats.booked_hours_filtered != null ? (
+              <>
+                <div style={{ border: "1px solid #e2e8f0", borderRadius: 8, padding: 12, background: "#fffbeb" }}>
+                  <div style={{ fontSize: "0.75rem", color: "#64748b" }}>Horas (filtro profesional)</div>
+                  <div style={{ fontSize: "1.5rem", fontWeight: 700 }}>{stats.booked_hours_filtered}</div>
+                </div>
+                <div style={{ border: "1px solid #e2e8f0", borderRadius: 8, padding: 12, background: "#fffbeb" }}>
+                  <div style={{ fontSize: "0.75rem", color: "#64748b" }}>Reservas (filtro profesional)</div>
+                  <div style={{ fontSize: "1.5rem", fontWeight: 700 }}>{stats.bookings_count_filtered}</div>
+                </div>
+              </>
+            ) : null}
           </section>
 
           <section style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(320px, 1fr))", gap: 16 }}>

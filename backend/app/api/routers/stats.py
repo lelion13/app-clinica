@@ -20,7 +20,10 @@ def stats_summary(
     _: User = Depends(require_operator_or_admin),
     location_ids: list[int] | None = Query(default=None, description="Filtrar por ubicación(es)"),
     room_ids: list[int] | None = Query(default=None, description="Filtrar por consultorio(s)"),
-    professional_ids: list[int] | None = Query(default=None, description="Filtrar reservas por profesional(es)"),
+    professional_ids: list[int] | None = Query(
+        default=None,
+        description="Opcional: ver horas/cantidad solo de esos profesionales (el % ocupación sigue siendo agenda total vs horas habilitadas)",
+    ),
 ) -> StatsSummaryResponse:
     try:
         return build_stats_summary(

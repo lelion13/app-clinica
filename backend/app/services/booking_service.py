@@ -6,6 +6,7 @@ from sqlalchemy import and_, select
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
+from app.core.calendar import weekday_js_from_local_datetime
 from app.core.config import settings
 from app.models.booking import Booking
 from app.models.consulting_room import ConsultingRoom, RoomOperatingHour
@@ -18,11 +19,6 @@ def _to_business_local(dt: datetime) -> datetime:
     if dt.tzinfo is None:
         dt = dt.replace(tzinfo=ZoneInfo("UTC"))
     return dt.astimezone(ZoneInfo(settings.business_tz))
-
-
-def _weekday_like_js_get_day(local_dt: datetime) -> int:
-    """Same numbering as JavaScript `Date.getDay()` / dashboard weekday select: 0=Sun .. 6=Sat."""
-    return (local_dt.weekday() + 1) % 7
 
 
 def _ensure_room_and_professional(db: Session, room_id: int, professional_id: int) -> None:
@@ -44,7 +40,7 @@ def _validate_operating_hours(db: Session, room_id: int, start_at: datetime, end
     if start_local.date() != end_local.date():
         raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail="La reserva debe iniciar y terminar el mismo dia")
 
-    weekday = _weekday_like_js_get_day(start_local)
+    weekday = weekday_js_from_local_datetime(start_local)
     schedule = db.execute(
         select(RoomOperatingHour).where(
             and_(

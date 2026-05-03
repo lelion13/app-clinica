@@ -7,6 +7,7 @@ from zoneinfo import ZoneInfo
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
+from app.core.calendar import weekday_js_from_date
 from app.core.config import settings
 from app.models.booking import Booking
 from app.models.consulting_room import ConsultingRoom, RoomOperatingHour
@@ -26,11 +27,6 @@ def _daterange_inclusive(start: date, end: date):
         d += timedelta(days=1)
 
 
-def _weekday_js_from_date(d: date) -> int:
-    """Igual que frontend / BD: 0=domingo … 6=sábado."""
-    return (d.weekday() + 1) % 7
-
-
 def _filtered_room_ids(db: Session, location_ids: list[int], room_ids: list[int]) -> list[int]:
     q = select(ConsultingRoom.id).where(ConsultingRoom.deleted_at.is_(None))
     if location_ids:
@@ -46,7 +42,7 @@ def _compute_enabled_hours(db: Session, room_ids: list[int], start_d: date, end_
     tz = ZoneInfo(settings.business_tz)
     total_seconds = 0.0
     for day in _daterange_inclusive(start_d, end_d):
-        js_wd = _weekday_js_from_date(day)
+        js_wd = weekday_js_from_date(day)
         rows = db.execute(
             select(RoomOperatingHour.start_time, RoomOperatingHour.end_time).where(
                 RoomOperatingHour.room_id.in_(room_ids),
@@ -67,6 +63,33 @@ def _period_bounds_utc(start_d: date, end_d: date) -> tuple[datetime, datetime]:
     start_local = datetime.combine(start_d, datetime.min.time(), tzinfo=tz)
     end_next_local = datetime.combine(end_d + timedelta(days=1), datetime.min.time(), tzinfo=tz)
     return start_local.astimezone(UTC), end_next_local.astimezone(UTC)
+
+
+def _aggregate_bookings_for_period(
+    bookings: list[Booking],
+    range_start_utc: datetime,
+    range_end_excl_utc: datetime,
+    tz: ZoneInfo,
+) -> tuple[float, int, dict[int, float], dict[int, float], dict[int, float]]:
+    """Horas solapadas con el período; weekday en índice ISO (lun=0 … dom=6)."""
+    booked = 0.0
+    hours_by_weekday: dict[int, float] = defaultdict(float)
+    room_totals: dict[int, float] = defaultdict(float)
+    prof_totals: dict[int, float] = defaultdict(float)
+    overlap_count = 0
+    for b in bookings:
+        overlap_start = max(b.start_at, range_start_utc)
+        overlap_end = min(b.end_at, range_end_excl_utc)
+        if overlap_start >= overlap_end:
+            continue
+        overlap_count += 1
+        seg_hours = (overlap_end - overlap_start).total_seconds() / 3600.0
+        booked += seg_hours
+        wd = overlap_start.astimezone(tz).weekday()
+        hours_by_weekday[wd] += seg_hours
+        room_totals[b.room_id] += seg_hours
+        prof_totals[b.professional_id] += seg_hours
+    return booked, overlap_count, hours_by_weekday, room_totals, prof_totals
 
 
 _WEEKDAY_LABELS = ("Lun", "Mar", "Mié", "Jue", "Vie", "Sáb", "Dom")
@@ -91,6 +114,10 @@ def build_stats_summary(
     enabled = _compute_enabled_hours(db, room_filter_ids, start_d, end_d)
 
     range_start_utc, range_end_excl_utc = _period_bounds_utc(start_d, end_d)
+    tz = ZoneInfo(settings.business_tz)
+
+    booked_hours_filtered: float | None = None
+    bookings_count_filtered: int | None = None
 
     if not room_filter_ids:
         booked = 0.0
@@ -99,36 +126,35 @@ def build_stats_summary(
         room_totals: dict[int, float] = defaultdict(float)
         prof_totals: dict[int, float] = defaultdict(float)
     else:
-        q = select(Booking).where(
+        q_all = select(Booking).where(
             Booking.deleted_at.is_(None),
             Booking.room_id.in_(room_filter_ids),
             Booking.start_at < range_end_excl_utc,
             Booking.end_at > range_start_utc,
         )
+        bookings_all = list(db.execute(q_all).scalars().all())
+        booked, count, hours_by_weekday, room_totals, prof_totals = _aggregate_bookings_for_period(
+            bookings_all, range_start_utc, range_end_excl_utc, tz
+        )
+
         if professional_ids:
-            q = q.where(Booking.professional_id.in_(professional_ids))
-        bookings = list(db.execute(q).scalars().all())
-        booked = 0.0
-        count = len(bookings)
-        hours_by_weekday = defaultdict(float)
-        room_totals = defaultdict(float)
-        prof_totals = defaultdict(float)
+            q_f = select(Booking).where(
+                Booking.deleted_at.is_(None),
+                Booking.room_id.in_(room_filter_ids),
+                Booking.start_at < range_end_excl_utc,
+                Booking.end_at > range_start_utc,
+                Booking.professional_id.in_(professional_ids),
+            )
+            bookings_f = list(db.execute(q_f).scalars().all())
+            bh_f, cnt_f, _, _, _ = _aggregate_bookings_for_period(
+                bookings_f, range_start_utc, range_end_excl_utc, tz
+            )
+            booked_hours_filtered = round(bh_f, 2)
+            bookings_count_filtered = cnt_f
 
-        tz = ZoneInfo(settings.business_tz)
-        for b in bookings:
-            overlap_start = max(b.start_at, range_start_utc)
-            overlap_end = min(b.end_at, range_end_excl_utc)
-            if overlap_start >= overlap_end:
-                continue
-            seg_hours = (overlap_end - overlap_start).total_seconds() / 3600.0
-            booked += seg_hours
-            wd = overlap_start.astimezone(tz).weekday()
-            hours_by_weekday[wd] += seg_hours
-            room_totals[b.room_id] += seg_hours
-            prof_totals[b.professional_id] += seg_hours
-
-    free = max(0.0, enabled - booked)
     occupancy = (booked / enabled * 100.0) if enabled > 0 else 0.0
+    pie_occ = min(booked, enabled) if enabled > 0 else 0.0
+    pie_free = max(0.0, enabled - pie_occ)
 
     weekday_points: list[WeekdayHoursPoint] = []
     for i in range(7):
@@ -179,8 +205,10 @@ def build_stats_summary(
         booked_hours=round(booked, 2),
         occupancy_rate_percent=round(occupancy, 2),
         bookings_count=count,
-        pie_occupied_hours=round(booked, 2),
-        pie_free_hours=round(free, 2),
+        booked_hours_filtered=booked_hours_filtered,
+        bookings_count_filtered=bookings_count_filtered,
+        pie_occupied_hours=round(pie_occ, 2),
+        pie_free_hours=round(pie_free, 2),
         hours_by_weekday=weekday_points,
         top_rooms=top_rooms,
         top_professionals=top_professionals,
