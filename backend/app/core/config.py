@@ -22,6 +22,30 @@ class Settings(BaseSettings):
     # - CSV: "https://a.com,https://b.com"
     # - JSON: ["https://a.com","https://b.com"]
     cors_origins: str = "http://localhost:5173"
+    ext_db_enabled: bool = False
+    ext_db_engine: str = "mysql"
+    ext_db_host: str = ""
+    ext_db_port: int = 3306
+    ext_db_name: str = ""
+    ext_db_user: str = ""
+    ext_db_password: str = ""
+    ext_db_charset: str = "utf8mb4"
+    ext_db_connect_timeout: int = 10
+    prof_sync_query: str = (
+        "SELECT upe.numero_documento, MAX(upe.nombres) AS nombres, MAX(upe.email) AS email, "
+        "MAX(upe.profesion) AS profesion, MAX(upe.tipo_matricula) AS tipo_matricula, "
+        "MAX(upe.numero_matricula) AS numero_matricula, "
+        "GROUP_CONCAT(DISTINCT upe.especialidad ORDER BY upe.especialidad SEPARATOR ' | ') AS especialidad, "
+        "'A' AS estado_usuario "
+        "FROM montegrande_usuarios_profesiones_especialidades upe "
+        "WHERE upe.profesion = 'MEDICO' "
+        "AND upe.matricula_preferida = 'S' "
+        "AND upe.estado_usuario = 'A' "
+        "AND upe.usuario_estado_institucion = 'A' "
+        "AND upe.numero_documento IS NOT NULL "
+        "AND TRIM(upe.numero_documento) <> '' "
+        "GROUP BY upe.numero_documento"
+    )
 
     @property
     def cors_origins_list(self) -> list[str]:

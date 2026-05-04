@@ -9,7 +9,7 @@ from app.schemas.consulting_room import (
     RoomOperatingHourUpdateRequest,
 )
 from app.schemas.location import LocationCreateRequest, LocationResponse, LocationUpdateRequest
-from app.schemas.professional import ProfessionalCreateRequest, ProfessionalResponse, ProfessionalUpdateRequest
+from app.schemas.professional import ProfessionalResponse, ProfessionalSyncResponse
 from app.schemas.setup import BootstrapAdminRequest
 from app.schemas.user import UserCreateRequest, UserResponse, UserUpdateRequest
 from app.schemas.weekly_assignment import WeeklyAssignmentCreateRequest, WeeklyAssignmentResponse
@@ -30,9 +30,8 @@ __all__ = [
     "RoomOperatingHourCreateRequest",
     "RoomOperatingHourUpdateRequest",
     "RoomOperatingHourResponse",
-    "ProfessionalCreateRequest",
-    "ProfessionalUpdateRequest",
     "ProfessionalResponse",
+    "ProfessionalSyncResponse",
     "BookingCreateRequest",
     "BookingUpdateRequest",
     "BookingResponse",

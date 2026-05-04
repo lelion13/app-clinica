@@ -2,6 +2,7 @@ fastapi
 uvicorn[standard]
 sqlalchemy
 psycopg[binary]
+pymysql
 alembic
 python-jose[cryptography]
 bcrypt>=4.1,<5

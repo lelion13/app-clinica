@@ -44,7 +44,11 @@ def _ensure_room_and_professional(db: Session, room_id: int, professional_id: in
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Consultorio no encontrado")
 
     professional = db.execute(
-        select(Professional).where(Professional.id == professional_id, Professional.deleted_at.is_(None))
+        select(Professional).where(
+            Professional.id == professional_id,
+            Professional.deleted_at.is_(None),
+            Professional.is_active.is_(True),
+        )
     ).scalar_one_or_none()
     if not professional:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Profesional no encontrado")
