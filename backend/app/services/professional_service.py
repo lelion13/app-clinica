@@ -1,4 +1,5 @@
 from datetime import datetime
+from urllib.parse import quote_plus
 
 from fastapi import HTTPException, status
 from sqlalchemy import create_engine, select, text
@@ -23,22 +24,27 @@ def _external_mysql_url() -> str:
             status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
             detail="Configuración externa incompleta (EXT_DB_HOST/NAME/USER)",
         )
-    return (
-        f"mysql+pymysql://{settings.ext_db_user}:{settings.ext_db_password}"
-        f"@{settings.ext_db_host}:{settings.ext_db_port}/{settings.ext_db_name}"
-        f"?charset={settings.ext_db_charset}"
-    )
+    user = quote_plus(settings.ext_db_user)
+    password = quote_plus(settings.ext_db_password)
+    db_name = quote_plus(settings.ext_db_name)
+    return f"mysql+pymysql://{user}:{password}@{settings.ext_db_host}:{settings.ext_db_port}/{db_name}?charset={settings.ext_db_charset}"
 
 
 def sync_professionals_from_external(db: Session, actor_id: int) -> ProfessionalSyncResponse:
     if not settings.ext_db_enabled:
         raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail="Sincronización externa deshabilitada")
 
-    ext_engine = create_engine(
-        _external_mysql_url(),
-        pool_pre_ping=True,
-        connect_args={"connect_timeout": settings.ext_db_connect_timeout},
-    )
+    try:
+        ext_engine = create_engine(
+            _external_mysql_url(),
+            pool_pre_ping=True,
+            connect_args={"connect_timeout": settings.ext_db_connect_timeout},
+        )
+    except Exception as exc:
+        raise HTTPException(
+            status_code=status.HTTP_502_BAD_GATEWAY,
+            detail=f"No se pudo inicializar conexión externa MySQL (driver/config): {exc}",
+        ) from exc
     errors: list[str] = []
     now = datetime.utcnow()
 
