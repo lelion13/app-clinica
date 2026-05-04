@@ -6,8 +6,13 @@ from sqlalchemy.orm import Session
 from app.api.deps import require_operator_or_admin
 from app.db.session import get_db
 from app.models.user import User
-from app.schemas.booking import BookingCreateRequest, BookingResponse, BookingUpdateRequest
-from app.services.booking_service import create_booking, delete_booking, list_bookings, update_booking
+from app.schemas.booking import (
+    BookingCreateRequest,
+    BookingRecurringCreateRequest,
+    BookingResponse,
+    BookingUpdateRequest,
+)
+from app.services.booking_service import create_booking, create_recurring_bookings, delete_booking, list_bookings, update_booking
 
 router = APIRouter()
 
@@ -42,6 +47,16 @@ def bookings_create(
     user: User = Depends(require_operator_or_admin),
 ) -> BookingResponse:
     return _to_response(create_booking(db, payload, actor_id=user.id))
+
+
+@router.post("/recurring", response_model=list[BookingResponse], status_code=status.HTTP_201_CREATED)
+def bookings_create_recurring(
+    payload: BookingRecurringCreateRequest,
+    db: Session = Depends(get_db),
+    user: User = Depends(require_operator_or_admin),
+) -> list[BookingResponse]:
+    created = create_recurring_bookings(db, payload, actor_id=user.id)
+    return [_to_response(b) for b in created]
 
 
 @router.patch("/{booking_id}", response_model=BookingResponse)

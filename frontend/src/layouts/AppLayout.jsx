@@ -69,6 +69,9 @@ export function AppLayout() {
             }}
           >
             <NavLink to="/" end style={navLinkStyle}>
+              Ocupación semanal
+            </NavLink>
+            <NavLink to="/agenda" style={navLinkStyle}>
               Agenda
             </NavLink>
             <NavLink to="/ubicaciones" style={navLinkStyle}>

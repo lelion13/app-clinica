@@ -13,6 +13,7 @@ import { ProfessionalsPage } from "./pages/ProfessionalsPage";
 import { RoomHoursPage } from "./pages/RoomHoursPage";
 import { SetupPage } from "./pages/SetupPage";
 import { UsersPage } from "./pages/UsersPage";
+import { WeeklyOccupancyPage } from "./pages/WeeklyOccupancyPage";
 import { ProtectedRoute } from "./router/ProtectedRoute";
 
 function AppRouter() {
@@ -28,7 +29,8 @@ function AppRouter() {
           </ProtectedRoute>
         }
       >
-        <Route index element={<AgendaPage />} />
+        <Route index element={<WeeklyOccupancyPage />} />
+        <Route path="agenda" element={<AgendaPage />} />
         <Route path="ubicaciones" element={<LocationsPage />} />
         <Route path="profesionales" element={<ProfessionalsPage />} />
         <Route path="consultorios" element={<ConsultingRoomsPage />} />

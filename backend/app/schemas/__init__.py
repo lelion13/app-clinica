@@ -12,6 +12,7 @@ from app.schemas.location import LocationCreateRequest, LocationResponse, Locati
 from app.schemas.professional import ProfessionalCreateRequest, ProfessionalResponse, ProfessionalUpdateRequest
 from app.schemas.setup import BootstrapAdminRequest
 from app.schemas.user import UserCreateRequest, UserResponse, UserUpdateRequest
+from app.schemas.weekly_assignment import WeeklyAssignmentCreateRequest, WeeklyAssignmentResponse
 
 __all__ = [
     "LoginRequest",
@@ -35,5 +36,7 @@ __all__ = [
     "BookingCreateRequest",
     "BookingUpdateRequest",
     "BookingResponse",
+    "WeeklyAssignmentCreateRequest",
+    "WeeklyAssignmentResponse",
 ]
 

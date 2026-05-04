@@ -1,4 +1,4 @@
-from datetime import datetime
+from datetime import UTC, date, datetime, timedelta
 from zoneinfo import ZoneInfo
 
 from fastapi import HTTPException, status
@@ -6,12 +6,12 @@ from sqlalchemy import and_, select
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
-from app.core.calendar import weekday_js_from_local_datetime
+from app.core.calendar import weekday_js_from_date, weekday_js_from_local_datetime
 from app.core.config import settings
 from app.models.booking import Booking
 from app.models.consulting_room import ConsultingRoom, RoomOperatingHour
 from app.models.professional import Professional
-from app.schemas.booking import BookingCreateRequest, BookingUpdateRequest
+from app.schemas.booking import BookingCreateRequest, BookingRecurringCreateRequest, BookingUpdateRequest
 
 
 def _to_business_local(dt: datetime) -> datetime:
@@ -19,6 +19,13 @@ def _to_business_local(dt: datetime) -> datetime:
     if dt.tzinfo is None:
         dt = dt.replace(tzinfo=ZoneInfo("UTC"))
     return dt.astimezone(ZoneInfo(settings.business_tz))
+
+
+def _daterange_inclusive(start: date, end: date):
+    d = start
+    while d <= end:
+        yield d
+        d += timedelta(days=1)
 
 
 def _ensure_room_and_professional(db: Session, room_id: int, professional_id: int) -> None:
@@ -93,6 +100,75 @@ def create_booking(db: Session, payload: BookingCreateRequest, actor_id: int) ->
         raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="Conflicto de reserva para el consultorio") from exc
     db.refresh(booking)
     return booking
+
+
+def create_recurring_bookings(db: Session, payload: BookingRecurringCreateRequest, actor_id: int) -> list[Booking]:
+    """Una fila `bookings` por cada fecha del período que coincide con `weekday` (patrón semanal)."""
+    _ensure_room_and_professional(db, payload.room_id, payload.professional_id)
+
+    max_days = 400
+    if (payload.period_end - payload.period_start).days + 1 > max_days:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail=f"El período no puede superar {max_days} días",
+        )
+
+    dates: list[date] = [
+        d
+        for d in _daterange_inclusive(payload.period_start, payload.period_end)
+        if weekday_js_from_date(d) == payload.weekday
+    ]
+    if not dates:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail="Ninguna fecha del período coincide con el día de la semana elegido",
+        )
+
+    max_occurrences = 200
+    if len(dates) > max_occurrences:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail=f"Demasiadas ocurrencias (máximo {max_occurrences} por solicitud). Acortá el período.",
+        )
+
+    tz = ZoneInfo(settings.business_tz)
+    now = datetime.utcnow()
+    to_add: list[Booking] = []
+
+    for d in dates:
+        start_local = datetime.combine(d, payload.start_time, tzinfo=tz)
+        end_local = datetime.combine(d, payload.end_time, tzinfo=tz)
+        start_at = start_local.astimezone(UTC)
+        end_at = end_local.astimezone(UTC)
+        _validate_operating_hours(db, payload.room_id, start_at, end_at)
+        to_add.append(
+            Booking(
+                room_id=payload.room_id,
+                professional_id=payload.professional_id,
+                start_at=start_at,
+                end_at=end_at,
+                created_at=now,
+                updated_at=now,
+                created_by=actor_id,
+                updated_by=actor_id,
+                deleted_at=None,
+            )
+        )
+
+    for b in to_add:
+        db.add(b)
+    try:
+        db.commit()
+    except IntegrityError as exc:
+        db.rollback()
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail="Alguna ocurrencia choca con otra reserva del mismo consultorio",
+        ) from exc
+
+    for b in to_add:
+        db.refresh(b)
+    return to_add
 
 
 def update_booking(db: Session, booking_id: int, payload: BookingUpdateRequest, actor_id: int) -> Booking:

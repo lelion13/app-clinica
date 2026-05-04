@@ -8,6 +8,23 @@ import esLocale from "@fullcalendar/core/locales/es";
 import { apiRequestWithRefresh } from "../services/api";
 import { safeLoad } from "../lib/apiHelpers";
 
+const WEEKDAYS = [
+  ["0", "Domingo"],
+  ["1", "Lunes"],
+  ["2", "Martes"],
+  ["3", "Miércoles"],
+  ["4", "Jueves"],
+  ["5", "Viernes"],
+  ["6", "Sábado"],
+];
+
+function isoDate(d) {
+  const y = d.getFullYear();
+  const m = String(d.getMonth() + 1).padStart(2, "0");
+  const day = String(d.getDate()).padStart(2, "0");
+  return `${y}-${m}-${day}`;
+}
+
 export function AgendaPage() {
   const [error, setError] = useState("");
   const [professionals, setProfessionals] = useState([]);
@@ -19,6 +36,16 @@ export function AgendaPage() {
   const [bookingProfessionalId, setBookingProfessionalId] = useState("");
   const [bookingStartAt, setBookingStartAt] = useState("");
   const [bookingEndAt, setBookingEndAt] = useState("");
+
+  const [recurringWeekday, setRecurringWeekday] = useState("1");
+  const [recurringStartTime, setRecurringStartTime] = useState("09:00");
+  const [recurringEndTime, setRecurringEndTime] = useState("12:00");
+  const [periodStart, setPeriodStart] = useState(() => isoDate(new Date()));
+  const [periodEnd, setPeriodEnd] = useState(() => {
+    const d = new Date();
+    d.setMonth(d.getMonth() + 3);
+    return isoDate(d);
+  });
 
   const loadCatalog = async () => {
     setError("");
@@ -38,7 +65,6 @@ export function AgendaPage() {
     loadCatalog();
   }, []);
 
-
   const calendarEvents = useMemo(
     () =>
       bookings.map((booking) => {
@@ -55,21 +81,51 @@ export function AgendaPage() {
     [bookings, rooms, professionals]
   );
 
+  const fmtTimeForApi = (hm) => (hm && hm.length === 5 ? `${hm}:00` : hm);
+
+  const submitRecurring = async (event) => {
+    event.preventDefault();
+    setError("");
+    try {
+      await apiRequestWithRefresh("/bookings/recurring", {
+        method: "POST",
+        body: JSON.stringify({
+          room_id: Number(bookingRoomId),
+          professional_id: Number(bookingProfessionalId),
+          weekday: Number(recurringWeekday),
+          start_time: fmtTimeForApi(recurringStartTime),
+          end_time: fmtTimeForApi(recurringEndTime),
+          period_start: periodStart,
+          period_end: periodEnd,
+        }),
+      });
+      await loadCatalog();
+      await loadBookingsForRange(calendarRange);
+    } catch (e) {
+      setError(e.message || String(e));
+    }
+  };
+
   const submitBooking = async (event) => {
     event.preventDefault();
-    await apiRequestWithRefresh("/bookings", {
-      method: "POST",
-      body: JSON.stringify({
-        room_id: Number(bookingRoomId),
-        professional_id: Number(bookingProfessionalId),
-        start_at: new Date(bookingStartAt).toISOString(),
-        end_at: new Date(bookingEndAt).toISOString(),
-      }),
-    });
-    setBookingStartAt("");
-    setBookingEndAt("");
-    await loadCatalog();
-    await loadBookingsForRange(calendarRange);
+    setError("");
+    try {
+      await apiRequestWithRefresh("/bookings", {
+        method: "POST",
+        body: JSON.stringify({
+          room_id: Number(bookingRoomId),
+          professional_id: Number(bookingProfessionalId),
+          start_at: new Date(bookingStartAt).toISOString(),
+          end_at: new Date(bookingEndAt).toISOString(),
+        }),
+      });
+      setBookingStartAt("");
+      setBookingEndAt("");
+      await loadCatalog();
+      await loadBookingsForRange(calendarRange);
+    } catch (e) {
+      setError(e.message || String(e));
+    }
   };
 
   const removeBooking = async (bookingId) => {
@@ -99,16 +155,97 @@ export function AgendaPage() {
     await removeBooking(bookingId);
   };
 
+  const sharedRoomProfFields = (
+    <>
+      <label style={{ display: "flex", flexDirection: "column", gap: 4, fontSize: "0.85rem" }}>
+        Consultorio
+        <select value={bookingRoomId} onChange={(event) => setBookingRoomId(event.target.value)} required>
+          <option value="">Elegir…</option>
+          {rooms.map((room) => (
+            <option key={room.id} value={room.id}>
+              #{room.id} - {room.code}
+            </option>
+          ))}
+        </select>
+      </label>
+      <label style={{ display: "flex", flexDirection: "column", gap: 4, fontSize: "0.85rem" }}>
+        Profesional
+        <select value={bookingProfessionalId} onChange={(event) => setBookingProfessionalId(event.target.value)} required>
+          <option value="">Elegir…</option>
+          {professionals.map((item) => (
+            <option key={item.id} value={item.id}>
+              #{item.id} - {item.full_name}
+            </option>
+          ))}
+        </select>
+      </label>
+    </>
+  );
+
   return (
     <section style={{ border: "1px solid #ddd", borderRadius: 8, padding: 16, background: "#fff" }}>
       <h1 style={{ marginTop: 0, fontSize: "1.35rem" }}>Agenda</h1>
       <p style={{ color: "#64748b", marginTop: -4 }}>
-        Reservas por consultorio y profesional. Podés arrastrar en el calendario para prefijar horario o completar el formulario.
+        El modelo habitual es un <strong>turno fijo semanal</strong> (mismo día y horario que definís en{" "}
+        <em>Horarios de consultorio</em>): elegís el día de la semana, la franja horaria y el rango de fechas; el sistema
+        crea una reserva por cada ocurrencia. Para una sola fecha podés usar el bloque de abajo o arrastrar en el
+        calendario.
       </p>
 
       {error ? <p style={{ color: "crimson" }}>{error}</p> : null}
 
-      <form onSubmit={submitBooking} style={{ display: "flex", gap: 8, flexWrap: "wrap", marginBottom: 16, alignItems: "flex-end" }}>
+      <form
+        onSubmit={submitRecurring}
+        style={{
+          display: "flex",
+          flexWrap: "wrap",
+          gap: 12,
+          marginBottom: 20,
+          alignItems: "flex-end",
+          padding: 12,
+          border: "1px solid #e2e8f0",
+          borderRadius: 8,
+          background: "#f8fafc",
+        }}
+      >
+        <div style={{ flexBasis: "100%", fontWeight: 600, fontSize: "0.95rem" }}>Turno fijo semanal</div>
+        {sharedRoomProfFields}
+        <label style={{ display: "flex", flexDirection: "column", gap: 4, fontSize: "0.85rem" }}>
+          Día de la semana
+          <select value={recurringWeekday} onChange={(event) => setRecurringWeekday(event.target.value)} required>
+            {WEEKDAYS.map(([value, label]) => (
+              <option key={value} value={value}>
+                {label}
+              </option>
+            ))}
+          </select>
+        </label>
+        <label style={{ display: "flex", flexDirection: "column", gap: 4, fontSize: "0.85rem" }}>
+          Desde (hora)
+          <input type="time" value={recurringStartTime} onChange={(event) => setRecurringStartTime(event.target.value)} required />
+        </label>
+        <label style={{ display: "flex", flexDirection: "column", gap: 4, fontSize: "0.85rem" }}>
+          Hasta (hora)
+          <input type="time" value={recurringEndTime} onChange={(event) => setRecurringEndTime(event.target.value)} required />
+        </label>
+        <label style={{ display: "flex", flexDirection: "column", gap: 4, fontSize: "0.85rem" }}>
+          Período desde
+          <input type="date" value={periodStart} onChange={(event) => setPeriodStart(event.target.value)} required />
+        </label>
+        <label style={{ display: "flex", flexDirection: "column", gap: 4, fontSize: "0.85rem" }}>
+          Período hasta
+          <input type="date" value={periodEnd} onChange={(event) => setPeriodEnd(event.target.value)} required />
+        </label>
+        <button type="submit">Crear turnos en el período</button>
+      </form>
+
+      <form
+        onSubmit={submitBooking}
+        style={{ display: "flex", gap: 8, flexWrap: "wrap", marginBottom: 16, alignItems: "flex-end" }}
+      >
+        <div style={{ flexBasis: "100%", fontSize: "0.9rem", color: "#64748b" }}>
+          Reserva puntual (una sola fecha y hora)
+        </div>
         <select value={bookingRoomId} onChange={(event) => setBookingRoomId(event.target.value)} required>
           <option value="">Consultorio</option>
           {rooms.map((room) => (
@@ -117,11 +254,7 @@ export function AgendaPage() {
             </option>
           ))}
         </select>
-        <select
-          value={bookingProfessionalId}
-          onChange={(event) => setBookingProfessionalId(event.target.value)}
-          required
-        >
+        <select value={bookingProfessionalId} onChange={(event) => setBookingProfessionalId(event.target.value)} required>
           <option value="">Profesional</option>
           {professionals.map((item) => (
             <option key={item.id} value={item.id}>
@@ -147,7 +280,7 @@ export function AgendaPage() {
             required
           />
         </label>
-        <button type="submit">Crear reserva</button>
+        <button type="submit">Crear una reserva</button>
       </form>
 
       <FullCalendar
