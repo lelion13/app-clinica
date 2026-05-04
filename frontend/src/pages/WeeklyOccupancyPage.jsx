@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 
+import { ProfessionalCombobox } from "../components/ProfessionalCombobox";
 import { safeLoad } from "../lib/apiHelpers";
 import { apiRequestWithRefresh } from "../services/api";
 
@@ -204,6 +205,10 @@ export function WeeklyOccupancyPage() {
     e.preventDefault();
     setError("");
     setConflictBlocks([]);
+    if (!formProfessionalId) {
+      setError("Elegí un profesional de la lista.");
+      return;
+    }
     try {
       await apiRequestWithRefresh("/weekly-assignments", {
         method: "POST",
@@ -273,18 +278,16 @@ export function WeeklyOccupancyPage() {
         </div>
       </div>
 
-      <div style={{ display: "flex", flexWrap: "wrap", gap: 8, marginBottom: 12 }}>
-        <label style={{ display: "flex", flexDirection: "column", gap: 4 }}>
-          Profesional (filtro visual)
-          <select value={selectedProfessionalId} onChange={(e) => setSelectedProfessionalId(e.target.value)}>
-            <option value="">Todos</option>
-            {professionals.map((p) => (
-              <option key={p.id} value={p.id}>
-                #{p.id} {p.full_name}
-              </option>
-            ))}
-          </select>
-        </label>
+      <div style={{ display: "flex", flexWrap: "wrap", gap: 8, marginBottom: 12, alignItems: "flex-end" }}>
+        <ProfessionalCombobox
+          label="Profesional (filtro visual)"
+          professionals={professionals}
+          value={selectedProfessionalId}
+          onChange={setSelectedProfessionalId}
+          showAllEntry
+          allEntryLabel="Todos los profesionales (sin filtrar)"
+          placeholder="Buscar para filtrar la grilla…"
+        />
       </div>
 
       <form
@@ -313,17 +316,14 @@ export function WeeklyOccupancyPage() {
             ))}
           </select>
         </label>
-        <label style={{ display: "flex", flexDirection: "column", gap: 4 }}>
-          Profesional
-          <select value={formProfessionalId} onChange={(e) => setFormProfessionalId(e.target.value)} required>
-            <option value="">Elegir…</option>
-            {professionals.map((p) => (
-              <option key={p.id} value={p.id}>
-                #{p.id} {p.full_name}
-              </option>
-            ))}
-          </select>
-        </label>
+        <ProfessionalCombobox
+          label="Profesional"
+          professionals={professionals}
+          value={formProfessionalId}
+          onChange={setFormProfessionalId}
+          required
+          placeholder="Buscar por nombre, DNI o matrícula…"
+        />
         <label style={{ display: "flex", flexDirection: "column", gap: 4 }}>
           Día
           <select value={formWeekday} onChange={(e) => setFormWeekday(Number(e.target.value))}>
