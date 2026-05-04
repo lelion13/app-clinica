@@ -1,7 +1,7 @@
 """Estadísticas agregadas (ocupación, rankings) para el dashboard."""
 
 from collections import defaultdict
-from datetime import UTC, date, datetime, timedelta
+from datetime import date, datetime, timedelta
 from zoneinfo import ZoneInfo
 
 from sqlalchemy import select
@@ -9,15 +9,10 @@ from sqlalchemy.orm import Session
 
 from app.core.calendar import weekday_js_from_date
 from app.core.config import settings
-from app.models.booking import Booking
 from app.models.consulting_room import ConsultingRoom, RoomOperatingHour
 from app.models.professional import Professional
-from app.schemas.stats import (
-    ProfessionalHoursRank,
-    RoomHoursRank,
-    StatsSummaryResponse,
-    WeekdayHoursPoint,
-)
+from app.models.weekly_assignment import RoomWeeklyAssignment
+from app.schemas.stats import ProfessionalHoursRank, RoomHoursRank, StatsSummaryResponse, WeekdayHoursPoint
 
 
 def _daterange_inclusive(start: date, end: date):
@@ -57,39 +52,16 @@ def _compute_enabled_hours(db: Session, room_ids: list[int], start_d: date, end_
     return total_seconds / 3600.0
 
 
-def _period_bounds_utc(start_d: date, end_d: date) -> tuple[datetime, datetime]:
-    """[start_d 00:00, end_d+1 00:00) en zona de negocio, devuelto como UTC aware."""
-    tz = ZoneInfo(settings.business_tz)
-    start_local = datetime.combine(start_d, datetime.min.time(), tzinfo=tz)
-    end_next_local = datetime.combine(end_d + timedelta(days=1), datetime.min.time(), tzinfo=tz)
-    return start_local.astimezone(UTC), end_next_local.astimezone(UTC)
+def _count_weekdays_js_in_period(start_d: date, end_d: date) -> dict[int, int]:
+    counts = {i: 0 for i in range(7)}
+    for day in _daterange_inclusive(start_d, end_d):
+        counts[weekday_js_from_date(day)] += 1
+    return counts
 
 
-def _aggregate_bookings_for_period(
-    bookings: list[Booking],
-    range_start_utc: datetime,
-    range_end_excl_utc: datetime,
-    tz: ZoneInfo,
-) -> tuple[float, int, dict[int, float], dict[int, float], dict[int, float]]:
-    """Horas solapadas con el período; weekday en índice ISO (lun=0 … dom=6)."""
-    booked = 0.0
-    hours_by_weekday: dict[int, float] = defaultdict(float)
-    room_totals: dict[int, float] = defaultdict(float)
-    prof_totals: dict[int, float] = defaultdict(float)
-    overlap_count = 0
-    for b in bookings:
-        overlap_start = max(b.start_at, range_start_utc)
-        overlap_end = min(b.end_at, range_end_excl_utc)
-        if overlap_start >= overlap_end:
-            continue
-        overlap_count += 1
-        seg_hours = (overlap_end - overlap_start).total_seconds() / 3600.0
-        booked += seg_hours
-        wd = overlap_start.astimezone(tz).weekday()
-        hours_by_weekday[wd] += seg_hours
-        room_totals[b.room_id] += seg_hours
-        prof_totals[b.professional_id] += seg_hours
-    return booked, overlap_count, hours_by_weekday, room_totals, prof_totals
+def _weekday_js_to_iso(js_weekday: int) -> int:
+    """JS day index (0=dom...6=sáb) -> ISO-like chart index (0=lun...6=dom)."""
+    return (js_weekday + 6) % 7
 
 
 _WEEKDAY_LABELS = ("Lun", "Mar", "Mié", "Jue", "Vie", "Sáb", "Dom")
@@ -113,9 +85,6 @@ def build_stats_summary(
     room_filter_ids = _filtered_room_ids(db, location_ids, room_ids)
     enabled = _compute_enabled_hours(db, room_filter_ids, start_d, end_d)
 
-    range_start_utc, range_end_excl_utc = _period_bounds_utc(start_d, end_d)
-    tz = ZoneInfo(settings.business_tz)
-
     booked_hours_filtered: float | None = None
     bookings_count_filtered: int | None = None
 
@@ -126,29 +95,48 @@ def build_stats_summary(
         room_totals: dict[int, float] = defaultdict(float)
         prof_totals: dict[int, float] = defaultdict(float)
     else:
-        q_all = select(Booking).where(
-            Booking.deleted_at.is_(None),
-            Booking.room_id.in_(room_filter_ids),
-            Booking.start_at < range_end_excl_utc,
-            Booking.end_at > range_start_utc,
+        weekday_occurrences = _count_weekdays_js_in_period(start_d, end_d)
+        assignments_all = list(
+            db.execute(
+                select(RoomWeeklyAssignment).where(
+                    RoomWeeklyAssignment.deleted_at.is_(None),
+                    RoomWeeklyAssignment.room_id.in_(room_filter_ids),
+                )
+            )
+            .scalars()
+            .all()
         )
-        bookings_all = list(db.execute(q_all).scalars().all())
-        booked, count, hours_by_weekday, room_totals, prof_totals = _aggregate_bookings_for_period(
-            bookings_all, range_start_utc, range_end_excl_utc, tz
-        )
+        booked = 0.0
+        count = 0
+        hours_by_weekday = defaultdict(float)
+        room_totals = defaultdict(float)
+        prof_totals = defaultdict(float)
+
+        for a in assignments_all:
+            occ = weekday_occurrences.get(a.weekday, 0)
+            if occ <= 0:
+                continue
+            hours_per_occurrence = (datetime.combine(start_d, a.end_time) - datetime.combine(start_d, a.start_time)).total_seconds() / 3600.0
+            seg_hours = hours_per_occurrence * occ
+            booked += seg_hours
+            count += occ
+            iso_wd = _weekday_js_to_iso(a.weekday)
+            hours_by_weekday[iso_wd] += seg_hours
+            room_totals[a.room_id] += seg_hours
+            prof_totals[a.professional_id] += seg_hours
 
         if professional_ids:
-            q_f = select(Booking).where(
-                Booking.deleted_at.is_(None),
-                Booking.room_id.in_(room_filter_ids),
-                Booking.start_at < range_end_excl_utc,
-                Booking.end_at > range_start_utc,
-                Booking.professional_id.in_(professional_ids),
-            )
-            bookings_f = list(db.execute(q_f).scalars().all())
-            bh_f, cnt_f, _, _, _ = _aggregate_bookings_for_period(
-                bookings_f, range_start_utc, range_end_excl_utc, tz
-            )
+            bh_f = 0.0
+            cnt_f = 0
+            for a in assignments_all:
+                if a.professional_id not in professional_ids:
+                    continue
+                occ = weekday_occurrences.get(a.weekday, 0)
+                if occ <= 0:
+                    continue
+                hours_per_occurrence = (datetime.combine(start_d, a.end_time) - datetime.combine(start_d, a.start_time)).total_seconds() / 3600.0
+                bh_f += hours_per_occurrence * occ
+                cnt_f += occ
             booked_hours_filtered = round(bh_f, 2)
             bookings_count_filtered = cnt_f
 

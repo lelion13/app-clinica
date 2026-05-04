@@ -118,9 +118,8 @@ export function EstadisticasPage() {
         <h1 style={{ marginTop: 0, fontSize: "1.35rem" }}>Estadísticas</h1>
         <p style={{ color: "#64748b", marginTop: -8 }}>
           Filtrá por ubicación y/o consultorio para delimitar el alcance. El % de ocupación es{" "}
-          <strong>horas reservadas (toda la agenda en ese alcance) ÷ horas habilitadas</strong> según los horarios de
-          consultorio en el período. Si marcás profesionales, se muestran además horas y cantidad solo de ellos. Zona
-          horaria: negocio del servidor.
+          <strong>horas asignadas semanalmente (proyectadas al período) ÷ horas habilitadas</strong> según los horarios
+          de consultorio. Si marcás profesionales, se muestran además horas y ocurrencias solo de ellos.
         </p>
 
         <div style={{ display: "flex", flexWrap: "wrap", gap: 16, alignItems: "flex-end", marginBottom: 16 }}>
@@ -206,11 +205,11 @@ export function EstadisticasPage() {
               <div style={{ fontSize: "1.5rem", fontWeight: 700 }}>{stats.enabled_hours}</div>
             </div>
             <div style={{ border: "1px solid #e2e8f0", borderRadius: 8, padding: 12, background: "#f8fafc" }}>
-              <div style={{ fontSize: "0.75rem", color: "#64748b" }}>Horas reservadas</div>
+              <div style={{ fontSize: "0.75rem", color: "#64748b" }}>Horas asignadas</div>
               <div style={{ fontSize: "1.5rem", fontWeight: 700 }}>{stats.booked_hours}</div>
             </div>
             <div style={{ border: "1px solid #e2e8f0", borderRadius: 8, padding: 12, background: "#f8fafc" }}>
-              <div style={{ fontSize: "0.75rem", color: "#64748b" }}>Cantidad reservas</div>
+              <div style={{ fontSize: "0.75rem", color: "#64748b" }}>Ocurrencias</div>
               <div style={{ fontSize: "1.5rem", fontWeight: 700 }}>{stats.bookings_count}</div>
             </div>
             {stats.booked_hours_filtered != null ? (
@@ -220,7 +219,7 @@ export function EstadisticasPage() {
                   <div style={{ fontSize: "1.5rem", fontWeight: 700 }}>{stats.booked_hours_filtered}</div>
                 </div>
                 <div style={{ border: "1px solid #e2e8f0", borderRadius: 8, padding: 12, background: "#fffbeb" }}>
-                  <div style={{ fontSize: "0.75rem", color: "#64748b" }}>Reservas (filtro profesional)</div>
+                  <div style={{ fontSize: "0.75rem", color: "#64748b" }}>Ocurrencias (filtro profesional)</div>
                   <div style={{ fontSize: "1.5rem", fontWeight: 700 }}>{stats.bookings_count_filtered}</div>
                 </div>
               </>
