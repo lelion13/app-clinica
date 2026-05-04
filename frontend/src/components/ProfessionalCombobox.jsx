@@ -13,6 +13,19 @@ function profHaystack(p) {
   );
 }
 
+/** Base visual compartida con `<select>` / `input[type=time]` en la misma fila de formulario. */
+export const alignedNativeFormControlStyle = {
+  boxSizing: "border-box",
+  minHeight: 36,
+  padding: "6px 8px",
+  border: "1px solid #cbd5e1",
+  borderRadius: 6,
+  fontSize: 14,
+  lineHeight: 1.25,
+  backgroundColor: "#fff",
+  color: "#0f172a",
+};
+
 export function formatProfessionalLabel(p) {
   if (!p) return "";
   const doc = p.external_document ? ` · DNI ${p.external_document}` : "";
@@ -145,14 +158,25 @@ export function ProfessionalCombobox({
   };
 
   return (
-    <label style={{ display: "flex", flexDirection: "column", gap: 4, position: "relative", minWidth: 260 }}>
-      <span>
+    <label
+      style={{
+        display: "flex",
+        flexDirection: "column",
+        gap: 4,
+        position: "relative",
+        minWidth: 260,
+        fontSize: 13,
+        color: "#334155",
+      }}
+    >
+      <span style={{ lineHeight: 1.2 }}>
         {label}
         {required ? <span style={{ color: "#b91c1c" }}> *</span> : null}
       </span>
-      <div ref={wrapRef} style={{ position: "relative" }}>
+      <div ref={wrapRef} style={{ position: "relative", width: "100%" }}>
         <input
-          type="search"
+          type="text"
+          inputMode="search"
           autoComplete="off"
           placeholder={placeholder}
           value={query}
@@ -183,13 +207,7 @@ export function ProfessionalCombobox({
             }, 120);
           }}
           onKeyDown={onKeyDown}
-          style={{
-            width: "100%",
-            padding: "8px 10px",
-            border: "1px solid #cbd5e1",
-            borderRadius: 6,
-            fontSize: "0.9rem",
-          }}
+          style={{ ...alignedNativeFormControlStyle, width: "100%" }}
         />
         {open && options.length > 0 ? (
           <ul

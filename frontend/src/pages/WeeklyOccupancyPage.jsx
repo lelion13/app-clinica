@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 
-import { ProfessionalCombobox } from "../components/ProfessionalCombobox";
+import { ProfessionalCombobox, alignedNativeFormControlStyle } from "../components/ProfessionalCombobox";
 import { safeLoad } from "../lib/apiHelpers";
 import { apiRequestWithRefresh } from "../services/api";
 
@@ -46,6 +46,28 @@ function inRange(slot, startTime, endTime) {
   const b = timeToMinutes(endTime);
   return slot.start >= a && slot.end <= b;
 }
+
+/** Texto largo en celdas angostas: varias líneas + clamp; nombre completo en `title` del td. */
+const slotCellNameStyle = {
+  display: "-webkit-box",
+  WebkitBoxOrient: "vertical",
+  WebkitLineClamp: 4,
+  overflow: "hidden",
+  wordBreak: "break-word",
+  overflowWrap: "break-word",
+  hyphens: "auto",
+  lineHeight: 1.25,
+  maxWidth: "100%",
+  margin: "0 auto",
+};
+
+const formFieldLabelStyle = {
+  display: "flex",
+  flexDirection: "column",
+  gap: 4,
+  fontSize: 13,
+  color: "#334155",
+};
 
 export function WeeklyOccupancyPage() {
   const [error, setError] = useState("");
@@ -295,7 +317,7 @@ export function WeeklyOccupancyPage() {
         style={{
           display: "flex",
           flexWrap: "wrap",
-          gap: 8,
+          gap: "10px 12px",
           alignItems: "flex-end",
           border: "1px solid #e2e8f0",
           borderRadius: 8,
@@ -304,10 +326,15 @@ export function WeeklyOccupancyPage() {
           background: "#f8fafc",
         }}
       >
-        <strong style={{ flexBasis: "100%" }}>Nueva asignación semanal</strong>
-        <label style={{ display: "flex", flexDirection: "column", gap: 4 }}>
+        <strong style={{ flexBasis: "100%", marginBottom: 2 }}>Nueva asignación semanal</strong>
+        <label style={formFieldLabelStyle}>
           Consultorio
-          <select value={formRoomId} onChange={(e) => setFormRoomId(e.target.value)} required>
+          <select
+            value={formRoomId}
+            onChange={(e) => setFormRoomId(e.target.value)}
+            required
+            style={{ ...alignedNativeFormControlStyle, minWidth: 120 }}
+          >
             <option value="">Elegir…</option>
             {visibleRooms.map((r) => (
               <option key={r.id} value={r.id}>
@@ -324,9 +351,13 @@ export function WeeklyOccupancyPage() {
           required
           placeholder="Buscar por nombre, DNI o matrícula…"
         />
-        <label style={{ display: "flex", flexDirection: "column", gap: 4 }}>
+        <label style={formFieldLabelStyle}>
           Día
-          <select value={formWeekday} onChange={(e) => setFormWeekday(Number(e.target.value))}>
+          <select
+            value={formWeekday}
+            onChange={(e) => setFormWeekday(Number(e.target.value))}
+            style={{ ...alignedNativeFormControlStyle, minWidth: 112 }}
+          >
             {WEEKDAYS.map((d) => (
               <option key={d.value} value={d.value}>
                 {d.label}
@@ -334,15 +365,42 @@ export function WeeklyOccupancyPage() {
             ))}
           </select>
         </label>
-        <label style={{ display: "flex", flexDirection: "column", gap: 4 }}>
+        <label style={formFieldLabelStyle}>
           Desde
-          <input type="time" step={1800} value={formStartTime} onChange={(e) => setFormStartTime(e.target.value)} required />
+          <input
+            type="time"
+            step={1800}
+            value={formStartTime}
+            onChange={(e) => setFormStartTime(e.target.value)}
+            required
+            style={{ ...alignedNativeFormControlStyle, minWidth: 104 }}
+          />
         </label>
-        <label style={{ display: "flex", flexDirection: "column", gap: 4 }}>
+        <label style={formFieldLabelStyle}>
           Hasta
-          <input type="time" step={1800} value={formEndTime} onChange={(e) => setFormEndTime(e.target.value)} required />
+          <input
+            type="time"
+            step={1800}
+            value={formEndTime}
+            onChange={(e) => setFormEndTime(e.target.value)}
+            required
+            style={{ ...alignedNativeFormControlStyle, minWidth: 104 }}
+          />
         </label>
-        <button type="submit">Guardar</button>
+        <button
+          type="submit"
+          style={{
+            ...alignedNativeFormControlStyle,
+            cursor: "pointer",
+            fontWeight: 600,
+            backgroundColor: "#e2e8f0",
+            borderColor: "#94a3b8",
+            color: "#0f172a",
+            padding: "6px 16px",
+          }}
+        >
+          Guardar
+        </button>
       </form>
 
       <div style={{ display: "flex", gap: 8, flexWrap: "wrap", marginBottom: 12 }}>
@@ -391,7 +449,7 @@ export function WeeklyOccupancyPage() {
       {loading ? <p style={{ color: "#475569", marginBottom: 12 }}>Cargando…</p> : null}
 
       <div style={{ overflowX: "auto", border: "1px solid #e2e8f0", borderRadius: 8 }}>
-        <table style={{ width: "100%", borderCollapse: "collapse", minWidth: 1100 }}>
+        <table lang="es" style={{ width: "100%", borderCollapse: "collapse", minWidth: 1100 }}>
           <thead>
             <tr style={{ background: "#f8fafc" }}>
               <th style={{ borderBottom: "1px solid #e2e8f0", padding: 8, textAlign: "left", position: "sticky", left: 0, background: "#f8fafc" }}>
@@ -432,20 +490,22 @@ export function WeeklyOccupancyPage() {
                   return (
                     <td
                       key={`${room.id}-${slot.key}`}
-                      title={text}
+                      title={text || undefined}
                       style={{
                         borderBottom: "1px solid #f1f5f9",
                         borderLeft: "1px solid #f8fafc",
-                        padding: 3,
-                        fontSize: 9,
-                        minWidth: 68,
-                        maxWidth: 68,
+                        padding: "4px 3px",
+                        fontSize: 10,
+                        minWidth: 78,
+                        maxWidth: 78,
+                        width: 78,
                         background: bg,
                         textAlign: "center",
-                        lineHeight: 1.15,
+                        verticalAlign: "middle",
+                        lineHeight: 1.25,
                       }}
                     >
-                      <span style={{ display: "inline-block", maxHeight: 24, overflow: "hidden" }}>{text}</span>
+                      {text ? <span style={slotCellNameStyle}>{text}</span> : null}
                     </td>
                   );
                 })}
