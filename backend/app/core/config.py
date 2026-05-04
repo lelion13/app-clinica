@@ -31,6 +31,8 @@ class Settings(BaseSettings):
     ext_db_password: str = ""
     ext_db_charset: str = "utf8mb4"
     ext_db_connect_timeout: int = 10
+    # PyMySQL: True desactiva SSL (útil si el servidor MySQL no negocia TLS desde el contenedor).
+    ext_db_ssl_disabled: bool = Field(default=False, validation_alias="EXT_DB_SSL_DISABLED")
     prof_sync_query: str = (
         "SELECT upe.numero_documento, MAX(upe.nombres) AS nombres, MAX(upe.email) AS email, "
         "MAX(upe.profesion) AS profesion, MAX(upe.tipo_matricula) AS tipo_matricula, "
