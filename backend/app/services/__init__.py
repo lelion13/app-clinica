@@ -12,10 +12,8 @@ from app.services.consulting_room_service import (
 )
 from app.services.location_service import create_location, delete_location, list_locations, update_location
 from app.services.professional_service import (
-    create_professional,
-    delete_professional,
     list_professionals,
-    update_professional,
+    sync_professionals_from_external,
 )
 from app.services.setup_service import bootstrap_admin
 from app.services.user_service import create_user, delete_user, list_users, update_user
@@ -42,9 +40,7 @@ __all__ = [
     "update_room_hour",
     "delete_room_hour",
     "list_professionals",
-    "create_professional",
-    "update_professional",
-    "delete_professional",
+    "sync_professionals_from_external",
     "list_bookings",
     "create_booking",
     "update_booking",
