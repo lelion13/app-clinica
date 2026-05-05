@@ -69,6 +69,9 @@ const formFieldLabelStyle = {
   color: "#334155",
 };
 
+/** Ancho fijo de la columna de hora; el resto del ancho va a los consultorios. */
+const SCHEDULE_COL_WIDTH_PX = 72;
+
 export function WeeklyOccupancyPage() {
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
@@ -189,6 +192,13 @@ export function WeeklyOccupancyPage() {
         .sort((a, b) => a.code.localeCompare(b.code)),
     [rooms, selectedLocationId]
   );
+
+  const roomColumnWidth =
+    visibleRooms.length > 0
+      ? `calc((100% - ${SCHEDULE_COL_WIDTH_PX}px) / ${visibleRooms.length})`
+      : "100%";
+
+  const occupancyTableMinWidth = Math.max(640, SCHEDULE_COL_WIDTH_PX + visibleRooms.length * 104);
 
   const assignmentByRoom = useMemo(() => {
     const map = new Map();
@@ -411,14 +421,57 @@ export function WeeklyOccupancyPage() {
       {loading ? <p style={{ color: "#475569", marginBottom: 12 }}>Cargando…</p> : null}
 
       <div style={{ overflowX: "auto", border: "1px solid #e2e8f0", borderRadius: 8 }}>
-        <table lang="es" style={{ width: "100%", borderCollapse: "collapse", minWidth: 900 }}>
+        <table
+          lang="es"
+          style={{
+            width: "100%",
+            minWidth: occupancyTableMinWidth,
+            borderCollapse: "collapse",
+            tableLayout: "fixed",
+            boxSizing: "border-box",
+          }}
+        >
+          <colgroup>
+            <col style={{ width: SCHEDULE_COL_WIDTH_PX }} />
+            {visibleRooms.map((room) => (
+              <col key={room.id} style={{ width: roomColumnWidth }} />
+            ))}
+          </colgroup>
           <thead>
             <tr style={{ background: "#f8fafc" }}>
-              <th style={{ borderBottom: "1px solid #e2e8f0", padding: 8, textAlign: "left", position: "sticky", left: 0, background: "#f8fafc", zIndex: 1 }}>
+              <th
+                style={{
+                  borderBottom: "1px solid #e2e8f0",
+                  padding: "8px 6px",
+                  textAlign: "left",
+                  position: "sticky",
+                  left: 0,
+                  background: "#f8fafc",
+                  zIndex: 2,
+                  width: SCHEDULE_COL_WIDTH_PX,
+                  maxWidth: SCHEDULE_COL_WIDTH_PX,
+                  boxSizing: "border-box",
+                  fontSize: 11,
+                  boxShadow: "4px 0 10px -6px rgba(15, 23, 42, 0.12)",
+                }}
+              >
                 Horario
               </th>
               {visibleRooms.map((room) => (
-                <th key={room.id} style={{ borderBottom: "1px solid #e2e8f0", padding: 6, fontSize: 11, minWidth: 88 }}>
+                <th
+                  key={room.id}
+                  style={{
+                    borderBottom: "1px solid #e2e8f0",
+                    padding: 6,
+                    fontSize: 11,
+                    width: roomColumnWidth,
+                    minWidth: 96,
+                    boxSizing: "border-box",
+                    overflow: "hidden",
+                    textOverflow: "ellipsis",
+                  }}
+                  title={room.code}
+                >
                   {room.code}
                 </th>
               ))}
@@ -430,13 +483,18 @@ export function WeeklyOccupancyPage() {
                 <td
                   style={{
                     borderBottom: "1px solid #f1f5f9",
-                    padding: "6px 8px",
+                    padding: "6px 6px",
                     whiteSpace: "nowrap",
                     position: "sticky",
                     left: 0,
                     background: "#fff",
                     fontSize: 11,
                     fontWeight: 600,
+                    width: SCHEDULE_COL_WIDTH_PX,
+                    maxWidth: SCHEDULE_COL_WIDTH_PX,
+                    boxSizing: "border-box",
+                    boxShadow: "4px 0 10px -6px rgba(15, 23, 42, 0.1)",
+                    zIndex: 1,
                   }}
                 >
                   {slot.key}
@@ -458,11 +516,11 @@ export function WeeklyOccupancyPage() {
                       style={{
                         borderBottom: "1px solid #f1f5f9",
                         borderLeft: "1px solid #f8fafc",
-                        padding: "4px 3px",
+                        padding: "4px 4px",
                         fontSize: 10,
-                        minWidth: 88,
-                        maxWidth: 88,
-                        width: 88,
+                        width: roomColumnWidth,
+                        minWidth: 96,
+                        boxSizing: "border-box",
                         background: bg,
                         textAlign: "center",
                         verticalAlign: "middle",
