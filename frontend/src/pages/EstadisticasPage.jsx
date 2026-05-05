@@ -33,6 +33,14 @@ function monthStartISO() {
   return `${y}-${m}-01`;
 }
 
+function specialtyTokens(rawSpecialty) {
+  if (!rawSpecialty) return [];
+  return String(rawSpecialty)
+    .split("|")
+    .map((token) => token.trim())
+    .filter(Boolean);
+}
+
 export function EstadisticasPage() {
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
@@ -46,6 +54,21 @@ export function EstadisticasPage() {
   const [selLocations, setSelLocations] = useState(() => new Set());
   const [selProfessionals, setSelProfessionals] = useState(() => new Set());
   const [selRooms, setSelRooms] = useState(() => new Set());
+  const [selSpecialties, setSelSpecialties] = useState(() => new Set());
+
+  const specialtyOptions = useMemo(() => {
+    const options = new Set();
+    for (const p of professionals) {
+      for (const token of specialtyTokens(p.specialty)) {
+        options.add(token);
+      }
+    }
+    return [...options].sort((a, b) => a.localeCompare(b, "es"));
+  }, [professionals]);
+
+  const selectedSpecialtyNames = useMemo(() => {
+    return specialtyOptions.filter((name) => selSpecialties.has(name));
+  }, [specialtyOptions, selSpecialties]);
 
   useEffect(() => {
     const load = async () => {
@@ -66,8 +89,9 @@ export function EstadisticasPage() {
     selLocations.forEach((id) => params.append("location_ids", String(id)));
     selProfessionals.forEach((id) => params.append("professional_ids", String(id)));
     selRooms.forEach((id) => params.append("room_ids", String(id)));
+    selSpecialties.forEach((name) => params.append("specialty_filters", name));
     return params.toString();
-  }, [startDate, endDate, selLocations, selProfessionals, selRooms]);
+  }, [startDate, endDate, selLocations, selProfessionals, selRooms, selSpecialties]);
 
   const fetchStats = useCallback(async () => {
     setLoading(true);
@@ -112,6 +136,13 @@ export function EstadisticasPage() {
     });
   };
 
+  const clearAllFilters = () => {
+    setSelLocations(new Set());
+    setSelProfessionals(new Set());
+    setSelRooms(new Set());
+    setSelSpecialties(new Set());
+  };
+
   return (
     <div style={{ display: "grid", gap: 20 }}>
       <section style={{ border: "1px solid #ddd", borderRadius: 8, padding: 16, background: "#fff" }}>
@@ -119,7 +150,8 @@ export function EstadisticasPage() {
         <p style={{ color: "#64748b", marginTop: -8 }}>
           Filtrá por ubicación y/o consultorio para delimitar el alcance. El % de ocupación es{" "}
           <strong>horas asignadas semanalmente (proyectadas al período) ÷ horas habilitadas</strong> según los horarios
-          de consultorio. Si marcás profesionales, se muestran además horas y ocurrencias solo de ellos.
+          de consultorio. Si elegís especialidad, el numerador usa solo esas especialidades (la capacidad habilitada se
+          mantiene).
         </p>
 
         <div style={{ display: "flex", flexWrap: "wrap", gap: 16, alignItems: "flex-end", marginBottom: 16 }}>
@@ -134,7 +166,39 @@ export function EstadisticasPage() {
           <button type="button" onClick={fetchStats} disabled={loading}>
             {loading ? "Calculando…" : "Actualizar"}
           </button>
+          <button
+            type="button"
+            onClick={clearAllFilters}
+            style={{ border: "1px solid #cbd5e1", background: "#fff", borderRadius: 6, padding: "6px 10px", cursor: "pointer" }}
+          >
+            Limpiar filtros
+          </button>
         </div>
+
+        {selectedSpecialtyNames.length > 0 ? (
+          <div style={{ marginBottom: 12 }}>
+            <div style={{ fontSize: "0.8rem", color: "#64748b", marginBottom: 6 }}>
+              Especialidades seleccionadas ({selectedSpecialtyNames.length})
+            </div>
+            <div style={{ display: "flex", flexWrap: "wrap", gap: 6 }}>
+              {selectedSpecialtyNames.map((name) => (
+                <span
+                  key={name}
+                  style={{
+                    fontSize: "0.78rem",
+                    border: "1px solid #99f6e4",
+                    background: "#f0fdfa",
+                    color: "#115e59",
+                    borderRadius: 999,
+                    padding: "2px 8px",
+                  }}
+                >
+                  {name}
+                </span>
+              ))}
+            </div>
+          </div>
+        ) : null}
 
         <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(220px, 1fr))", gap: 16 }}>
           <fieldset style={{ margin: 0, border: "1px solid #e2e8f0", borderRadius: 8, padding: 12 }}>
@@ -182,6 +246,22 @@ export function EstadisticasPage() {
               ))}
             </div>
           </fieldset>
+          <fieldset style={{ margin: 0, border: "1px solid #e2e8f0", borderRadius: 8, padding: 12 }}>
+            <legend>Especialidades</legend>
+            <div style={{ display: "flex", flexDirection: "column", gap: 6, maxHeight: 160, overflowY: "auto" }}>
+              {specialtyOptions.map((name) => (
+                <label key={name} style={{ display: "flex", gap: 8, alignItems: "center", fontSize: "0.9rem" }}>
+                  <input
+                    type="checkbox"
+                    checked={selSpecialties.has(name)}
+                    onChange={() => toggleSet(setSelSpecialties, name)}
+                  />
+                  {name}
+                </label>
+              ))}
+              {specialtyOptions.length === 0 ? <span style={{ color: "#64748b", fontSize: "0.85rem" }}>Sin especialidades</span> : null}
+            </div>
+          </fieldset>
         </div>
 
         {error ? <p style={{ color: "crimson", marginTop: 12 }}>{error}</p> : null}
@@ -197,7 +277,9 @@ export function EstadisticasPage() {
             }}
           >
             <div style={{ border: "1px solid #e2e8f0", borderRadius: 8, padding: 12, background: "#f8fafc" }}>
-              <div style={{ fontSize: "0.75rem", color: "#64748b" }}>% Ocupación</div>
+              <div style={{ fontSize: "0.75rem", color: "#64748b" }}>
+                {selSpecialties.size > 0 ? "% Ocupación (especialidad)" : "% Ocupación"}
+              </div>
               <div style={{ fontSize: "1.5rem", fontWeight: 700 }}>{stats.occupancy_rate_percent}%</div>
             </div>
             <div style={{ border: "1px solid #e2e8f0", borderRadius: 8, padding: 12, background: "#f8fafc" }}>

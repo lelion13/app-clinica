@@ -20,9 +20,13 @@ def stats_summary(
     _: User = Depends(require_operator_or_admin),
     location_ids: list[int] | None = Query(default=None, description="Filtrar por ubicación(es)"),
     room_ids: list[int] | None = Query(default=None, description="Filtrar por consultorio(s)"),
+    specialty_filters: list[str] | None = Query(
+        default=None,
+        description="Opcional: filtra asignaciones por especialidad(es) del profesional; impacta el % de ocupación",
+    ),
     professional_ids: list[int] | None = Query(
         default=None,
-        description="Opcional: ver horas/cantidad solo de esos profesionales (el % ocupación sigue siendo agenda total vs horas habilitadas)",
+        description="Opcional: ver horas/cantidad solo de esos profesionales (si hay especialidad, se cruza con ella)",
     ),
 ) -> StatsSummaryResponse:
     try:
@@ -33,6 +37,7 @@ def stats_summary(
             location_ids or [],
             room_ids or [],
             professional_ids or [],
+            specialty_filters or [],
         )
     except ValueError as exc:
         raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail=str(exc)) from exc

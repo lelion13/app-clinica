@@ -67,6 +67,32 @@ def _weekday_js_to_iso(js_weekday: int) -> int:
 _WEEKDAY_LABELS = ("Lun", "Mar", "Mié", "Jue", "Vie", "Sáb", "Dom")
 
 
+def _normalize_specialty_token(value: str) -> str:
+    return " ".join(value.strip().lower().split())
+
+
+def _split_specialties(specialty: str | None) -> set[str]:
+    if not specialty:
+        return set()
+    return {_normalize_specialty_token(token) for token in specialty.split("|") if token.strip()}
+
+
+def _matching_professional_ids_by_specialty(
+    db: Session, professional_ids: set[int], specialty_filters: list[str]
+) -> set[int]:
+    if not professional_ids or not specialty_filters:
+        return set()
+    requested = {_normalize_specialty_token(s) for s in specialty_filters if str(s).strip()}
+    if not requested:
+        return set()
+    rows = db.execute(select(Professional.id, Professional.specialty).where(Professional.id.in_(professional_ids))).all()
+    matches: set[int] = set()
+    for pid, specialty in rows:
+        if _split_specialties(specialty).intersection(requested):
+            matches.add(pid)
+    return matches
+
+
 def build_stats_summary(
     db: Session,
     start_d: date,
@@ -74,6 +100,7 @@ def build_stats_summary(
     location_ids: list[int],
     room_ids: list[int],
     professional_ids: list[int],
+    specialty_filters: list[str],
 ) -> StatsSummaryResponse:
     if end_d < start_d:
         raise ValueError("Rango de fechas invalido")
@@ -106,6 +133,12 @@ def build_stats_summary(
             .scalars()
             .all()
         )
+        specialty_professional_ids = _matching_professional_ids_by_specialty(
+            db,
+            {a.professional_id for a in assignments_all},
+            specialty_filters,
+        )
+        apply_specialty_filter = bool(specialty_filters)
         booked = 0.0
         count = 0
         hours_by_weekday = defaultdict(float)
@@ -113,6 +146,8 @@ def build_stats_summary(
         prof_totals = defaultdict(float)
 
         for a in assignments_all:
+            if apply_specialty_filter and a.professional_id not in specialty_professional_ids:
+                continue
             occ = weekday_occurrences.get(a.weekday, 0)
             if occ <= 0:
                 continue
@@ -129,6 +164,8 @@ def build_stats_summary(
             bh_f = 0.0
             cnt_f = 0
             for a in assignments_all:
+                if apply_specialty_filter and a.professional_id not in specialty_professional_ids:
+                    continue
                 if a.professional_id not in professional_ids:
                     continue
                 occ = weekday_occurrences.get(a.weekday, 0)
