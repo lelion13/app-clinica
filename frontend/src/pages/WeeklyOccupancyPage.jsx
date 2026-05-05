@@ -89,7 +89,35 @@ export function WeeklyOccupancyPage() {
   const [formStartTime, setFormStartTime] = useState("08:00");
   const [formEndTime, setFormEndTime] = useState("12:00");
 
+  const [assignmentModalOpen, setAssignmentModalOpen] = useState(false);
+  const [assignmentModalError, setAssignmentModalError] = useState("");
+
   const slots = useMemo(() => buildHalfHourSlots(), []);
+
+  const openAssignmentModal = useCallback(() => {
+    setAssignmentModalError("");
+    setConflictBlocks([]);
+    setFormRoomId("");
+    setFormProfessionalId("");
+    setFormWeekday(selectedWeekday);
+    setFormStartTime("08:00");
+    setFormEndTime("12:00");
+    setAssignmentModalOpen(true);
+  }, [selectedWeekday]);
+
+  const closeAssignmentModal = useCallback(() => {
+    setAssignmentModalOpen(false);
+    setAssignmentModalError("");
+  }, []);
+
+  useEffect(() => {
+    if (!assignmentModalOpen) return;
+    const onKey = (e) => {
+      if (e.key === "Escape") closeAssignmentModal();
+    };
+    document.addEventListener("keydown", onKey);
+    return () => document.removeEventListener("keydown", onKey);
+  }, [assignmentModalOpen, closeAssignmentModal]);
 
   const loadCatalogs = useCallback(async () => {
     setError("");
@@ -225,25 +253,33 @@ export function WeeklyOccupancyPage() {
 
   const submitAssignment = async (e) => {
     e.preventDefault();
-    setError("");
+    setAssignmentModalError("");
     setConflictBlocks([]);
     if (!formProfessionalId) {
-      setError("Elegí un profesional de la lista.");
+      setAssignmentModalError("Elegí un profesional de la lista.");
       return;
     }
+    const savedWeekday = Number(formWeekday);
     try {
       await apiRequestWithRefresh("/weekly-assignments", {
         method: "POST",
         body: JSON.stringify({
           room_id: Number(formRoomId),
           professional_id: Number(formProfessionalId),
-          weekday: Number(formWeekday),
+          weekday: savedWeekday,
           start_time: `${formStartTime}:00`,
           end_time: `${formEndTime}:00`,
         }),
       });
-      if (Number(formWeekday) !== selectedWeekday) {
-        setSelectedWeekday(Number(formWeekday));
+      setAssignmentModalOpen(false);
+      setAssignmentModalError("");
+      setFormRoomId("");
+      setFormProfessionalId("");
+      setFormWeekday(savedWeekday);
+      setFormStartTime("08:00");
+      setFormEndTime("12:00");
+      if (savedWeekday !== selectedWeekday) {
+        setSelectedWeekday(savedWeekday);
       } else {
         await fetchAssignments();
       }
@@ -252,7 +288,7 @@ export function WeeklyOccupancyPage() {
       if (detail && typeof detail === "object" && Array.isArray(detail.conflicts)) {
         setConflictBlocks(detail.conflicts);
       }
-      setError(err.message || String(err));
+      setAssignmentModalError(err.message || String(err));
     }
   };
 
@@ -312,98 +348,7 @@ export function WeeklyOccupancyPage() {
         />
       </div>
 
-      <form
-        onSubmit={submitAssignment}
-        style={{
-          display: "flex",
-          flexWrap: "wrap",
-          gap: "10px 12px",
-          alignItems: "flex-end",
-          border: "1px solid #e2e8f0",
-          borderRadius: 8,
-          padding: 12,
-          marginBottom: 12,
-          background: "#f8fafc",
-        }}
-      >
-        <strong style={{ flexBasis: "100%", marginBottom: 2 }}>Nueva asignación semanal</strong>
-        <label style={formFieldLabelStyle}>
-          Consultorio
-          <select
-            value={formRoomId}
-            onChange={(e) => setFormRoomId(e.target.value)}
-            required
-            style={{ ...alignedNativeFormControlStyle, minWidth: 120 }}
-          >
-            <option value="">Elegir…</option>
-            {visibleRooms.map((r) => (
-              <option key={r.id} value={r.id}>
-                #{r.id} {r.code}
-              </option>
-            ))}
-          </select>
-        </label>
-        <ProfessionalCombobox
-          label="Profesional"
-          professionals={professionals}
-          value={formProfessionalId}
-          onChange={setFormProfessionalId}
-          required
-          placeholder="Buscar por nombre, DNI o matrícula…"
-        />
-        <label style={formFieldLabelStyle}>
-          Día
-          <select
-            value={formWeekday}
-            onChange={(e) => setFormWeekday(Number(e.target.value))}
-            style={{ ...alignedNativeFormControlStyle, minWidth: 112 }}
-          >
-            {WEEKDAYS.map((d) => (
-              <option key={d.value} value={d.value}>
-                {d.label}
-              </option>
-            ))}
-          </select>
-        </label>
-        <label style={formFieldLabelStyle}>
-          Desde
-          <input
-            type="time"
-            step={1800}
-            value={formStartTime}
-            onChange={(e) => setFormStartTime(e.target.value)}
-            required
-            style={{ ...alignedNativeFormControlStyle, minWidth: 104 }}
-          />
-        </label>
-        <label style={formFieldLabelStyle}>
-          Hasta
-          <input
-            type="time"
-            step={1800}
-            value={formEndTime}
-            onChange={(e) => setFormEndTime(e.target.value)}
-            required
-            style={{ ...alignedNativeFormControlStyle, minWidth: 104 }}
-          />
-        </label>
-        <button
-          type="submit"
-          style={{
-            ...alignedNativeFormControlStyle,
-            cursor: "pointer",
-            fontWeight: 600,
-            backgroundColor: "#e2e8f0",
-            borderColor: "#94a3b8",
-            color: "#0f172a",
-            padding: "6px 16px",
-          }}
-        >
-          Guardar
-        </button>
-      </form>
-
-      <div style={{ display: "flex", gap: 8, flexWrap: "wrap", marginBottom: 12 }}>
+      <div style={{ display: "flex", gap: 8, flexWrap: "wrap", marginBottom: 12, alignItems: "center" }}>
         {WEEKDAYS.map((d) => (
           <button
             key={d.value}
@@ -424,6 +369,23 @@ export function WeeklyOccupancyPage() {
             {d.label}
           </button>
         ))}
+        <button
+          type="button"
+          onClick={openAssignmentModal}
+          style={{
+            border: "1px solid #0f766e",
+            background: "#0f766e",
+            color: "#fff",
+            borderRadius: 6,
+            padding: "6px 12px",
+            cursor: "pointer",
+            fontSize: 13,
+            fontWeight: 600,
+            marginLeft: 4,
+          }}
+        >
+          Nueva asignación semanal
+        </button>
       </div>
 
       <section style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(140px, 1fr))", gap: 8, marginBottom: 12 }}>
@@ -449,35 +411,37 @@ export function WeeklyOccupancyPage() {
       {loading ? <p style={{ color: "#475569", marginBottom: 12 }}>Cargando…</p> : null}
 
       <div style={{ overflowX: "auto", border: "1px solid #e2e8f0", borderRadius: 8 }}>
-        <table lang="es" style={{ width: "100%", borderCollapse: "collapse", minWidth: 1100 }}>
+        <table lang="es" style={{ width: "100%", borderCollapse: "collapse", minWidth: 900 }}>
           <thead>
             <tr style={{ background: "#f8fafc" }}>
-              <th style={{ borderBottom: "1px solid #e2e8f0", padding: 8, textAlign: "left", position: "sticky", left: 0, background: "#f8fafc" }}>
-                Consultorio
+              <th style={{ borderBottom: "1px solid #e2e8f0", padding: 8, textAlign: "left", position: "sticky", left: 0, background: "#f8fafc", zIndex: 1 }}>
+                Horario
               </th>
-              {slots.map((slot) => (
-                <th key={slot.key} style={{ borderBottom: "1px solid #e2e8f0", padding: 6, fontSize: 11 }}>
-                  {slot.key}
+              {visibleRooms.map((room) => (
+                <th key={room.id} style={{ borderBottom: "1px solid #e2e8f0", padding: 6, fontSize: 11, minWidth: 88 }}>
+                  {room.code}
                 </th>
               ))}
             </tr>
           </thead>
           <tbody>
-            {visibleRooms.map((room) => (
-              <tr key={room.id}>
+            {slots.map((slot) => (
+              <tr key={slot.key}>
                 <td
                   style={{
                     borderBottom: "1px solid #f1f5f9",
-                    padding: 8,
+                    padding: "6px 8px",
                     whiteSpace: "nowrap",
                     position: "sticky",
                     left: 0,
                     background: "#fff",
+                    fontSize: 11,
+                    fontWeight: 600,
                   }}
                 >
-                  <strong>{room.code}</strong>
+                  {slot.key}
                 </td>
-                {slots.map((slot) => {
+                {visibleRooms.map((room) => {
                   const state = slotCellState(room.id, slot);
                   let bg = "#e2e8f0";
                   let text = "";
@@ -489,16 +453,16 @@ export function WeeklyOccupancyPage() {
                   }
                   return (
                     <td
-                      key={`${room.id}-${slot.key}`}
+                      key={`${slot.key}-${room.id}`}
                       title={text || undefined}
                       style={{
                         borderBottom: "1px solid #f1f5f9",
                         borderLeft: "1px solid #f8fafc",
                         padding: "4px 3px",
                         fontSize: 10,
-                        minWidth: 78,
-                        maxWidth: 78,
-                        width: 78,
+                        minWidth: 88,
+                        maxWidth: 88,
+                        width: 88,
                         background: bg,
                         textAlign: "center",
                         verticalAlign: "middle",
@@ -529,6 +493,150 @@ export function WeeklyOccupancyPage() {
           {assignments.length === 0 ? <li>Sin asignaciones</li> : null}
         </ul>
       </div>
+
+      {assignmentModalOpen ? (
+        <div
+          role="presentation"
+          style={{
+            position: "fixed",
+            inset: 0,
+            zIndex: 1000,
+            background: "rgba(15, 23, 42, 0.45)",
+            display: "flex",
+            alignItems: "flex-start",
+            justifyContent: "center",
+            padding: "max(16px, 4vh) 16px",
+            overflowY: "auto",
+          }}
+          onClick={closeAssignmentModal}
+        >
+          <div
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="assignment-modal-title"
+            onClick={(e) => e.stopPropagation()}
+            style={{
+              background: "#fff",
+              borderRadius: 8,
+              maxWidth: 560,
+              width: "100%",
+              marginTop: 0,
+              marginBottom: 24,
+              padding: 20,
+              boxShadow: "0 25px 50px rgba(15, 23, 42, 0.18)",
+              border: "1px solid #e2e8f0",
+            }}
+          >
+            <h2 id="assignment-modal-title" style={{ marginTop: 0, marginBottom: 12, fontSize: "1.15rem" }}>
+              Nueva asignación semanal
+            </h2>
+            {assignmentModalError ? (
+              <p style={{ color: "#b91c1c", marginTop: 0, marginBottom: 14, fontSize: 14 }}>{assignmentModalError}</p>
+            ) : null}
+            <form
+              onSubmit={submitAssignment}
+              style={{
+                display: "flex",
+                flexWrap: "wrap",
+                gap: "10px 12px",
+                alignItems: "flex-end",
+              }}
+            >
+              <label style={formFieldLabelStyle}>
+                Consultorio
+                <select
+                  value={formRoomId}
+                  onChange={(e) => setFormRoomId(e.target.value)}
+                  required
+                  style={{ ...alignedNativeFormControlStyle, minWidth: 120 }}
+                >
+                  <option value="">Elegir…</option>
+                  {visibleRooms.map((r) => (
+                    <option key={r.id} value={r.id}>
+                      #{r.id} {r.code}
+                    </option>
+                  ))}
+                </select>
+              </label>
+              <ProfessionalCombobox
+                label="Profesional"
+                professionals={professionals}
+                value={formProfessionalId}
+                onChange={setFormProfessionalId}
+                required
+                placeholder="Buscar por nombre, DNI o matrícula…"
+              />
+              <label style={formFieldLabelStyle}>
+                Día
+                <select
+                  value={formWeekday}
+                  onChange={(e) => setFormWeekday(Number(e.target.value))}
+                  style={{ ...alignedNativeFormControlStyle, minWidth: 112 }}
+                >
+                  {WEEKDAYS.map((d) => (
+                    <option key={d.value} value={d.value}>
+                      {d.label}
+                    </option>
+                  ))}
+                </select>
+              </label>
+              <label style={formFieldLabelStyle}>
+                Desde
+                <input
+                  type="time"
+                  step={1800}
+                  value={formStartTime}
+                  onChange={(e) => setFormStartTime(e.target.value)}
+                  required
+                  style={{ ...alignedNativeFormControlStyle, minWidth: 104 }}
+                />
+              </label>
+              <label style={formFieldLabelStyle}>
+                Hasta
+                <input
+                  type="time"
+                  step={1800}
+                  value={formEndTime}
+                  onChange={(e) => setFormEndTime(e.target.value)}
+                  required
+                  style={{ ...alignedNativeFormControlStyle, minWidth: 104 }}
+                />
+              </label>
+              <div style={{ flexBasis: "100%", display: "flex", flexWrap: "wrap", gap: 8, marginTop: 4 }}>
+                <button
+                  type="submit"
+                  style={{
+                    ...alignedNativeFormControlStyle,
+                    cursor: "pointer",
+                    fontWeight: 600,
+                    backgroundColor: "#0f766e",
+                    borderColor: "#0f766e",
+                    color: "#fff",
+                    padding: "6px 16px",
+                  }}
+                >
+                  Guardar
+                </button>
+                <button
+                  type="button"
+                  onClick={closeAssignmentModal}
+                  style={{
+                    ...alignedNativeFormControlStyle,
+                    cursor: "pointer",
+                    fontWeight: 600,
+                    backgroundColor: "#f1f5f9",
+                    borderColor: "#cbd5e1",
+                    color: "#0f172a",
+                    padding: "6px 16px",
+                  }}
+                >
+                  Cancelar
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      ) : null}
     </section>
   );
 }
