@@ -3,6 +3,7 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import { ProfessionalCombobox, alignedNativeFormControlStyle } from "../components/ProfessionalCombobox";
 import { safeLoad } from "../lib/apiHelpers";
 import { apiRequestWithRefresh } from "../services/api";
+import { uiStyles, uiTheme } from "../ui/theme";
 
 const WEEKDAYS = [
   { value: 0, label: "Domingo" },
@@ -66,7 +67,15 @@ const formFieldLabelStyle = {
   flexDirection: "column",
   gap: 4,
   fontSize: 13,
-  color: "#334155",
+  color: uiTheme.colors.textMuted,
+};
+
+const weekdayButtonBaseStyle = {
+  border: `1px solid ${uiTheme.colors.borderStrong}`,
+  borderRadius: uiTheme.radius.sm,
+  padding: "6px 10px",
+  cursor: "pointer",
+  transition: "background-color 140ms ease, color 140ms ease, border-color 140ms ease",
 };
 
 /** Ancho fijo de la columna de hora; el resto del ancho va a los consultorios. */
@@ -313,14 +322,14 @@ export function WeeklyOccupancyPage() {
   };
 
   return (
-    <section style={{ border: "1px solid #ddd", borderRadius: 8, padding: 16, background: "#fff" }}>
-      <h1 style={{ marginTop: 0, fontSize: "1.35rem" }}>Ocupación semanal de consultorios</h1>
-      <p style={{ color: "#64748b", marginTop: -6 }}>
+    <section style={uiStyles.pageSection}>
+      <h1 style={uiStyles.sectionTitle}>Ocupación semanal de consultorios</h1>
+      <p style={{ ...uiStyles.helpText, marginTop: -6 }}>
         Semana tipo fija. Cerrado = sin horario laboral cargado. Verde = libre habilitado. Azul = ocupado. Rojo = conflicto.
       </p>
 
       <div style={{ marginBottom: 10 }}>
-        <div style={{ marginBottom: 6, fontSize: 13, color: "#64748b" }}>Ubicación</div>
+        <div style={{ marginBottom: 6, fontSize: 13, color: uiTheme.colors.textMuted }}>Ubicación</div>
         <div style={{ display: "flex", flexWrap: "wrap", gap: 8 }}>
           {locations.map((loc) => (
             <button
@@ -331,13 +340,14 @@ export function WeeklyOccupancyPage() {
                 setConflictBlocks([]);
               }}
               style={{
-                border: "1px solid #cbd5e1",
-                background: String(loc.id) === selectedLocationId ? "#0f766e" : "#fff",
+                border: `1px solid ${uiTheme.colors.borderStrong}`,
+                background: String(loc.id) === selectedLocationId ? uiTheme.colors.primary : "#fff",
                 color: String(loc.id) === selectedLocationId ? "#fff" : "#0f172a",
-                borderRadius: 999,
+                borderRadius: uiTheme.radius.pill,
                 padding: "6px 12px",
                 cursor: "pointer",
                 fontSize: 13,
+                transition: "background-color 140ms ease, color 140ms ease, border-color 140ms ease",
               }}
             >
               {loc.name}
@@ -368,12 +378,10 @@ export function WeeklyOccupancyPage() {
               setConflictBlocks([]);
             }}
             style={{
-              border: "1px solid #cbd5e1",
-              background: selectedWeekday === d.value ? "#0f766e" : "#fff",
-              color: selectedWeekday === d.value ? "#fff" : "#0f172a",
-              borderRadius: 6,
-              padding: "6px 10px",
-              cursor: "pointer",
+              ...weekdayButtonBaseStyle,
+              background: selectedWeekday === d.value ? uiTheme.colors.primary : "#fff",
+              color: selectedWeekday === d.value ? "#fff" : uiTheme.colors.text,
+              borderColor: selectedWeekday === d.value ? uiTheme.colors.primary : uiTheme.colors.borderStrong,
             }}
           >
             {d.label}
@@ -382,45 +390,35 @@ export function WeeklyOccupancyPage() {
         <button
           type="button"
           onClick={openAssignmentModal}
-          style={{
-            border: "1px solid #0f766e",
-            background: "#0f766e",
-            color: "#fff",
-            borderRadius: 6,
-            padding: "6px 12px",
-            cursor: "pointer",
-            fontSize: 13,
-            fontWeight: 600,
-            marginLeft: 4,
-          }}
+          style={{ ...uiStyles.buttonPrimary, marginLeft: 4 }}
         >
           Nueva asignación semanal
         </button>
       </div>
 
       <section style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(140px, 1fr))", gap: 8, marginBottom: 12 }}>
-        <div style={{ border: "1px solid #e2e8f0", borderRadius: 8, padding: 10 }}>
-          <div style={{ fontSize: 12, color: "#64748b" }}>% ocupación</div>
+        <div style={uiStyles.kpiCard}>
+          <div style={{ fontSize: 12, color: uiTheme.colors.textMuted }}>% ocupación</div>
           <div style={{ fontWeight: 700, fontSize: 20 }}>{kpis.rate}%</div>
         </div>
-        <div style={{ border: "1px solid #e2e8f0", borderRadius: 8, padding: 10 }}>
-          <div style={{ fontSize: 12, color: "#64748b" }}>Horas habilitadas</div>
+        <div style={uiStyles.kpiCard}>
+          <div style={{ fontSize: 12, color: uiTheme.colors.textMuted }}>Horas habilitadas</div>
           <div style={{ fontWeight: 700, fontSize: 20 }}>{kpis.enabled}</div>
         </div>
-        <div style={{ border: "1px solid #e2e8f0", borderRadius: 8, padding: 10 }}>
-          <div style={{ fontSize: 12, color: "#64748b" }}>Horas ocupadas</div>
+        <div style={uiStyles.kpiCard}>
+          <div style={{ fontSize: 12, color: uiTheme.colors.textMuted }}>Horas ocupadas</div>
           <div style={{ fontWeight: 700, fontSize: 20 }}>{kpis.occupied}</div>
         </div>
-        <div style={{ border: "1px solid #e2e8f0", borderRadius: 8, padding: 10 }}>
-          <div style={{ fontSize: 12, color: "#64748b" }}>Horas libres</div>
+        <div style={uiStyles.kpiCard}>
+          <div style={{ fontSize: 12, color: uiTheme.colors.textMuted }}>Horas libres</div>
           <div style={{ fontWeight: 700, fontSize: 20 }}>{kpis.free}</div>
         </div>
       </section>
 
-      {error ? <p style={{ color: "crimson", marginBottom: 12 }}>{String(error)}</p> : null}
-      {loading ? <p style={{ color: "#475569", marginBottom: 12 }}>Cargando…</p> : null}
+      {error ? <p style={{ color: uiTheme.colors.danger, marginBottom: 12 }}>{String(error)}</p> : null}
+      {loading ? <p style={{ color: uiTheme.colors.textMuted, marginBottom: 12 }}>Cargando…</p> : null}
 
-      <div style={{ overflowX: "auto", border: "1px solid #e2e8f0", borderRadius: 8 }}>
+      <div style={{ overflowX: "auto", border: `1px solid ${uiTheme.colors.border}`, borderRadius: uiTheme.radius.md }}>
         <table
           lang="es"
           style={{
@@ -441,7 +439,7 @@ export function WeeklyOccupancyPage() {
             <tr style={{ background: "#f8fafc" }}>
               <th
                 style={{
-                  borderBottom: "1px solid #e2e8f0",
+                  borderBottom: `1px solid ${uiTheme.colors.border}`,
                   padding: "8px 6px",
                   textAlign: "left",
                   position: "sticky",
@@ -452,7 +450,7 @@ export function WeeklyOccupancyPage() {
                   maxWidth: SCHEDULE_COL_WIDTH_PX,
                   boxSizing: "border-box",
                   fontSize: 11,
-                  boxShadow: "4px 0 10px -6px rgba(15, 23, 42, 0.12)",
+                  boxShadow: "4px 0 10px -6px rgba(15, 43, 39, 0.12)",
                 }}
               >
                 Horario
@@ -461,7 +459,7 @@ export function WeeklyOccupancyPage() {
                 <th
                   key={room.id}
                   style={{
-                    borderBottom: "1px solid #e2e8f0",
+                    borderBottom: `1px solid ${uiTheme.colors.border}`,
                     padding: 6,
                     fontSize: 11,
                     width: roomColumnWidth,
@@ -482,7 +480,7 @@ export function WeeklyOccupancyPage() {
               <tr key={slot.key}>
                 <td
                   style={{
-                    borderBottom: "1px solid #f1f5f9",
+                    borderBottom: `1px solid ${uiTheme.colors.border}`,
                     padding: "6px 6px",
                     whiteSpace: "nowrap",
                     position: "sticky",
@@ -493,7 +491,7 @@ export function WeeklyOccupancyPage() {
                     width: SCHEDULE_COL_WIDTH_PX,
                     maxWidth: SCHEDULE_COL_WIDTH_PX,
                     boxSizing: "border-box",
-                    boxShadow: "4px 0 10px -6px rgba(15, 23, 42, 0.1)",
+                    boxShadow: "4px 0 10px -6px rgba(15, 43, 39, 0.12)",
                     zIndex: 1,
                   }}
                 >
@@ -514,8 +512,8 @@ export function WeeklyOccupancyPage() {
                       key={`${slot.key}-${room.id}`}
                       title={text || undefined}
                       style={{
-                        borderBottom: "1px solid #f1f5f9",
-                        borderLeft: "1px solid #f8fafc",
+                        borderBottom: `1px solid ${uiTheme.colors.border}`,
+                        borderLeft: "1px solid #edf4f2",
                         padding: "4px 4px",
                         fontSize: 10,
                         width: roomColumnWidth,
@@ -539,16 +537,28 @@ export function WeeklyOccupancyPage() {
 
       <div style={{ marginTop: 12 }}>
         <h2 style={{ fontSize: "1rem", marginBottom: 6 }}>Asignaciones del día</h2>
-        <ul style={{ paddingLeft: 18 }}>
+        <ul style={uiStyles.listCard}>
           {assignments.map((a) => (
-            <li key={a.id} style={{ marginBottom: 6 }}>
-              {a.room_code} · {a.start_time}–{a.end_time} · <strong>{a.professional_full_name}</strong>{" "}
-              <button type="button" onClick={() => deleteAssignment(a.id)}>
+            <li
+              key={a.id}
+              style={{
+                display: "flex",
+                justifyContent: "space-between",
+                alignItems: "center",
+                gap: 8,
+                padding: "8px 10px",
+                borderBottom: `1px solid ${uiTheme.colors.border}`,
+              }}
+            >
+              <span>
+                {a.room_code} · {a.start_time}–{a.end_time} · <strong>{a.professional_full_name}</strong>
+              </span>
+              <button type="button" onClick={() => deleteAssignment(a.id)} style={uiStyles.buttonDanger}>
                 eliminar
               </button>
             </li>
           ))}
-          {assignments.length === 0 ? <li>Sin asignaciones</li> : null}
+          {assignments.length === 0 ? <li style={{ padding: "10px 12px", color: uiTheme.colors.textMuted }}>Sin asignaciones</li> : null}
         </ul>
       </div>
 
@@ -575,21 +585,21 @@ export function WeeklyOccupancyPage() {
             onClick={(e) => e.stopPropagation()}
             style={{
               background: "#fff",
-              borderRadius: 8,
+              borderRadius: uiTheme.radius.md,
               maxWidth: 560,
               width: "100%",
               marginTop: 0,
               marginBottom: 24,
-              padding: 20,
+              padding: 22,
               boxShadow: "0 25px 50px rgba(15, 23, 42, 0.18)",
-              border: "1px solid #e2e8f0",
+              border: `1px solid ${uiTheme.colors.border}`,
             }}
           >
             <h2 id="assignment-modal-title" style={{ marginTop: 0, marginBottom: 12, fontSize: "1.15rem" }}>
               Nueva asignación semanal
             </h2>
             {assignmentModalError ? (
-              <p style={{ color: "#b91c1c", marginTop: 0, marginBottom: 14, fontSize: 14 }}>{assignmentModalError}</p>
+              <p style={{ color: uiTheme.colors.danger, marginTop: 0, marginBottom: 14, fontSize: 14 }}>{assignmentModalError}</p>
             ) : null}
             <form
               onSubmit={submitAssignment}
@@ -660,35 +670,19 @@ export function WeeklyOccupancyPage() {
                   style={{ ...alignedNativeFormControlStyle, minWidth: 104 }}
                 />
               </label>
-              <div style={{ flexBasis: "100%", display: "flex", flexWrap: "wrap", gap: 8, marginTop: 4 }}>
-                <button
-                  type="submit"
-                  style={{
-                    ...alignedNativeFormControlStyle,
-                    cursor: "pointer",
-                    fontWeight: 600,
-                    backgroundColor: "#0f766e",
-                    borderColor: "#0f766e",
-                    color: "#fff",
-                    padding: "6px 16px",
-                  }}
-                >
-                  Guardar
-                </button>
+              <div style={{ flexBasis: "100%", display: "flex", flexWrap: "wrap", gap: 8, marginTop: 8, justifyContent: "flex-end" }}>
                 <button
                   type="button"
                   onClick={closeAssignmentModal}
-                  style={{
-                    ...alignedNativeFormControlStyle,
-                    cursor: "pointer",
-                    fontWeight: 600,
-                    backgroundColor: "#f1f5f9",
-                    borderColor: "#cbd5e1",
-                    color: "#0f172a",
-                    padding: "6px 16px",
-                  }}
+                  style={{ ...alignedNativeFormControlStyle, ...uiStyles.buttonSecondary, padding: "6px 16px" }}
                 >
                   Cancelar
+                </button>
+                <button
+                  type="submit"
+                  style={{ ...alignedNativeFormControlStyle, ...uiStyles.buttonPrimary, padding: "6px 16px" }}
+                >
+                  Guardar
                 </button>
               </div>
             </form>

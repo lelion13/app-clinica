@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 
 import { apiRequestWithRefresh } from "../services/api";
 import { safeLoad } from "../lib/apiHelpers";
+import { uiStyles, uiTheme } from "../ui/theme";
 
 export function LocationsPage() {
   const [error, setError] = useState("");
@@ -33,25 +34,25 @@ export function LocationsPage() {
   };
 
   return (
-    <section style={{ border: "1px solid #ddd", borderRadius: 8, padding: 16, background: "#fff" }}>
-      <h1 style={{ marginTop: 0, fontSize: "1.35rem" }}>Ubicaciones</h1>
-      <p style={{ color: "#64748b" }}>Sedes o puntos físicos donde hay consultorios.</p>
-      {error ? <p style={{ color: "crimson" }}>{error}</p> : null}
+    <section style={uiStyles.pageSection}>
+      <h1 style={uiStyles.sectionTitle}>Ubicaciones</h1>
+      <p style={uiStyles.helpText}>Sedes o puntos físicos donde hay consultorios.</p>
+      {error ? <p style={{ color: uiTheme.colors.danger }}>{error}</p> : null}
       <form onSubmit={submitLocation} style={{ display: "flex", gap: 8, flexWrap: "wrap", marginBottom: 16 }}>
         <input
           value={locationName}
           onChange={(event) => setLocationName(event.target.value)}
           placeholder="Nombre"
           required
-          style={{ minWidth: 220 }}
+          style={{ ...uiStyles.formControl, minWidth: 220 }}
         />
-        <button type="submit">Agregar</button>
+        <button type="submit" style={uiStyles.buttonPrimary}>Agregar</button>
       </form>
-      <ul style={{ paddingLeft: 20 }}>
+      <ul style={uiStyles.listCard}>
         {locations.map((item) => (
-          <li key={item.id} style={{ marginBottom: 8 }}>
+          <li key={item.id} style={{ padding: "8px 10px", borderBottom: `1px solid ${uiTheme.colors.border}` }}>
             #{item.id} - {item.name}{" "}
-            <button type="button" onClick={() => removeItem(item.id)}>
+            <button type="button" onClick={() => removeItem(item.id)} style={{ ...uiStyles.buttonDanger, marginLeft: 8 }}>
               eliminar
             </button>
           </li>

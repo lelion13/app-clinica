@@ -7,6 +7,7 @@ import esLocale from "@fullcalendar/core/locales/es";
 
 import { apiRequestWithRefresh } from "../services/api";
 import { safeLoad } from "../lib/apiHelpers";
+import { uiStyles, uiTheme } from "../ui/theme";
 
 const WEEKDAYS = [
   ["0", "Domingo"],
@@ -159,7 +160,7 @@ export function AgendaPage() {
     <>
       <label style={{ display: "flex", flexDirection: "column", gap: 4, fontSize: "0.85rem" }}>
         Consultorio
-        <select value={bookingRoomId} onChange={(event) => setBookingRoomId(event.target.value)} required>
+        <select value={bookingRoomId} onChange={(event) => setBookingRoomId(event.target.value)} required style={uiStyles.formControl}>
           <option value="">Elegir…</option>
           {rooms.map((room) => (
             <option key={room.id} value={room.id}>
@@ -170,7 +171,7 @@ export function AgendaPage() {
       </label>
       <label style={{ display: "flex", flexDirection: "column", gap: 4, fontSize: "0.85rem" }}>
         Profesional
-        <select value={bookingProfessionalId} onChange={(event) => setBookingProfessionalId(event.target.value)} required>
+        <select value={bookingProfessionalId} onChange={(event) => setBookingProfessionalId(event.target.value)} required style={uiStyles.formControl}>
           <option value="">Elegir…</option>
           {professionals.map((item) => (
             <option key={item.id} value={item.id}>
@@ -183,16 +184,16 @@ export function AgendaPage() {
   );
 
   return (
-    <section style={{ border: "1px solid #ddd", borderRadius: 8, padding: 16, background: "#fff" }}>
-      <h1 style={{ marginTop: 0, fontSize: "1.35rem" }}>Agenda</h1>
-      <p style={{ color: "#64748b", marginTop: -4 }}>
+    <section style={uiStyles.pageSection}>
+      <h1 style={uiStyles.sectionTitle}>Agenda</h1>
+      <p style={{ ...uiStyles.helpText, marginTop: -4 }}>
         El modelo habitual es un <strong>turno fijo semanal</strong> (mismo día y horario que definís en{" "}
         <em>Horarios de consultorio</em>): elegís el día de la semana, la franja horaria y el rango de fechas; el sistema
         crea una reserva por cada ocurrencia. Para una sola fecha podés usar el bloque de abajo o arrastrar en el
         calendario.
       </p>
 
-      {error ? <p style={{ color: "crimson" }}>{error}</p> : null}
+      {error ? <p style={{ color: uiTheme.colors.danger }}>{error}</p> : null}
 
       <form
         onSubmit={submitRecurring}
@@ -212,7 +213,7 @@ export function AgendaPage() {
         {sharedRoomProfFields}
         <label style={{ display: "flex", flexDirection: "column", gap: 4, fontSize: "0.85rem" }}>
           Día de la semana
-          <select value={recurringWeekday} onChange={(event) => setRecurringWeekday(event.target.value)} required>
+          <select value={recurringWeekday} onChange={(event) => setRecurringWeekday(event.target.value)} required style={uiStyles.formControl}>
             {WEEKDAYS.map(([value, label]) => (
               <option key={value} value={value}>
                 {label}
@@ -222,31 +223,31 @@ export function AgendaPage() {
         </label>
         <label style={{ display: "flex", flexDirection: "column", gap: 4, fontSize: "0.85rem" }}>
           Desde (hora)
-          <input type="time" value={recurringStartTime} onChange={(event) => setRecurringStartTime(event.target.value)} required />
+          <input type="time" value={recurringStartTime} onChange={(event) => setRecurringStartTime(event.target.value)} required style={uiStyles.formControl} />
         </label>
         <label style={{ display: "flex", flexDirection: "column", gap: 4, fontSize: "0.85rem" }}>
           Hasta (hora)
-          <input type="time" value={recurringEndTime} onChange={(event) => setRecurringEndTime(event.target.value)} required />
+          <input type="time" value={recurringEndTime} onChange={(event) => setRecurringEndTime(event.target.value)} required style={uiStyles.formControl} />
         </label>
         <label style={{ display: "flex", flexDirection: "column", gap: 4, fontSize: "0.85rem" }}>
           Período desde
-          <input type="date" value={periodStart} onChange={(event) => setPeriodStart(event.target.value)} required />
+          <input type="date" value={periodStart} onChange={(event) => setPeriodStart(event.target.value)} required style={uiStyles.formControl} />
         </label>
         <label style={{ display: "flex", flexDirection: "column", gap: 4, fontSize: "0.85rem" }}>
           Período hasta
-          <input type="date" value={periodEnd} onChange={(event) => setPeriodEnd(event.target.value)} required />
+          <input type="date" value={periodEnd} onChange={(event) => setPeriodEnd(event.target.value)} required style={uiStyles.formControl} />
         </label>
-        <button type="submit">Crear turnos en el período</button>
+        <button type="submit" style={uiStyles.buttonPrimary}>Crear turnos en el período</button>
       </form>
 
       <form
         onSubmit={submitBooking}
         style={{ display: "flex", gap: 8, flexWrap: "wrap", marginBottom: 16, alignItems: "flex-end" }}
       >
-        <div style={{ flexBasis: "100%", fontSize: "0.9rem", color: "#64748b" }}>
+        <div style={{ flexBasis: "100%", fontSize: "0.9rem", color: uiTheme.colors.textMuted }}>
           Reserva puntual (una sola fecha y hora)
         </div>
-        <select value={bookingRoomId} onChange={(event) => setBookingRoomId(event.target.value)} required>
+        <select value={bookingRoomId} onChange={(event) => setBookingRoomId(event.target.value)} required style={uiStyles.formControl}>
           <option value="">Consultorio</option>
           {rooms.map((room) => (
             <option key={room.id} value={room.id}>
@@ -254,7 +255,7 @@ export function AgendaPage() {
             </option>
           ))}
         </select>
-        <select value={bookingProfessionalId} onChange={(event) => setBookingProfessionalId(event.target.value)} required>
+        <select value={bookingProfessionalId} onChange={(event) => setBookingProfessionalId(event.target.value)} required style={uiStyles.formControl}>
           <option value="">Profesional</option>
           {professionals.map((item) => (
             <option key={item.id} value={item.id}>
@@ -269,6 +270,7 @@ export function AgendaPage() {
             value={bookingStartAt}
             onChange={(event) => setBookingStartAt(event.target.value)}
             required
+            style={uiStyles.formControl}
           />
         </label>
         <label style={{ display: "flex", flexDirection: "column", fontSize: "0.8rem", gap: 4 }}>
@@ -278,9 +280,10 @@ export function AgendaPage() {
             value={bookingEndAt}
             onChange={(event) => setBookingEndAt(event.target.value)}
             required
+            style={uiStyles.formControl}
           />
         </label>
-        <button type="submit">Crear una reserva</button>
+        <button type="submit" style={uiStyles.buttonPrimary}>Crear una reserva</button>
       </form>
 
       <FullCalendar

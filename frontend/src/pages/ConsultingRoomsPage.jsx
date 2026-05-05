@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 
 import { apiRequestWithRefresh } from "../services/api";
 import { safeLoad } from "../lib/apiHelpers";
+import { uiStyles, uiTheme } from "../ui/theme";
 
 export function ConsultingRoomsPage() {
   const [error, setError] = useState("");
@@ -35,12 +36,12 @@ export function ConsultingRoomsPage() {
   };
 
   return (
-    <section style={{ border: "1px solid #ddd", borderRadius: 8, padding: 16, background: "#fff" }}>
-      <h1 style={{ marginTop: 0, fontSize: "1.35rem" }}>Consultorios</h1>
-      <p style={{ color: "#64748b" }}>Salas vinculadas a una ubicación. Los horarios operativos se administran en la sección dedicada.</p>
-      {error ? <p style={{ color: "crimson" }}>{error}</p> : null}
+    <section style={uiStyles.pageSection}>
+      <h1 style={uiStyles.sectionTitle}>Consultorios</h1>
+      <p style={uiStyles.helpText}>Salas vinculadas a una ubicación. Los horarios operativos se administran en la sección dedicada.</p>
+      {error ? <p style={{ color: uiTheme.colors.danger }}>{error}</p> : null}
       <form onSubmit={submitRoom} style={{ display: "flex", gap: 8, flexWrap: "wrap", marginBottom: 16 }}>
-        <select value={roomLocationId} onChange={(event) => setRoomLocationId(event.target.value)} required>
+        <select value={roomLocationId} onChange={(event) => setRoomLocationId(event.target.value)} required style={uiStyles.formControl}>
           <option value="">Ubicación</option>
           {locations.map((location) => (
             <option key={location.id} value={location.id}>
@@ -48,14 +49,14 @@ export function ConsultingRoomsPage() {
             </option>
           ))}
         </select>
-        <input value={roomCode} onChange={(event) => setRoomCode(event.target.value)} placeholder="Código" required />
-        <button type="submit">Agregar</button>
+        <input value={roomCode} onChange={(event) => setRoomCode(event.target.value)} placeholder="Código" required style={uiStyles.formControl} />
+        <button type="submit" style={uiStyles.buttonPrimary}>Agregar</button>
       </form>
-      <ul style={{ paddingLeft: 20 }}>
+      <ul style={uiStyles.listCard}>
         {rooms.map((item) => (
-          <li key={item.id} style={{ marginBottom: 8 }}>
+          <li key={item.id} style={{ padding: "8px 10px", borderBottom: `1px solid ${uiTheme.colors.border}` }}>
             #{item.id} - Ubic. {item.location_id} - {item.code}{" "}
-            <button type="button" onClick={() => removeItem(item.id)}>
+            <button type="button" onClick={() => removeItem(item.id)} style={{ ...uiStyles.buttonDanger, marginLeft: 8 }}>
               eliminar
             </button>
           </li>

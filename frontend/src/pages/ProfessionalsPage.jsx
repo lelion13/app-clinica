@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 
 import { apiRequestWithRefresh } from "../services/api";
 import { safeLoad } from "../lib/apiHelpers";
+import { uiStyles, uiTheme } from "../ui/theme";
 
 export function ProfessionalsPage() {
   const [error, setError] = useState("");
@@ -35,15 +36,15 @@ export function ProfessionalsPage() {
   };
 
   return (
-    <section style={{ border: "1px solid #ddd", borderRadius: 8, padding: 16, background: "#fff" }}>
-      <h1 style={{ marginTop: 0, fontSize: "1.35rem" }}>Profesionales</h1>
-      <p style={{ color: "#64748b" }}>
+    <section style={uiStyles.pageSection}>
+      <h1 style={uiStyles.sectionTitle}>Profesionales</h1>
+      <p style={uiStyles.helpText}>
         Catálogo sincronizado desde sistema externo (solo lectura local). Los inactivos no se pueden usar en nuevas
         asignaciones o reservas.
       </p>
-      {error ? <p style={{ color: "crimson" }}>{error}</p> : null}
+      {error ? <p style={{ color: uiTheme.colors.danger }}>{error}</p> : null}
       <div style={{ display: "flex", gap: 8, flexWrap: "wrap", marginBottom: 16, alignItems: "center" }}>
-        <button type="button" onClick={runSync} disabled={syncing}>
+        <button type="button" onClick={runSync} disabled={syncing} style={uiStyles.buttonPrimary}>
           {syncing ? "Sincronizando..." : "Sincronizar ahora"}
         </button>
         <label style={{ display: "inline-flex", gap: 6, alignItems: "center" }}>
@@ -56,20 +57,20 @@ export function ProfessionalsPage() {
         </label>
       </div>
       {syncSummary ? (
-        <div style={{ marginBottom: 12, background: "#f8fafc", border: "1px solid #e2e8f0", borderRadius: 8, padding: 10 }}>
+        <div style={{ ...uiStyles.kpiCard, marginBottom: 12 }}>
           <strong>Última sincronización:</strong> {new Date(syncSummary.synced_at).toLocaleString()} <br />
           Creados: {syncSummary.created} · Actualizados: {syncSummary.updated} · Inactivados: {syncSummary.inactivated} ·
           Omitidos: {syncSummary.skipped}
           {syncSummary.errors?.length ? (
-            <div style={{ marginTop: 6, color: "#b91c1c" }}>Errores: {syncSummary.errors.join(" | ")}</div>
+            <div style={{ marginTop: 6, color: uiTheme.colors.danger }}>Errores: {syncSummary.errors.join(" | ")}</div>
           ) : null}
         </div>
       ) : null}
-      <ul style={{ paddingLeft: 20 }}>
+      <ul style={{ ...uiStyles.listCard, maxHeight: 520, overflowY: "auto" }}>
         {professionals.map((item) => (
-          <li key={item.id} style={{ marginBottom: 8 }}>
-            #{item.id} - {item.full_name} ({item.license_number || "sin matrícula"}) · Doc:{" "}
-            {item.external_document || "-"} · {item.specialty || "sin especialidad"} ·{" "}
+          <li key={item.id} style={{ padding: "8px 10px", borderBottom: `1px solid ${uiTheme.colors.border}` }}>
+            #{item.id} · {item.full_name} ({item.license_number || "sin matrícula"}) · Doc: {item.external_document || "-"} ·{" "}
+            {item.specialty || "sin especialidad"} ·{" "}
             <strong style={{ color: item.is_active ? "#166534" : "#b91c1c" }}>
               {item.is_active ? "Activo" : "Inactivo"}
             </strong>

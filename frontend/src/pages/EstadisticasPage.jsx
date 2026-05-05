@@ -15,8 +15,16 @@ import {
 
 import { apiRequestWithRefresh } from "../services/api";
 import { safeLoad } from "../lib/apiHelpers";
+import { uiStyles, uiTheme } from "../ui/theme";
 
 const PIE_COLORS = ["#0f766e", "#cbd5e1"];
+const filterGroupStyle = {
+  margin: 0,
+  border: `1px solid ${uiTheme.colors.border}`,
+  borderRadius: uiTheme.radius.md,
+  padding: 12,
+  background: uiTheme.colors.surfaceMuted,
+};
 
 function todayISO() {
   const d = new Date();
@@ -145,9 +153,9 @@ export function EstadisticasPage() {
 
   return (
     <div style={{ display: "grid", gap: 20 }}>
-      <section style={{ border: "1px solid #ddd", borderRadius: 8, padding: 16, background: "#fff" }}>
-        <h1 style={{ marginTop: 0, fontSize: "1.35rem" }}>Estadísticas</h1>
-        <p style={{ color: "#64748b", marginTop: -8 }}>
+      <section style={uiStyles.pageSection}>
+        <h1 style={uiStyles.sectionTitle}>Estadísticas</h1>
+        <p style={{ ...uiStyles.helpText, marginTop: -8 }}>
           Filtrá por ubicación y/o consultorio para delimitar el alcance. El % de ocupación es{" "}
           <strong>horas asignadas semanalmente (proyectadas al período) ÷ horas habilitadas</strong> según los horarios
           de consultorio. Si elegís especialidad, el numerador usa solo esas especialidades (la capacidad habilitada se
@@ -163,13 +171,13 @@ export function EstadisticasPage() {
             Hasta
             <input type="date" value={endDate} onChange={(e) => setEndDate(e.target.value)} />
           </label>
-          <button type="button" onClick={fetchStats} disabled={loading}>
+          <button type="button" onClick={fetchStats} disabled={loading} style={uiStyles.buttonPrimary}>
             {loading ? "Calculando…" : "Actualizar"}
           </button>
           <button
             type="button"
             onClick={clearAllFilters}
-            style={{ border: "1px solid #cbd5e1", background: "#fff", borderRadius: 6, padding: "6px 10px", cursor: "pointer" }}
+            style={uiStyles.buttonSecondary}
           >
             Limpiar filtros
           </button>
@@ -177,7 +185,7 @@ export function EstadisticasPage() {
 
         {selectedSpecialtyNames.length > 0 ? (
           <div style={{ marginBottom: 12 }}>
-            <div style={{ fontSize: "0.8rem", color: "#64748b", marginBottom: 6 }}>
+            <div style={{ fontSize: "0.8rem", color: uiTheme.colors.textMuted, marginBottom: 6 }}>
               Especialidades seleccionadas ({selectedSpecialtyNames.length})
             </div>
             <div style={{ display: "flex", flexWrap: "wrap", gap: 6 }}>
@@ -186,9 +194,9 @@ export function EstadisticasPage() {
                   key={name}
                   style={{
                     fontSize: "0.78rem",
-                    border: "1px solid #99f6e4",
-                    background: "#f0fdfa",
-                    color: "#115e59",
+                    border: `1px solid ${uiTheme.colors.borderStrong}`,
+                    background: uiTheme.colors.primarySoft,
+                    color: uiTheme.colors.primaryStrong,
                     borderRadius: 999,
                     padding: "2px 8px",
                   }}
@@ -201,7 +209,7 @@ export function EstadisticasPage() {
         ) : null}
 
         <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(220px, 1fr))", gap: 16 }}>
-          <fieldset style={{ margin: 0, border: "1px solid #e2e8f0", borderRadius: 8, padding: 12 }}>
+          <fieldset style={filterGroupStyle}>
             <legend>Ubicaciones</legend>
             <div style={{ display: "flex", flexDirection: "column", gap: 6, maxHeight: 160, overflowY: "auto" }}>
               {locations.map((loc) => (
@@ -216,7 +224,7 @@ export function EstadisticasPage() {
               ))}
             </div>
           </fieldset>
-          <fieldset style={{ margin: 0, border: "1px solid #e2e8f0", borderRadius: 8, padding: 12 }}>
+          <fieldset style={filterGroupStyle}>
             <legend>Profesionales</legend>
             <div style={{ display: "flex", flexDirection: "column", gap: 6, maxHeight: 160, overflowY: "auto" }}>
               {professionals.map((p) => (
@@ -231,7 +239,7 @@ export function EstadisticasPage() {
               ))}
             </div>
           </fieldset>
-          <fieldset style={{ margin: 0, border: "1px solid #e2e8f0", borderRadius: 8, padding: 12 }}>
+          <fieldset style={filterGroupStyle}>
             <legend>Consultorios</legend>
             <div style={{ display: "flex", flexDirection: "column", gap: 6, maxHeight: 160, overflowY: "auto" }}>
               {rooms.map((r) => (
@@ -246,7 +254,7 @@ export function EstadisticasPage() {
               ))}
             </div>
           </fieldset>
-          <fieldset style={{ margin: 0, border: "1px solid #e2e8f0", borderRadius: 8, padding: 12 }}>
+          <fieldset style={filterGroupStyle}>
             <legend>Especialidades</legend>
             <div style={{ display: "flex", flexDirection: "column", gap: 6, maxHeight: 160, overflowY: "auto" }}>
               {specialtyOptions.map((name) => (
@@ -264,7 +272,7 @@ export function EstadisticasPage() {
           </fieldset>
         </div>
 
-        {error ? <p style={{ color: "crimson", marginTop: 12 }}>{error}</p> : null}
+        {error ? <p style={{ color: uiTheme.colors.danger, marginTop: 12 }}>{error}</p> : null}
       </section>
 
       {stats ? (
@@ -276,22 +284,22 @@ export function EstadisticasPage() {
               gap: 12,
             }}
           >
-            <div style={{ border: "1px solid #e2e8f0", borderRadius: 8, padding: 12, background: "#f8fafc" }}>
-              <div style={{ fontSize: "0.75rem", color: "#64748b" }}>
+            <div style={uiStyles.kpiCard}>
+                  <div style={{ fontSize: "0.75rem", color: uiTheme.colors.textMuted }}>
                 {selSpecialties.size > 0 ? "% Ocupación (especialidad)" : "% Ocupación"}
               </div>
               <div style={{ fontSize: "1.5rem", fontWeight: 700 }}>{stats.occupancy_rate_percent}%</div>
             </div>
-            <div style={{ border: "1px solid #e2e8f0", borderRadius: 8, padding: 12, background: "#f8fafc" }}>
-              <div style={{ fontSize: "0.75rem", color: "#64748b" }}>Horas habilitadas</div>
+            <div style={uiStyles.kpiCard}>
+              <div style={{ fontSize: "0.75rem", color: uiTheme.colors.textMuted }}>Horas habilitadas</div>
               <div style={{ fontSize: "1.5rem", fontWeight: 700 }}>{stats.enabled_hours}</div>
             </div>
-            <div style={{ border: "1px solid #e2e8f0", borderRadius: 8, padding: 12, background: "#f8fafc" }}>
-              <div style={{ fontSize: "0.75rem", color: "#64748b" }}>Horas asignadas</div>
+            <div style={uiStyles.kpiCard}>
+              <div style={{ fontSize: "0.75rem", color: uiTheme.colors.textMuted }}>Horas asignadas</div>
               <div style={{ fontSize: "1.5rem", fontWeight: 700 }}>{stats.booked_hours}</div>
             </div>
-            <div style={{ border: "1px solid #e2e8f0", borderRadius: 8, padding: 12, background: "#f8fafc" }}>
-              <div style={{ fontSize: "0.75rem", color: "#64748b" }}>Ocurrencias</div>
+            <div style={uiStyles.kpiCard}>
+              <div style={{ fontSize: "0.75rem", color: uiTheme.colors.textMuted }}>Ocurrencias</div>
               <div style={{ fontSize: "1.5rem", fontWeight: 700 }}>{stats.bookings_count}</div>
             </div>
             {stats.booked_hours_filtered != null ? (

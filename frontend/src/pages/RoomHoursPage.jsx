@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 
 import { apiRequestWithRefresh } from "../services/api";
 import { safeLoad } from "../lib/apiHelpers";
+import { uiStyles, uiTheme } from "../ui/theme";
 
 const WEEKDAYS = [
   ["0", "Domingo"],
@@ -63,16 +64,16 @@ export function RoomHoursPage() {
   const weekdayLabel = (n) => WEEKDAYS.find(([v]) => v === String(n))?.[1] ?? n;
 
   return (
-    <section style={{ border: "1px solid #ddd", borderRadius: 8, padding: 16, background: "#fff" }}>
-      <h1 style={{ marginTop: 0, fontSize: "1.35rem" }}>Horarios de consultorio</h1>
-      <p style={{ color: "#64748b" }}>
+    <section style={uiStyles.pageSection}>
+      <h1 style={uiStyles.sectionTitle}>Horarios de consultorio</h1>
+      <p style={uiStyles.helpText}>
         Franjas habilitadas por día de la semana (misma convención que el calendario: 0 = domingo … 6 = sábado).
       </p>
-      {error ? <p style={{ color: "crimson" }}>{error}</p> : null}
+      {error ? <p style={{ color: uiTheme.colors.danger }}>{error}</p> : null}
       <form onSubmit={submitHour} style={{ display: "flex", gap: 8, flexWrap: "wrap", marginBottom: 16, alignItems: "flex-end" }}>
         <label style={{ display: "flex", flexDirection: "column", gap: 4, fontSize: "0.85rem" }}>
           Consultorio
-          <select value={hourRoomId} onChange={(event) => setHourRoomId(event.target.value)} required>
+          <select value={hourRoomId} onChange={(event) => setHourRoomId(event.target.value)} required style={uiStyles.formControl}>
             <option value="">Elegir…</option>
             {rooms.map((room) => (
               <option key={room.id} value={room.id}>
@@ -83,7 +84,7 @@ export function RoomHoursPage() {
         </label>
         <label style={{ display: "flex", flexDirection: "column", gap: 4, fontSize: "0.85rem" }}>
           Día
-          <select value={hourWeekday} onChange={(event) => setHourWeekday(event.target.value)}>
+          <select value={hourWeekday} onChange={(event) => setHourWeekday(event.target.value)} style={uiStyles.formControl}>
             {WEEKDAYS.map(([value, label]) => (
               <option key={value} value={value}>
                 {label}
@@ -93,19 +94,19 @@ export function RoomHoursPage() {
         </label>
         <label style={{ display: "flex", flexDirection: "column", gap: 4, fontSize: "0.85rem" }}>
           Desde
-          <input type="time" value={hourStart} onChange={(event) => setHourStart(event.target.value)} required />
+          <input type="time" value={hourStart} onChange={(event) => setHourStart(event.target.value)} required style={uiStyles.formControl} />
         </label>
         <label style={{ display: "flex", flexDirection: "column", gap: 4, fontSize: "0.85rem" }}>
           Hasta
-          <input type="time" value={hourEnd} onChange={(event) => setHourEnd(event.target.value)} required />
+          <input type="time" value={hourEnd} onChange={(event) => setHourEnd(event.target.value)} required style={uiStyles.formControl} />
         </label>
-        <button type="submit">Agregar franja</button>
+        <button type="submit" style={uiStyles.buttonPrimary}>Agregar franja</button>
       </form>
-      <ul style={{ paddingLeft: 20 }}>
+      <ul style={uiStyles.listCard}>
         {roomHours.map((hour) => (
-          <li key={hour.id} style={{ marginBottom: 8 }}>
+          <li key={hour.id} style={{ padding: "8px 10px", borderBottom: `1px solid ${uiTheme.colors.border}` }}>
             #{hour.id} — {weekdayLabel(hour.weekday)} — {hour.start_time} a {hour.end_time}{" "}
-            <button type="button" onClick={() => removeHour(hour.id)}>
+            <button type="button" onClick={() => removeHour(hour.id)} style={{ ...uiStyles.buttonDanger, marginLeft: 8 }}>
               eliminar
             </button>
           </li>

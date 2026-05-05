@@ -2,6 +2,7 @@ import { useState } from "react";
 import { Link } from "react-router-dom";
 
 import { apiRequest } from "../services/api";
+import { uiStyles, uiTheme } from "../ui/theme";
 
 export function SetupPage() {
   const [name, setName] = useState("");
@@ -31,9 +32,10 @@ export function SetupPage() {
   };
 
   return (
-    <main style={{ maxWidth: 500, margin: "32px auto", display: "grid", gap: 12 }}>
-      <h1>Setup inicial</h1>
-      <p>Este flujo funciona solo si aun no existe ningun usuario.</p>
+    <main style={{ maxWidth: 520, margin: "44px auto", display: "grid", gap: 12 }}>
+      <section style={uiStyles.pageSection}>
+      <h1 style={uiStyles.sectionTitle}>Setup inicial</h1>
+      <p style={uiStyles.helpText}>Este flujo funciona solo si aun no existe ningun usuario.</p>
       <form onSubmit={onSubmit} style={{ display: "grid", gap: 8 }}>
         <input value={name} onChange={(event) => setName(event.target.value)} placeholder="Nombre" required />
         <input
@@ -50,12 +52,13 @@ export function SetupPage() {
           placeholder="Contrasena (min 8)"
           required
         />
-        <button type="submit" disabled={submitting}>
+        <button type="submit" disabled={submitting} style={uiStyles.buttonPrimary}>
           {submitting ? "Creando..." : "Crear admin inicial"}
         </button>
       </form>
-      <Link to="/login">Volver a login</Link>
-      {status ? <p>{status}</p> : null}
+      <Link to="/login" style={{ color: uiTheme.colors.primaryStrong }}>Volver a login</Link>
+      {status ? <p style={{ color: uiTheme.colors.text }}>{status}</p> : null}
+      </section>
     </main>
   );
 }

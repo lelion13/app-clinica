@@ -1,0 +1,118 @@
+export const uiTheme = {
+  colors: {
+    pageBg: "#f3f7f6",
+    surface: "#ffffff",
+    surfaceMuted: "#f7fbfa",
+    border: "#dbe7e5",
+    borderStrong: "#bfd4d0",
+    text: "#0f2b27",
+    textMuted: "#5a6f6a",
+    primary: "#0f766e",
+    primaryStrong: "#0b5e58",
+    primarySoft: "#e7f5f2",
+    danger: "#b91c1c",
+    focus: "#2ea89e",
+  },
+  radius: {
+    sm: 8,
+    md: 12,
+    lg: 16,
+    pill: 999,
+  },
+  shadow: {
+    sm: "0 1px 2px rgba(15, 43, 39, 0.08)",
+    md: "0 10px 28px rgba(15, 43, 39, 0.08)",
+  },
+};
+
+export const uiStyles = {
+  pageSection: {
+    border: `1px solid ${uiTheme.colors.border}`,
+    borderRadius: uiTheme.radius.lg,
+    padding: 16,
+    background: uiTheme.colors.surface,
+    boxShadow: uiTheme.shadow.sm,
+  },
+  sectionTitle: {
+    marginTop: 0,
+    fontSize: "1.38rem",
+    color: uiTheme.colors.text,
+    letterSpacing: 0.1,
+  },
+  helpText: {
+    color: uiTheme.colors.textMuted,
+  },
+  kpiCard: {
+    border: `1px solid ${uiTheme.colors.border}`,
+    borderRadius: uiTheme.radius.md,
+    padding: 10,
+    background: uiTheme.colors.surfaceMuted,
+  },
+  buttonPrimary: {
+    border: `1px solid ${uiTheme.colors.primary}`,
+    background: uiTheme.colors.primary,
+    color: "#fff",
+    borderRadius: uiTheme.radius.sm,
+    padding: "7px 12px",
+    cursor: "pointer",
+    fontSize: 13,
+    fontWeight: 600,
+    transition: "background-color 160ms ease, border-color 160ms ease, box-shadow 160ms ease",
+  },
+  buttonSecondary: {
+    border: `1px solid ${uiTheme.colors.borderStrong}`,
+    background: uiTheme.colors.surface,
+    color: uiTheme.colors.text,
+    borderRadius: uiTheme.radius.sm,
+    padding: "7px 11px",
+    cursor: "pointer",
+    fontSize: 13,
+    fontWeight: 500,
+    transition: "background-color 160ms ease, border-color 160ms ease, box-shadow 160ms ease",
+  },
+  buttonDanger: {
+    border: "1px solid #ef4444",
+    background: "#fff5f5",
+    color: "#b91c1c",
+    borderRadius: uiTheme.radius.sm,
+    padding: "5px 10px",
+    cursor: "pointer",
+    fontSize: 12,
+    fontWeight: 600,
+  },
+  formControl: {
+    minHeight: 36,
+    padding: "6px 8px",
+    border: `1px solid ${uiTheme.colors.borderStrong}`,
+    borderRadius: uiTheme.radius.sm,
+    color: uiTheme.colors.text,
+    background: "#fff",
+    fontSize: 14,
+    boxSizing: "border-box",
+  },
+  listCard: {
+    listStyle: "none",
+    padding: 0,
+    margin: 0,
+    border: `1px solid ${uiTheme.colors.border}`,
+    borderRadius: uiTheme.radius.md,
+    background: uiTheme.colors.surface,
+    overflow: "hidden",
+  },
+};
+
+export function navPillStyle(isActive) {
+  return {
+    padding: "8px 13px",
+    borderRadius: uiTheme.radius.sm,
+    textDecoration: "none",
+    color: isActive ? "#fff" : uiTheme.colors.text,
+    backgroundColor: isActive ? uiTheme.colors.primary : uiTheme.colors.surfaceMuted,
+    border: `1px solid ${isActive ? uiTheme.colors.primary : uiTheme.colors.border}`,
+    fontWeight: isActive ? 600 : 500,
+    fontSize: "0.9rem",
+    whiteSpace: "nowrap",
+    boxShadow: isActive ? "none" : uiTheme.shadow.sm,
+    transition: "background-color 160ms ease, color 160ms ease, border-color 160ms ease",
+  };
+}

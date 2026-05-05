@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useId, useMemo, useRef, useState } from "react";
+import { uiTheme } from "../ui/theme";
 
 function normalize(s) {
   return String(s || "")
@@ -18,7 +19,7 @@ export const alignedNativeFormControlStyle = {
   boxSizing: "border-box",
   minHeight: 36,
   padding: "6px 8px",
-  border: "1px solid #cbd5e1",
+  border: `1px solid ${uiTheme.colors.borderStrong}`,
   borderRadius: 6,
   fontSize: 14,
   lineHeight: 1.25,
@@ -225,7 +226,7 @@ export function ProfessionalCombobox({
               maxHeight: 280,
               overflowY: "auto",
               background: "#fff",
-              border: "1px solid #e2e8f0",
+              border: `1px solid ${uiTheme.colors.border}`,
               borderRadius: 8,
               boxShadow: "0 10px 30px rgba(15,23,42,0.12)",
             }}

@@ -1,16 +1,10 @@
 import { Link, NavLink, Outlet } from "react-router-dom";
 
 import { useAuth } from "../auth/AuthContext";
+import { navPillStyle, uiStyles, uiTheme } from "../ui/theme";
 
 const navLinkStyle = ({ isActive }) => ({
-  padding: "8px 12px",
-  borderRadius: 6,
-  textDecoration: "none",
-  color: isActive ? "#fff" : "#1e293b",
-  backgroundColor: isActive ? "#0f766e" : "#f1f5f9",
-  fontWeight: isActive ? 600 : 500,
-  fontSize: "0.9rem",
-  whiteSpace: "nowrap",
+  ...navPillStyle(isActive),
 });
 
 export function AppLayout() {
@@ -22,11 +16,11 @@ export function AppLayout() {
   };
 
   return (
-    <div style={{ minHeight: "100vh", background: "#fafafa" }}>
+    <div style={{ minHeight: "100vh", background: uiTheme.colors.pageBg }}>
       <header
         style={{
-          borderBottom: "1px solid #e2e8f0",
-          background: "#fff",
+          borderBottom: `1px solid ${uiTheme.colors.border}`,
+          background: uiTheme.colors.surface,
           position: "sticky",
           top: 0,
           zIndex: 10,
@@ -34,7 +28,7 @@ export function AppLayout() {
       >
         <div
           style={{
-            maxWidth: 1100,
+            maxWidth: 1180,
             margin: "0 auto",
             padding: "12px 16px",
             display: "flex",
@@ -44,16 +38,16 @@ export function AppLayout() {
         >
           <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 12, flexWrap: "wrap" }}>
             <div>
-              <div style={{ fontSize: "1.15rem", fontWeight: 700 }}>Clínica — Panel</div>
-              <div style={{ fontSize: "0.85rem", color: "#64748b" }}>
+              <div style={{ fontSize: "1.2rem", fontWeight: 700, color: uiTheme.colors.text }}>Clínica — Panel</div>
+              <div style={{ fontSize: "0.85rem", color: uiTheme.colors.textMuted }}>
                 {user?.name} · {user?.role}
               </div>
             </div>
             <div style={{ display: "flex", gap: 8, alignItems: "center", flexWrap: "wrap" }}>
-              <Link to="/setup" style={{ fontSize: "0.9rem", color: "#64748b" }}>
+              <Link to="/setup" style={{ fontSize: "0.9rem", color: uiTheme.colors.textMuted }}>
                 Setup
               </Link>
-              <button type="button" onClick={doLogout}>
+              <button type="button" onClick={doLogout} style={uiStyles.buttonSecondary}>
                 Cerrar sesión
               </button>
             </div>
@@ -98,7 +92,7 @@ export function AppLayout() {
         </div>
       </header>
 
-      <main style={{ maxWidth: 1100, margin: "0 auto", padding: "20px 16px 40px" }}>
+      <main style={{ maxWidth: 1180, margin: "0 auto", padding: "22px 16px 40px" }}>
         <Outlet />
       </main>
     </div>
