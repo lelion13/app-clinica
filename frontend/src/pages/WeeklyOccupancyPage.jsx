@@ -108,14 +108,14 @@ export function WeeklyOccupancyPage() {
 
   const slots = useMemo(() => buildHalfHourSlots(), []);
 
-  const openAssignmentModal = useCallback(() => {
+  const openAssignmentModal = useCallback((prefill = {}) => {
     setAssignmentModalError("");
     setConflictBlocks([]);
-    setFormRoomId("");
+    setFormRoomId(prefill.roomId ? String(prefill.roomId) : "");
     setFormProfessionalId("");
-    setFormWeekday(selectedWeekday);
-    setFormStartTime("08:00");
-    setFormEndTime("12:00");
+    setFormWeekday(prefill.weekday ?? selectedWeekday);
+    setFormStartTime(prefill.startTime ?? "08:00");
+    setFormEndTime(prefill.endTime ?? "12:00");
     setAssignmentModalOpen(true);
   }, [selectedWeekday]);
 
@@ -344,6 +344,21 @@ export function WeeklyOccupancyPage() {
     setDeleteModalAssignment(state.assignment);
   };
 
+  const onGridCellClick = (state, room, slot) => {
+    if (state.kind === "occupied" || state.kind === "conflict") {
+      openDeleteModalFromState(state);
+      return;
+    }
+    if (state.kind === "free") {
+      openAssignmentModal({
+        roomId: room.id,
+        weekday: selectedWeekday,
+        startTime: slot.key,
+        endTime: minutesToTime(slot.end),
+      });
+    }
+  };
+
   const confirmDeleteFromModal = async () => {
     if (!deleteModalAssignment?.id) return;
     setDeleteModalError("");
@@ -546,7 +561,7 @@ export function WeeklyOccupancyPage() {
                     <td
                       key={`${slot.key}-${room.id}`}
                       title={text || undefined}
-                      onClick={() => openDeleteModalFromState(state)}
+                      onClick={() => onGridCellClick(state, room, slot)}
                       style={{
                         borderBottom: `1px solid ${uiTheme.colors.border}`,
                         borderLeft: "1px solid #edf4f2",
