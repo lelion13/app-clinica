@@ -103,6 +103,8 @@ export function WeeklyOccupancyPage() {
 
   const [assignmentModalOpen, setAssignmentModalOpen] = useState(false);
   const [assignmentModalError, setAssignmentModalError] = useState("");
+  const [deleteModalAssignment, setDeleteModalAssignment] = useState(null);
+  const [deleteModalError, setDeleteModalError] = useState("");
 
   const slots = useMemo(() => buildHalfHourSlots(), []);
 
@@ -122,6 +124,11 @@ export function WeeklyOccupancyPage() {
     setAssignmentModalError("");
   }, []);
 
+  const closeDeleteModal = useCallback(() => {
+    setDeleteModalAssignment(null);
+    setDeleteModalError("");
+  }, []);
+
   useEffect(() => {
     if (!assignmentModalOpen) return;
     const onKey = (e) => {
@@ -130,6 +137,15 @@ export function WeeklyOccupancyPage() {
     document.addEventListener("keydown", onKey);
     return () => document.removeEventListener("keydown", onKey);
   }, [assignmentModalOpen, closeAssignmentModal]);
+
+  useEffect(() => {
+    if (!deleteModalAssignment) return;
+    const onKey = (e) => {
+      if (e.key === "Escape") closeDeleteModal();
+    };
+    document.addEventListener("keydown", onKey);
+    return () => document.removeEventListener("keydown", onKey);
+  }, [deleteModalAssignment, closeDeleteModal]);
 
   const loadCatalogs = useCallback(async () => {
     setError("");
@@ -318,6 +334,25 @@ export function WeeklyOccupancyPage() {
       await fetchAssignments();
     } catch (err) {
       setError(err.message || String(err));
+    }
+  };
+
+  const openDeleteModalFromState = (state) => {
+    if (!(state.kind === "occupied" || state.kind === "conflict")) return;
+    if (!state.assignment?.id) return;
+    setDeleteModalError("");
+    setDeleteModalAssignment(state.assignment);
+  };
+
+  const confirmDeleteFromModal = async () => {
+    if (!deleteModalAssignment?.id) return;
+    setDeleteModalError("");
+    try {
+      await apiRequestWithRefresh(`/weekly-assignments/${deleteModalAssignment.id}`, { method: "DELETE" });
+      closeDeleteModal();
+      await fetchAssignments();
+    } catch (err) {
+      setDeleteModalError(err.message || String(err));
     }
   };
 
@@ -511,6 +546,7 @@ export function WeeklyOccupancyPage() {
                     <td
                       key={`${slot.key}-${room.id}`}
                       title={text || undefined}
+                      onClick={() => openDeleteModalFromState(state)}
                       style={{
                         borderBottom: `1px solid ${uiTheme.colors.border}`,
                         borderLeft: "1px solid #edf4f2",
@@ -523,6 +559,7 @@ export function WeeklyOccupancyPage() {
                         textAlign: "center",
                         verticalAlign: "middle",
                         lineHeight: 1.25,
+                        cursor: state.kind === "occupied" || state.kind === "conflict" ? "pointer" : "default",
                       }}
                     >
                       {text ? <span style={slotCellNameStyle}>{text}</span> : null}
@@ -686,6 +723,71 @@ export function WeeklyOccupancyPage() {
                 </button>
               </div>
             </form>
+          </div>
+        </div>
+      ) : null}
+
+      {deleteModalAssignment ? (
+        <div
+          role="presentation"
+          style={{
+            position: "fixed",
+            inset: 0,
+            zIndex: 1000,
+            background: "rgba(15, 23, 42, 0.45)",
+            display: "flex",
+            alignItems: "flex-start",
+            justifyContent: "center",
+            padding: "max(16px, 4vh) 16px",
+            overflowY: "auto",
+          }}
+          onClick={closeDeleteModal}
+        >
+          <div
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="delete-assignment-modal-title"
+            onClick={(e) => e.stopPropagation()}
+            style={{
+              background: "#fff",
+              borderRadius: uiTheme.radius.md,
+              maxWidth: 520,
+              width: "100%",
+              marginBottom: 24,
+              padding: 22,
+              boxShadow: "0 25px 50px rgba(15, 23, 42, 0.18)",
+              border: `1px solid ${uiTheme.colors.border}`,
+            }}
+          >
+            <h2 id="delete-assignment-modal-title" style={{ marginTop: 0, marginBottom: 10, fontSize: "1.1rem" }}>
+              Eliminar asignación semanal
+            </h2>
+            <p style={{ marginTop: 0, marginBottom: 10, color: uiTheme.colors.textMuted }}>
+              Esta acción elimina el bloque completo de la semana tipo.
+            </p>
+            <div style={{ ...uiStyles.kpiCard, marginBottom: 12, lineHeight: 1.4 }}>
+              <div>
+                <strong>Profesional:</strong> {deleteModalAssignment.professional_full_name}
+              </div>
+              <div>
+                <strong>Consultorio:</strong> {deleteModalAssignment.room_code}
+              </div>
+              <div>
+                <strong>Día:</strong> {WEEKDAYS.find((d) => d.value === selectedWeekday)?.label || selectedWeekday}
+              </div>
+              <div>
+                <strong>Horario:</strong> {deleteModalAssignment.start_time}–{deleteModalAssignment.end_time}
+              </div>
+            </div>
+            {deleteModalError ? <p style={{ color: uiTheme.colors.danger, margin: "0 0 10px" }}>{deleteModalError}</p> : null}
+            <div style={{ display: "flex", gap: 8, justifyContent: "flex-end" }}>
+              <button type="button" onClick={closeDeleteModal} style={uiStyles.buttonSecondary}>
+                Cancelar
+              </button>
+              <button type="button" onClick={confirmDeleteFromModal} style={uiStyles.buttonDanger}>
+                Eliminar bloque
+              </button>
+            </div>
           </div>
         </div>
       ) : null}
