@@ -1,6 +1,8 @@
 import { Link, NavLink, Outlet } from "react-router-dom";
 
 import { useAuth } from "../auth/AuthContext";
+import { DistributionNavMenu } from "../components/DistributionNavMenu";
+import { USERS_NAV_ITEM } from "../config/navigation";
 import { navPillStyle, uiStyles, uiTheme } from "../ui/theme";
 
 const navLinkStyle = ({ isActive }) => ({
@@ -38,7 +40,17 @@ export function AppLayout() {
         >
           <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 12, flexWrap: "wrap" }}>
             <div>
-              <div style={{ fontSize: "1.2rem", fontWeight: 700, color: uiTheme.colors.text }}>Clínica — Panel</div>
+              <Link
+                to="/"
+                style={{
+                  fontSize: "1.2rem",
+                  fontWeight: 700,
+                  color: uiTheme.colors.text,
+                  textDecoration: "none",
+                }}
+              >
+                Clínica — Panel
+              </Link>
               <div style={{ fontSize: "0.85rem", color: uiTheme.colors.textMuted }}>
                 {user?.name} · {user?.role}
               </div>
@@ -62,30 +74,10 @@ export function AppLayout() {
               alignItems: "center",
             }}
           >
-            <NavLink to="/" end style={navLinkStyle}>
-              Ocupación semanal
-            </NavLink>
-            <NavLink to="/agenda" style={navLinkStyle}>
-              Agenda
-            </NavLink>
-            <NavLink to="/ubicaciones" style={navLinkStyle}>
-              Ubicaciones
-            </NavLink>
-            <NavLink to="/profesionales" style={navLinkStyle}>
-              Profesionales
-            </NavLink>
-            <NavLink to="/consultorios" style={navLinkStyle}>
-              Consultorios
-            </NavLink>
-            <NavLink to="/horarios-consultorio" style={navLinkStyle}>
-              Horarios consultorio
-            </NavLink>
-            <NavLink to="/estadisticas" style={navLinkStyle}>
-              Estadística
-            </NavLink>
+            <DistributionNavMenu />
             {isAdmin ? (
-              <NavLink to="/usuarios" style={navLinkStyle}>
-                Usuarios
+              <NavLink to={USERS_NAV_ITEM.path} style={navLinkStyle}>
+                {USERS_NAV_ITEM.label}
               </NavLink>
             ) : null}
           </nav>
