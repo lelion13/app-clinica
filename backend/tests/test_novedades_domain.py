@@ -1,5 +1,4 @@
 from datetime import date
-from decimal import Decimal
 from types import SimpleNamespace
 
 import pytest
@@ -90,7 +89,7 @@ def test_novedad_create_request_requires_horas_positive():
             servicio_id=1,
             professional_id=1,
             tipo="hora_extra",
-            horas=Decimal("0"),
+            horas=0,
         )
 
 
@@ -100,11 +99,21 @@ def test_novedad_tipos_validos():
         servicio_id=1,
         professional_id=1,
         tipo="hora_extra_por_ausencia",
-        horas=Decimal("2.5"),
+        horas=3,
     )
     assert payload.tipo == "hora_extra_por_ausencia"
-    assert payload.horas == Decimal("2.5")
+    assert payload.horas == 3
 
+
+def test_novedad_horas_rechaza_decimal():
+    with pytest.raises(Exception):
+        NovedadCreateRequest(
+            periodo_id=1,
+            servicio_id=1,
+            professional_id=1,
+            tipo="hora_extra",
+            horas=1.5,
+        )
 
 def test_export_xlsx_content_type_bytes(monkeypatch):
     from app.services.novedades import export_xls

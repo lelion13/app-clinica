@@ -139,12 +139,12 @@ class NovedadCreateRequest(BaseModel):
     servicio_id: int
     professional_id: int
     tipo: NovedadTipoLiteral
-    horas: Decimal = Field(gt=0)
+    horas: int = Field(ge=1)
 
 
 class NovedadUpdateRequest(BaseModel):
     tipo: NovedadTipoLiteral
-    horas: Decimal = Field(gt=0)
+    horas: int = Field(ge=1)
 
 
 class NovedadResponse(BaseModel):

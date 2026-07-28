@@ -24,12 +24,21 @@ export function NovedadesCargaPage() {
   const [moduloId, setModuloId] = useState("");
   const [tipo, setTipo] = useState("hora_extra");
   const [horas, setHoras] = useState("");
+  const [incluirNovedad, setIncluirNovedad] = useState(false);
 
   const openPeriodo = useMemo(() => periodos.find((p) => p.estado === "open"), [periodos]);
   const selectedModulo = useMemo(
     () => modulos.find((m) => String(m.id) === String(moduloId)),
     [modulos, moduloId]
   );
+
+  const clearCargaFields = () => {
+    setProfessionalId("");
+    setModuloId("");
+    setTipo("hora_extra");
+    setHoras("");
+    setIncluirNovedad(false);
+  };
 
   const load = async () => {
     setError("");
@@ -72,7 +81,6 @@ export function NovedadesCargaPage() {
       try {
         const rows = await apiRequestWithRefresh(`/novedades/profesionales?servicio_id=${servicioId}`);
         setProfesionales(rows);
-        setProfessionalId("");
       } catch (err) {
         setError(err.message || "Error al cargar profesionales");
       }
@@ -80,53 +88,58 @@ export function NovedadesCargaPage() {
     fetchPros();
   }, [servicioId]);
 
-  const sharedOk = periodoId && servicioId && professionalId;
-
-  const submitAsignacion = async (event) => {
+  const submitCarga = async (event) => {
     event.preventDefault();
     setError("");
-    if (!sharedOk || !moduloId) {
-      setError("Completá período, servicio, profesional y módulo");
-      return;
-    }
-    try {
-      await apiRequestWithRefresh("/novedades/asignaciones-modulos", {
-        method: "POST",
-        body: JSON.stringify({
-          periodo_id: Number(periodoId),
-          servicio_id: Number(servicioId),
-          professional_id: Number(professionalId),
-          modulo_id: Number(moduloId),
-        }),
-      });
-      await load();
-    } catch (err) {
-      setError(err.message || "No se pudo asignar módulo");
-    }
-  };
 
-  const submitNovedad = async (event) => {
-    event.preventDefault();
-    setError("");
-    if (!sharedOk || !horas) {
-      setError("Completá período, servicio, profesional, tipo y horas");
+    if (!periodoId || !servicioId || !professionalId) {
+      setError("Completá período, servicio y profesional");
       return;
     }
+
+    const hasModulo = Boolean(moduloId);
+    const hasNovedad = incluirNovedad || Boolean(horas);
+    if (!hasModulo && !hasNovedad) {
+      setError("Seleccioná un módulo y/o completá las horas de la novedad");
+      return;
+    }
+
+    if (hasNovedad) {
+      const horasInt = Number(horas);
+      if (!Number.isInteger(horasInt) || horasInt < 1) {
+        setError("La cantidad de horas debe ser un entero mayor o igual a 1");
+        return;
+      }
+    }
+
     try {
-      await apiRequestWithRefresh("/novedades/cargas", {
-        method: "POST",
-        body: JSON.stringify({
-          periodo_id: Number(periodoId),
-          servicio_id: Number(servicioId),
-          professional_id: Number(professionalId),
-          tipo,
-          horas: Number(horas),
-        }),
-      });
-      setHoras("");
+      if (hasModulo) {
+        await apiRequestWithRefresh("/novedades/asignaciones-modulos", {
+          method: "POST",
+          body: JSON.stringify({
+            periodo_id: Number(periodoId),
+            servicio_id: Number(servicioId),
+            professional_id: Number(professionalId),
+            modulo_id: Number(moduloId),
+          }),
+        });
+      }
+      if (hasNovedad) {
+        await apiRequestWithRefresh("/novedades/cargas", {
+          method: "POST",
+          body: JSON.stringify({
+            periodo_id: Number(periodoId),
+            servicio_id: Number(servicioId),
+            professional_id: Number(professionalId),
+            tipo,
+            horas: Number(horas),
+          }),
+        });
+      }
+      clearCargaFields();
       await load();
     } catch (err) {
-      setError(err.message || "No se pudo cargar novedad");
+      setError(err.message || "No se pudo cargar");
     }
   };
 
@@ -135,74 +148,85 @@ export function NovedadesCargaPage() {
       <div style={uiStyles.pageSection}>
         <h1 style={uiStyles.sectionTitle}>Carga de módulos / novedades</h1>
         <p style={uiStyles.helpText}>
-          Podés asignar solo un módulo (valor del catálogo, no editable), solo una novedad (tipo + horas), o ambos al mismo profesional.
+          Con un solo envío podés cargar módulo, novedad (tipo + horas enteras) o ambos.
           Los profesionales deben estar asociados al servicio en Parametrización.
           {openPeriodo ? ` Período abierto: #${openPeriodo.id}.` : " No hay período abierto."}
           {valorHora != null ? ` Valor hora: $${valorHora}.` : ""}
         </p>
         {error ? <p style={{ color: uiTheme.colors.danger }}>{error}</p> : null}
 
-        <h2 style={{ margin: "12px 0 8px", fontSize: "1rem" }}>Contexto</h2>
-        <div style={{ display: "grid", gap: 8, gridTemplateColumns: "repeat(auto-fill, minmax(180px, 1fr))", marginBottom: 16 }}>
-          <select value={periodoId} onChange={(e) => setPeriodoId(e.target.value)} style={uiStyles.formControl}>
-            <option value="">Período</option>
-            {periodos.map((p) => (
-              <option key={p.id} value={p.id}>#{p.id} {p.nombre || ""} ({p.estado})</option>
-            ))}
-          </select>
-          <select value={servicioId} onChange={(e) => setServicioId(e.target.value)} style={uiStyles.formControl}>
-            <option value="">Servicio</option>
-            {servicios.map((s) => (
-              <option key={s.id} value={s.id}>{s.nombre}</option>
-            ))}
-          </select>
-          <select value={professionalId} onChange={(e) => setProfessionalId(e.target.value)} style={uiStyles.formControl}>
-            <option value="">{servicioId ? "Profesional del servicio" : "Elegí servicio primero"}</option>
-            {profesionales.map((p) => (
-              <option key={p.id} value={p.id}>{p.full_name}</option>
-            ))}
-          </select>
-        </div>
-        {servicioId && !profesionales.length ? (
-          <p style={{ ...uiStyles.helpText, color: uiTheme.colors.danger }}>
-            No hay profesionales asociados a este servicio. Asociarlos en Parametrización → Profesionales ↔ servicios.
-          </p>
-        ) : null}
+        <form onSubmit={submitCarga}>
+          <h2 style={{ margin: "12px 0 8px", fontSize: "1rem" }}>Contexto</h2>
+          <div style={{ display: "grid", gap: 8, gridTemplateColumns: "repeat(auto-fill, minmax(180px, 1fr))", marginBottom: 16 }}>
+            <select value={periodoId} onChange={(e) => setPeriodoId(e.target.value)} style={uiStyles.formControl} required>
+              <option value="">Período</option>
+              {periodos.map((p) => (
+                <option key={p.id} value={p.id}>#{p.id} {p.nombre || ""} ({p.estado})</option>
+              ))}
+            </select>
+            <select value={servicioId} onChange={(e) => setServicioId(e.target.value)} style={uiStyles.formControl} required>
+              <option value="">Servicio</option>
+              {servicios.map((s) => (
+                <option key={s.id} value={s.id}>{s.nombre}</option>
+              ))}
+            </select>
+            <select value={professionalId} onChange={(e) => setProfessionalId(e.target.value)} style={uiStyles.formControl} required>
+              <option value="">{servicioId ? "Profesional del servicio" : "Elegí servicio primero"}</option>
+              {profesionales.map((p) => (
+                <option key={p.id} value={p.id}>{p.full_name}</option>
+              ))}
+            </select>
+          </div>
+          {servicioId && !profesionales.length ? (
+            <p style={{ ...uiStyles.helpText, color: uiTheme.colors.danger }}>
+              No hay profesionales asociados a este servicio. Asociarlos en Parametrización → Profesionales ↔ servicios.
+            </p>
+          ) : null}
 
-        <h2 style={{ margin: "8px 0", fontSize: "1rem" }}>1. Asignar módulo (opcional)</h2>
-        <form onSubmit={submitAsignacion} style={{ display: "flex", gap: 8, flexWrap: "wrap", alignItems: "center", marginBottom: 16 }}>
-          <select value={moduloId} onChange={(e) => setModuloId(e.target.value)} style={uiStyles.formControl}>
-            <option value="">Módulo del catálogo</option>
-            {modulos.map((m) => (
-              <option key={m.id} value={m.id}>{m.descripcion}</option>
-            ))}
-          </select>
-          <span style={uiStyles.helpText}>
-            Valor (solo lectura): {selectedModulo ? `$${selectedModulo.valor}` : "—"}
-          </span>
-          <button type="submit" style={uiStyles.buttonPrimary}>Asignar módulo</button>
-        </form>
+          <h2 style={{ margin: "8px 0", fontSize: "1rem" }}>Módulo (opcional)</h2>
+          <div style={{ display: "flex", gap: 8, flexWrap: "wrap", alignItems: "center", marginBottom: 16 }}>
+            <select value={moduloId} onChange={(e) => setModuloId(e.target.value)} style={uiStyles.formControl}>
+              <option value="">Sin módulo</option>
+              {modulos.map((m) => (
+                <option key={m.id} value={m.id}>{m.descripcion}</option>
+              ))}
+            </select>
+            <span style={uiStyles.helpText}>
+              Valor (solo lectura): {selectedModulo ? `$${selectedModulo.valor}` : "—"}
+            </span>
+          </div>
 
-        <h2 style={{ margin: "8px 0", fontSize: "1rem" }}>2. Cargar novedad (opcional)</h2>
-        <form onSubmit={submitNovedad} style={{ display: "flex", gap: 8, flexWrap: "wrap", alignItems: "center" }}>
-          <select value={tipo} onChange={(e) => setTipo(e.target.value)} style={uiStyles.formControl}>
-            {TIPO_OPTIONS.map((opt) => (
-              <option key={opt.value} value={opt.value}>{opt.label}</option>
-            ))}
-          </select>
-          <input
-            type="number"
-            step="0.25"
-            min="0.01"
-            value={horas}
-            onChange={(e) => setHoras(e.target.value)}
-            placeholder="Cantidad de horas"
-            required
-            style={uiStyles.formControl}
-          />
-          <span style={uiStyles.helpText}>
-            Valor estimado: {horas && valorHora != null ? `$${(Number(horas) * Number(valorHora)).toFixed(2)}` : "—"}
-          </span>
+          <h2 style={{ margin: "8px 0", fontSize: "1rem" }}>Novedad (opcional)</h2>
+          <div style={{ display: "flex", gap: 8, flexWrap: "wrap", alignItems: "center", marginBottom: 16 }}>
+            <select value={tipo} onChange={(e) => setTipo(e.target.value)} style={uiStyles.formControl}>
+              {TIPO_OPTIONS.map((opt) => (
+                <option key={opt.value} value={opt.value}>{opt.label}</option>
+              ))}
+            </select>
+            <input
+              type="number"
+              step="1"
+              min="1"
+              inputMode="numeric"
+              value={horas}
+              onChange={(e) => {
+                const raw = e.target.value;
+                if (raw === "") {
+                  setHoras("");
+                  return;
+                }
+                const onlyDigits = raw.replace(/[^\d]/g, "");
+                setHoras(onlyDigits);
+                if (onlyDigits) setIncluirNovedad(true);
+              }}
+              placeholder="Cantidad de horas (entero)"
+              style={uiStyles.formControl}
+            />
+            <span style={uiStyles.helpText}>
+              Valor estimado: {horas && valorHora != null ? `$${(Number(horas) * Number(valorHora)).toFixed(2)}` : "—"}
+            </span>
+          </div>
+
           <button type="submit" style={uiStyles.buttonPrimary}>Cargar novedad</button>
         </form>
       </div>
