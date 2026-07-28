@@ -21,6 +21,13 @@
 ## Migraciones
 - Ejecutar migraciones despues de levantar backend:
 - `docker compose --env-file .env.prod -f docker-compose.prod.yml exec backend alembic upgrade head`
+- Cambio `novedades-modulos` (rev `0004_novedades_modulos`): extiende roles `jefe_medico` / `rrhh` y crea tablas `novedades_*`.
+
+## Roles (panel)
+- `admin`: distribución + novedades (todo) + usuarios
+- `operador`: solo distribución de consultorios
+- `jefe_medico`: solo carga de módulos/novedades (servicios asociados)
+- `rrhh`: parametrización + grilla/XLS + cierre/reapertura de período
 
 ## Verificacion
 - App (mismo dominio): `GET https://<WEB_HOST>/health`

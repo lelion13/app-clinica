@@ -1,4 +1,4 @@
-/** Rutas y etiquetas del menú; alineado con RBAC backend (admin / operador). */
+/** Rutas y etiquetas del menú; alineado con RBAC backend. */
 
 export const DISTRIBUTION_ITEMS = [
   { label: "Ocupación semanal", path: "/ocupacion-semanal", roles: ["admin", "operador"] },
@@ -10,6 +10,12 @@ export const DISTRIBUTION_ITEMS = [
   { label: "Estadística", path: "/estadisticas", roles: ["admin", "operador"] },
 ];
 
+export const NOVEDADES_ITEMS = [
+  { label: "Carga módulos", path: "/novedades/carga", roles: ["admin", "jefe_medico"] },
+  { label: "Generación archivo XLS", path: "/novedades/xls", roles: ["admin", "rrhh"] },
+  { label: "Parametrización", path: "/novedades/parametrizacion", roles: ["admin", "rrhh"] },
+];
+
 export const USERS_NAV_ITEM = {
   label: "Usuarios",
   path: "/usuarios",
@@ -17,9 +23,14 @@ export const USERS_NAV_ITEM = {
 };
 
 export const DISTRIBUTION_PATHS = DISTRIBUTION_ITEMS.map((item) => item.path);
+export const NOVEDADES_PATHS = NOVEDADES_ITEMS.map((item) => item.path);
 
 export function isDistributionPath(pathname) {
   return DISTRIBUTION_PATHS.includes(pathname);
+}
+
+export function isNovedadesPath(pathname) {
+  return NOVEDADES_PATHS.includes(pathname) || pathname.startsWith("/novedades/");
 }
 
 export function canAccessModule(userRole, allowedRoles) {

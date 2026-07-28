@@ -77,6 +77,8 @@ export function UsersPage() {
         <select value={newUserRole} onChange={(event) => setNewUserRole(event.target.value)} style={uiStyles.formControl}>
           <option value="operador">operador</option>
           <option value="admin">admin</option>
+          <option value="jefe_medico">jefe_medico</option>
+          <option value="rrhh">rrhh</option>
         </select>
         <button type="submit" style={uiStyles.buttonPrimary}>Crear usuario</button>
       </form>

@@ -10,6 +10,8 @@ from app.models.common import AuditMixin
 class UserRole(str, enum.Enum):
     admin = "admin"
     operador = "operador"
+    jefe_medico = "jefe_medico"
+    rrhh = "rrhh"
 
 
 class User(AuditMixin, Base):

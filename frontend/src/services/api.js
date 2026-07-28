@@ -61,3 +61,28 @@ export async function apiRequestWithRefresh(path, options = {}) {
     }
   }
 }
+
+export async function apiDownloadWithRefresh(path) {
+  const doFetch = async () => {
+    const response = await fetch(`${API_BASE_URL}${path}`, {
+      credentials: "include",
+    });
+    if (!response.ok) {
+      throw await parseError(response);
+    }
+    const blob = await response.blob();
+    const disposition = response.headers.get("Content-Disposition") || "";
+    const match = /filename="?([^"]+)"?/i.exec(disposition);
+    return { blob, filename: match?.[1] || "download.xlsx" };
+  };
+
+  try {
+    return await doFetch();
+  } catch (error) {
+    if (error.status !== 401) {
+      throw error;
+    }
+    await apiRequest("/auth/refresh", { method: "POST" });
+    return doFetch();
+  }
+}

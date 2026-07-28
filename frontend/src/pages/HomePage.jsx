@@ -3,6 +3,7 @@ import { Link } from "react-router-dom";
 import { useAuth } from "../auth/AuthContext";
 import {
   DISTRIBUTION_ITEMS,
+  NOVEDADES_ITEMS,
   USERS_NAV_ITEM,
   canAccessModule,
   itemsForRole,
@@ -25,6 +26,7 @@ const cardLinkStyle = {
 export function HomePage() {
   const { user, isAdmin } = useAuth();
   const distributionLinks = itemsForRole(DISTRIBUTION_ITEMS, user?.role);
+  const novedadesLinks = itemsForRole(NOVEDADES_ITEMS, user?.role);
   const showUsers = isAdmin && canAccessModule(user?.role, USERS_NAV_ITEM.roles);
 
   return (
@@ -36,22 +38,43 @@ export function HomePage() {
         </p>
       </div>
 
-      <div style={{ display: "grid", gap: 12 }}>
-        <h2 style={{ margin: 0, fontSize: "1.05rem", color: uiTheme.colors.text }}>Distribución de consultorios</h2>
-        <div
-          style={{
-            display: "grid",
-            gridTemplateColumns: "repeat(auto-fill, minmax(200px, 1fr))",
-            gap: 10,
-          }}
-        >
-          {distributionLinks.map((item) => (
-            <Link key={item.path} to={item.path} style={cardLinkStyle}>
-              {item.label}
-            </Link>
-          ))}
+      {distributionLinks.length ? (
+        <div style={{ display: "grid", gap: 12 }}>
+          <h2 style={{ margin: 0, fontSize: "1.05rem", color: uiTheme.colors.text }}>Distribución de consultorios</h2>
+          <div
+            style={{
+              display: "grid",
+              gridTemplateColumns: "repeat(auto-fill, minmax(200px, 1fr))",
+              gap: 10,
+            }}
+          >
+            {distributionLinks.map((item) => (
+              <Link key={item.path} to={item.path} style={cardLinkStyle}>
+                {item.label}
+              </Link>
+            ))}
+          </div>
         </div>
-      </div>
+      ) : null}
+
+      {novedadesLinks.length ? (
+        <div style={{ display: "grid", gap: 12 }}>
+          <h2 style={{ margin: 0, fontSize: "1.05rem", color: uiTheme.colors.text }}>Novedades</h2>
+          <div
+            style={{
+              display: "grid",
+              gridTemplateColumns: "repeat(auto-fill, minmax(200px, 1fr))",
+              gap: 10,
+            }}
+          >
+            {novedadesLinks.map((item) => (
+              <Link key={item.path} to={item.path} style={cardLinkStyle}>
+                {item.label}
+              </Link>
+            ))}
+          </div>
+        </div>
+      ) : null}
 
       {showUsers ? (
         <div style={{ display: "grid", gap: 12 }}>

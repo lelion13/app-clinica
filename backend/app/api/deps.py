@@ -29,3 +29,22 @@ def require_operator_or_admin(user: User = Depends(current_user)) -> User:
     if user.role not in (UserRole.admin, UserRole.operador):
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Permisos insuficientes")
     return user
+
+
+def require_admin_or_rrhh(user: User = Depends(current_user)) -> User:
+    if user.role not in (UserRole.admin, UserRole.rrhh):
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Permisos insuficientes")
+    return user
+
+
+def require_admin_or_jefe(user: User = Depends(current_user)) -> User:
+    if user.role not in (UserRole.admin, UserRole.jefe_medico):
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Permisos insuficientes")
+    return user
+
+
+def require_novedades_reader(user: User = Depends(current_user)) -> User:
+    """Roles that can read masters used by Novedades screens (admin, rrhh, jefe)."""
+    if user.role not in (UserRole.admin, UserRole.rrhh, UserRole.jefe_medico):
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Permisos insuficientes")
+    return user

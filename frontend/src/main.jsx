@@ -15,6 +15,9 @@ import { SetupPage } from "./pages/SetupPage";
 import { UsersPage } from "./pages/UsersPage";
 import { HomePage } from "./pages/HomePage";
 import { WeeklyOccupancyPage } from "./pages/WeeklyOccupancyPage";
+import { NovedadesCargaPage } from "./pages/novedades/NovedadesCargaPage";
+import { NovedadesParamPage } from "./pages/novedades/NovedadesParamPage";
+import { NovedadesXlsPage } from "./pages/novedades/NovedadesXlsPage";
 import { ProtectedRoute } from "./router/ProtectedRoute";
 
 function AppRouter() {
@@ -38,6 +41,30 @@ function AppRouter() {
         <Route path="consultorios" element={<ConsultingRoomsPage />} />
         <Route path="horarios-consultorio" element={<RoomHoursPage />} />
         <Route path="estadisticas" element={<EstadisticasPage />} />
+        <Route
+          path="novedades/carga"
+          element={
+            <ProtectedRoute roles={["admin", "jefe_medico"]}>
+              <NovedadesCargaPage />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="novedades/xls"
+          element={
+            <ProtectedRoute roles={["admin", "rrhh"]}>
+              <NovedadesXlsPage />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="novedades/parametrizacion"
+          element={
+            <ProtectedRoute roles={["admin", "rrhh"]}>
+              <NovedadesParamPage />
+            </ProtectedRoute>
+          }
+        />
         <Route
           path="usuarios"
           element={
