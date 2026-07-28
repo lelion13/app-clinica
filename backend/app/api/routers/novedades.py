@@ -29,14 +29,11 @@ from app.schemas.novedades import (
     ServicioCreateRequest,
     ServicioResponse,
     ServicioUpdateRequest,
-    ValorHoraResponse,
-    ValorHoraUpdateRequest,
 )
 from app.services.novedades import cargas as cargas_service
-from app.services.novedades import config_service
 from app.services.novedades import export_xls
 from app.services.novedades import masters as masters_service
-from app.services.novedades.helpers import get_or_create_config, list_servicios_for_user
+from app.services.novedades.helpers import get_servicio_or_404, list_servicios_for_user
 from app.services.novedades.professional_directory import list_professionals_for_servicio
 
 router = APIRouter()
@@ -53,17 +50,20 @@ def _servicio_response(item) -> ServicioResponse:
         id=item.id,
         nombre=item.nombre,
         activo=item.activo,
+        valor_hora=item.valor_hora,
         created_at=item.created_at,
         updated_at=item.updated_at,
     )
 
 
-def _modulo_response(item) -> ModuloResponse:
+def _modulo_response(db: Session, item) -> ModuloResponse:
     return ModuloResponse(
         id=item.id,
         descripcion=item.descripcion,
         comentario=item.comentario,
         valor=item.valor,
+        servicio_ids=masters_service.list_modulo_servicio_ids(db, item.id),
+        servicio_nombres=masters_service.list_modulo_servicio_nombres(db, item.id),
         created_at=item.created_at,
         updated_at=item.updated_at,
     )
@@ -84,7 +84,8 @@ def _periodo_response(item) -> PeriodoResponse:
 
 def _novedad_response(db: Session, item) -> NovedadResponse:
     tipo = item.tipo if isinstance(item.tipo, NovedadTipo) else NovedadTipo(item.tipo)
-    valor_hora = get_or_create_config(db).valor_hora
+    servicio = get_servicio_or_404(db, item.servicio_id)
+    valor_hora = servicio.valor_hora
     return NovedadResponse(
         id=item.id,
         periodo_id=item.periodo_id,
@@ -166,9 +167,13 @@ def servicios_delete(
 
 
 @router.get("/modulos", response_model=list[ModuloResponse])
-def modulos_list(db: Session = Depends(get_db), user: User = Depends(require_novedades_reader)) -> list[ModuloResponse]:
+def modulos_list(
+    servicio_id: int | None = Query(default=None),
+    db: Session = Depends(get_db),
+    user: User = Depends(require_novedades_reader),
+) -> list[ModuloResponse]:
     _ = user
-    return [_modulo_response(item) for item in masters_service.list_modulos(db)]
+    return [_modulo_response(db, item) for item in masters_service.list_modulos(db, servicio_id=servicio_id)]
 
 
 @router.post("/modulos", response_model=ModuloResponse, status_code=status.HTTP_201_CREATED)
@@ -177,7 +182,8 @@ def modulos_create(
     db: Session = Depends(get_db),
     user: User = Depends(require_admin_or_rrhh),
 ) -> ModuloResponse:
-    return _modulo_response(masters_service.create_modulo(db, payload, actor_id=user.id))
+    item = masters_service.create_modulo(db, payload, actor_id=user.id)
+    return _modulo_response(db, item)
 
 
 @router.put("/modulos/{modulo_id}", response_model=ModuloResponse)
@@ -187,8 +193,8 @@ def modulos_update(
     db: Session = Depends(get_db),
     user: User = Depends(require_admin_or_rrhh),
 ) -> ModuloResponse:
-    return _modulo_response(masters_service.update_modulo(db, modulo_id, payload, actor_id=user.id))
-
+    item = masters_service.update_modulo(db, modulo_id, payload, actor_id=user.id)
+    return _modulo_response(db, item)
 
 @router.delete("/modulos/{modulo_id}", status_code=status.HTTP_204_NO_CONTENT)
 def modulos_delete(
@@ -411,23 +417,6 @@ def novedades_delete(
     user: User = Depends(require_admin_or_jefe),
 ) -> None:
     cargas_service.delete_novedad(db, item_id, user=user)
-
-
-@router.get("/valor-hora", response_model=ValorHoraResponse)
-def valor_hora_get(db: Session = Depends(get_db), user: User = Depends(require_novedades_reader)) -> ValorHoraResponse:
-    _ = user
-    valor, updated_at = config_service.get_valor_hora(db)
-    return ValorHoraResponse(valor_hora=valor, updated_at=updated_at)
-
-
-@router.put("/valor-hora", response_model=ValorHoraResponse)
-def valor_hora_put(
-    payload: ValorHoraUpdateRequest,
-    db: Session = Depends(get_db),
-    user: User = Depends(require_admin_or_rrhh),
-) -> ValorHoraResponse:
-    valor, updated_at = config_service.set_valor_hora(db, payload, actor_id=user.id)
-    return ValorHoraResponse(valor_hora=valor, updated_at=updated_at)
 
 
 @router.get("/grilla", response_model=list[GridRowResponse])

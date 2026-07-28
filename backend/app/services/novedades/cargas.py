@@ -233,6 +233,9 @@ def create_asignacion(db: Session, payload: AsignacionCreateRequest, user: User)
     get_modulo_or_404(db, payload.modulo_id)
     assert_can_load_servicio(db, user, payload.servicio_id)
     require_profesional_en_servicio(db, payload.professional_id, payload.servicio_id)
+    from app.services.novedades.masters import require_modulo_en_servicio
+
+    require_modulo_en_servicio(db, payload.modulo_id, payload.servicio_id)
     now = datetime.utcnow()
     item = NovedadesAsignacionModulo(
         periodo_id=payload.periodo_id,
@@ -263,6 +266,9 @@ def update_asignacion(db: Session, item_id: int, payload: AsignacionUpdateReques
     require_periodo_open(db, item.periodo_id)
     assert_can_load_servicio(db, user, item.servicio_id)
     get_modulo_or_404(db, payload.modulo_id)
+    from app.services.novedades.masters import require_modulo_en_servicio
+
+    require_modulo_en_servicio(db, payload.modulo_id, item.servicio_id)
     item.modulo_id = payload.modulo_id
     item.updated_at = datetime.utcnow()
     item.updated_by = user.id

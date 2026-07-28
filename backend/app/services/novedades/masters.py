@@ -5,14 +5,14 @@ from fastapi import HTTPException, status
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
-from app.models.novedades import NovedadesModulo, NovedadesServicio
+from app.models.novedades import NovedadesModulo, NovedadesModuloServicio, NovedadesServicio
 from app.schemas.novedades import (
     ModuloCreateRequest,
     ModuloUpdateRequest,
     ServicioCreateRequest,
     ServicioUpdateRequest,
 )
-from app.services.novedades.helpers import soft_delete
+from app.services.novedades.helpers import get_servicio_or_404, soft_delete
 
 
 def list_servicios(db: Session, only_active: bool = False) -> list[NovedadesServicio]:
@@ -33,6 +33,7 @@ def create_servicio(db: Session, payload: ServicioCreateRequest, actor_id: int) 
     item = NovedadesServicio(
         nombre=name,
         activo=payload.activo,
+        valor_hora=Decimal(payload.valor_hora),
         created_at=now,
         updated_at=now,
         created_by=actor_id,
@@ -53,6 +54,7 @@ def update_servicio(db: Session, servicio_id: int, payload: ServicioUpdateReques
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Servicio no encontrado")
     item.nombre = payload.nombre.strip()
     item.activo = payload.activo
+    item.valor_hora = Decimal(payload.valor_hora)
     item.updated_at = datetime.utcnow()
     item.updated_by = actor_id
     db.commit()
@@ -70,11 +72,104 @@ def delete_servicio(db: Session, servicio_id: int, actor_id: int) -> None:
     db.commit()
 
 
-def list_modulos(db: Session) -> list[NovedadesModulo]:
-    return list(db.execute(select(NovedadesModulo).where(NovedadesModulo.deleted_at.is_(None)).order_by(NovedadesModulo.id)).scalars().all())
+def _validate_servicio_ids(db: Session, servicio_ids: list[int]) -> list[int]:
+    unique_ids = list(dict.fromkeys(servicio_ids))
+    if not unique_ids:
+        raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail="Debe asociar al menos un servicio")
+    for sid in unique_ids:
+        get_servicio_or_404(db, sid)
+    return unique_ids
+
+
+def _set_modulo_servicios(db: Session, modulo_id: int, servicio_ids: list[int], actor_id: int) -> None:
+    now = datetime.utcnow()
+    desired = set(servicio_ids)
+    existing = list(
+        db.execute(
+            select(NovedadesModuloServicio).where(
+                NovedadesModuloServicio.modulo_id == modulo_id,
+                NovedadesModuloServicio.deleted_at.is_(None),
+            )
+        )
+        .scalars()
+        .all()
+    )
+    existing_by_servicio = {link.servicio_id: link for link in existing}
+    for sid, link in existing_by_servicio.items():
+        if sid not in desired:
+            soft_delete(link, actor_id)
+    for sid in desired:
+        if sid in existing_by_servicio:
+            continue
+        db.add(
+            NovedadesModuloServicio(
+                modulo_id=modulo_id,
+                servicio_id=sid,
+                created_at=now,
+                updated_at=now,
+                created_by=actor_id,
+                updated_by=actor_id,
+                deleted_at=None,
+            )
+        )
+
+
+def list_modulo_servicio_ids(db: Session, modulo_id: int) -> list[int]:
+    return list(
+        db.execute(
+            select(NovedadesModuloServicio.servicio_id).where(
+                NovedadesModuloServicio.modulo_id == modulo_id,
+                NovedadesModuloServicio.deleted_at.is_(None),
+            )
+        )
+        .scalars()
+        .all()
+    )
+
+
+def list_modulo_servicio_nombres(db: Session, modulo_id: int) -> list[str]:
+    rows = list(
+        db.execute(
+            select(NovedadesServicio.nombre)
+            .join(NovedadesModuloServicio, NovedadesModuloServicio.servicio_id == NovedadesServicio.id)
+            .where(
+                NovedadesModuloServicio.modulo_id == modulo_id,
+                NovedadesModuloServicio.deleted_at.is_(None),
+                NovedadesServicio.deleted_at.is_(None),
+            )
+            .order_by(NovedadesServicio.nombre)
+        )
+        .scalars()
+        .all()
+    )
+    return rows
+
+
+def list_modulos(db: Session, servicio_id: int | None = None) -> list[NovedadesModulo]:
+    if servicio_id is None:
+        return list(
+            db.execute(select(NovedadesModulo).where(NovedadesModulo.deleted_at.is_(None)).order_by(NovedadesModulo.id))
+            .scalars()
+            .all()
+        )
+    return list(
+        db.execute(
+            select(NovedadesModulo)
+            .join(NovedadesModuloServicio, NovedadesModuloServicio.modulo_id == NovedadesModulo.id)
+            .where(
+                NovedadesModulo.deleted_at.is_(None),
+                NovedadesModuloServicio.deleted_at.is_(None),
+                NovedadesModuloServicio.servicio_id == servicio_id,
+            )
+            .order_by(NovedadesModulo.id)
+        )
+        .scalars()
+        .all()
+    )
 
 
 def create_modulo(db: Session, payload: ModuloCreateRequest, actor_id: int) -> NovedadesModulo:
+    servicio_ids = _validate_servicio_ids(db, payload.servicio_ids)
     now = datetime.utcnow()
     item = NovedadesModulo(
         descripcion=payload.descripcion.strip(),
@@ -87,6 +182,8 @@ def create_modulo(db: Session, payload: ModuloCreateRequest, actor_id: int) -> N
         deleted_at=None,
     )
     db.add(item)
+    db.flush()
+    _set_modulo_servicios(db, item.id, servicio_ids, actor_id)
     db.commit()
     db.refresh(item)
     return item
@@ -98,11 +195,13 @@ def update_modulo(db: Session, modulo_id: int, payload: ModuloUpdateRequest, act
     ).scalar_one_or_none()
     if not item:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Modulo no encontrado")
+    servicio_ids = _validate_servicio_ids(db, payload.servicio_ids)
     item.descripcion = payload.descripcion.strip()
     item.comentario = (payload.comentario or "").strip() or None
     item.valor = Decimal(payload.valor)
     item.updated_at = datetime.utcnow()
     item.updated_by = actor_id
+    _set_modulo_servicios(db, item.id, servicio_ids, actor_id)
     db.commit()
     db.refresh(item)
     return item
@@ -115,4 +214,31 @@ def delete_modulo(db: Session, modulo_id: int, actor_id: int) -> None:
     if not item:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Modulo no encontrado")
     soft_delete(item, actor_id)
+    links = list(
+        db.execute(
+            select(NovedadesModuloServicio).where(
+                NovedadesModuloServicio.modulo_id == modulo_id,
+                NovedadesModuloServicio.deleted_at.is_(None),
+            )
+        )
+        .scalars()
+        .all()
+    )
+    for link in links:
+        soft_delete(link, actor_id)
     db.commit()
+
+
+def require_modulo_en_servicio(db: Session, modulo_id: int, servicio_id: int) -> None:
+    link = db.execute(
+        select(NovedadesModuloServicio).where(
+            NovedadesModuloServicio.modulo_id == modulo_id,
+            NovedadesModuloServicio.servicio_id == servicio_id,
+            NovedadesModuloServicio.deleted_at.is_(None),
+        )
+    ).scalar_one_or_none()
+    if not link:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail="El modulo no esta asociado al servicio",
+        )

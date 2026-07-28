@@ -8,17 +8,20 @@ from pydantic import BaseModel, Field
 class ServicioCreateRequest(BaseModel):
     nombre: str = Field(min_length=2, max_length=120)
     activo: bool = True
+    valor_hora: Decimal = Field(default=Decimal("0"), ge=0)
 
 
 class ServicioUpdateRequest(BaseModel):
     nombre: str = Field(min_length=2, max_length=120)
     activo: bool = True
+    valor_hora: Decimal = Field(ge=0)
 
 
 class ServicioResponse(BaseModel):
     id: int
     nombre: str
     activo: bool
+    valor_hora: Decimal
     created_at: datetime
     updated_at: datetime
 
@@ -27,12 +30,14 @@ class ModuloCreateRequest(BaseModel):
     descripcion: str = Field(min_length=2, max_length=200)
     comentario: str | None = Field(default=None, max_length=500)
     valor: Decimal = Field(ge=0)
+    servicio_ids: list[int] = Field(min_length=1)
 
 
 class ModuloUpdateRequest(BaseModel):
     descripcion: str = Field(min_length=2, max_length=200)
     comentario: str | None = Field(default=None, max_length=500)
     valor: Decimal = Field(ge=0)
+    servicio_ids: list[int] = Field(min_length=1)
 
 
 class ModuloResponse(BaseModel):
@@ -40,6 +45,8 @@ class ModuloResponse(BaseModel):
     descripcion: str
     comentario: str | None
     valor: Decimal
+    servicio_ids: list[int] = []
+    servicio_nombres: list[str] = []
     created_at: datetime
     updated_at: datetime
 
@@ -59,15 +66,6 @@ class PeriodoResponse(BaseModel):
     estado: str
     created_at: datetime
     updated_at: datetime
-
-
-class ValorHoraUpdateRequest(BaseModel):
-    valor_hora: Decimal = Field(ge=0)
-
-
-class ValorHoraResponse(BaseModel):
-    valor_hora: Decimal
-    updated_at: datetime | None = None
 
 
 class JefeServicioCreateRequest(BaseModel):

@@ -43,20 +43,16 @@ export function NovedadesCargaPage() {
   const load = async () => {
     setError("");
     try {
-      const [s, m, p, a, n, vh] = await Promise.all([
+      const [s, p, a, n] = await Promise.all([
         apiRequestWithRefresh("/novedades/servicios"),
-        apiRequestWithRefresh("/novedades/modulos"),
         apiRequestWithRefresh("/novedades/periodos"),
         apiRequestWithRefresh("/novedades/asignaciones-modulos"),
         apiRequestWithRefresh("/novedades/cargas"),
-        apiRequestWithRefresh("/novedades/valor-hora"),
       ]);
       setServicios(s);
-      setModulos(m);
       setPeriodos(p);
       setAsignaciones(a);
       setNovedades(n);
-      setValorHora(vh?.valor_hora ?? null);
       setPeriodoId((current) => {
         if (current) return current;
         const open = p.find((item) => item.estado === "open");
@@ -72,21 +68,31 @@ export function NovedadesCargaPage() {
   }, []);
 
   useEffect(() => {
-    const fetchPros = async () => {
+    const fetchProsAndModulos = async () => {
       if (!servicioId) {
         setProfesionales([]);
+        setModulos([]);
+        setValorHora(null);
         setProfessionalId("");
+        setModuloId("");
         return;
       }
+      const selected = servicios.find((s) => String(s.id) === String(servicioId));
+      setValorHora(selected?.valor_hora ?? null);
       try {
-        const rows = await apiRequestWithRefresh(`/novedades/profesionales?servicio_id=${servicioId}`);
+        const [rows, mods] = await Promise.all([
+          apiRequestWithRefresh(`/novedades/profesionales?servicio_id=${servicioId}`),
+          apiRequestWithRefresh(`/novedades/modulos?servicio_id=${servicioId}`),
+        ]);
         setProfesionales(rows);
+        setModulos(mods);
+        setModuloId("");
       } catch (err) {
-        setError(err.message || "Error al cargar profesionales");
+        setError(err.message || "Error al cargar datos del servicio");
       }
     };
-    fetchPros();
-  }, [servicioId]);
+    fetchProsAndModulos();
+  }, [servicioId, servicios]);
 
   const submitCarga = async (event) => {
     event.preventDefault();
@@ -148,10 +154,10 @@ export function NovedadesCargaPage() {
       <div style={uiStyles.pageSection}>
         <h1 style={uiStyles.sectionTitle}>Carga de módulos / novedades</h1>
         <p style={uiStyles.helpText}>
-          Con un solo envío podés cargar módulo, novedad (tipo + horas enteras) o ambos.
-          Los profesionales deben estar asociados al servicio en Parametrización.
+          Podés cargar módulo, novedad (tipo + horas enteras) o ambos.
+          Los módulos listados son los asociados al servicio elegido. El valor hora es el del servicio.
           {openPeriodo ? ` Período abierto: #${openPeriodo.id}.` : " No hay período abierto."}
-          {valorHora != null ? ` Valor hora: $${valorHora}.` : ""}
+          {valorHora != null ? ` Valor hora del servicio: $${valorHora}.` : ""}
         </p>
         {error ? <p style={{ color: uiTheme.colors.danger }}>{error}</p> : null}
 

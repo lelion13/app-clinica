@@ -31,6 +31,7 @@ class NovedadesServicio(AuditMixin, Base):
     id: Mapped[int] = mapped_column(Integer, primary_key=True)
     nombre: Mapped[str] = mapped_column(String(120), nullable=False)
     activo: Mapped[bool] = mapped_column(Boolean, nullable=False, default=True)
+    valor_hora: Mapped[Decimal] = mapped_column(Numeric(12, 2), nullable=False, default=Decimal("0"))
 
 
 class NovedadesModulo(AuditMixin, Base):
@@ -40,6 +41,14 @@ class NovedadesModulo(AuditMixin, Base):
     descripcion: Mapped[str] = mapped_column(String(200), nullable=False)
     comentario: Mapped[str | None] = mapped_column(String(500), nullable=True)
     valor: Mapped[Decimal] = mapped_column(Numeric(12, 2), nullable=False)
+
+
+class NovedadesModuloServicio(AuditMixin, Base):
+    __tablename__ = "novedades_modulo_servicio"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    modulo_id: Mapped[int] = mapped_column(ForeignKey("novedades_modulo.id"), nullable=False)
+    servicio_id: Mapped[int] = mapped_column(ForeignKey("novedades_servicio.id"), nullable=False)
 
 
 class NovedadesPeriodo(AuditMixin, Base):

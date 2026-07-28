@@ -17,7 +17,6 @@ from app.models.novedades import (
 from app.models.professional import Professional
 from app.models.user import User
 from app.schemas.novedades import GridRowResponse
-from app.services.novedades.helpers import get_or_create_config
 
 
 def build_grid_rows(
@@ -29,7 +28,6 @@ def build_grid_rows(
     concepto_q: str | None = None,
 ) -> list[GridRowResponse]:
     rows: list[GridRowResponse] = []
-    valor_hora = Decimal(get_or_create_config(db).valor_hora)
 
     asignaciones = list(
         db.execute(select(NovedadesAsignacionModulo).where(NovedadesAsignacionModulo.deleted_at.is_(None))).scalars().all()
@@ -41,7 +39,7 @@ def build_grid_rows(
         if row and _matches(row, periodo_id, servicio_id, q, concepto_q):
             rows.append(row)
     for item in novedades:
-        row = _novedad_row(db, item, valor_hora)
+        row = _novedad_row(db, item)
         if row and _matches(row, periodo_id, servicio_id, q, concepto_q):
             rows.append(row)
 
@@ -145,7 +143,7 @@ def _asignacion_row(db: Session, item: NovedadesAsignacionModulo) -> GridRowResp
     )
 
 
-def _novedad_row(db: Session, item: NovedadesNovedad, valor_hora: Decimal) -> GridRowResponse | None:
+def _novedad_row(db: Session, item: NovedadesNovedad) -> GridRowResponse | None:
     periodo, servicio, professional, actor = _base_context(
         db, item.periodo_id, item.servicio_id, item.professional_id, item.created_by
     )
@@ -154,6 +152,7 @@ def _novedad_row(db: Session, item: NovedadesNovedad, valor_hora: Decimal) -> Gr
     tipo = item.tipo if isinstance(item.tipo, NovedadTipo) else NovedadTipo(item.tipo)
     label = NOVEDAD_TIPO_LABELS.get(tipo, str(item.tipo))
     horas = Decimal(item.horas)
+    valor_hora = Decimal(servicio.valor_hora or 0)
     return GridRowResponse(
         tipo=tipo.value,
         id=item.id,
