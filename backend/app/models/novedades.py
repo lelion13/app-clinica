@@ -14,6 +14,17 @@ class PeriodoEstado(str, enum.Enum):
     closed = "closed"
 
 
+class NovedadTipo(str, enum.Enum):
+    hora_extra = "hora_extra"
+    hora_extra_por_ausencia = "hora_extra_por_ausencia"
+
+
+NOVEDAD_TIPO_LABELS = {
+    NovedadTipo.hora_extra: "Hora extra",
+    NovedadTipo.hora_extra_por_ausencia: "Hora extra por ausencia",
+}
+
+
 class NovedadesServicio(AuditMixin, Base):
     __tablename__ = "novedades_servicio"
 
@@ -38,7 +49,18 @@ class NovedadesPeriodo(AuditMixin, Base):
     nombre: Mapped[str | None] = mapped_column(String(120), nullable=True)
     fecha_inicio: Mapped[date] = mapped_column(Date, nullable=False)
     fecha_fin: Mapped[date] = mapped_column(Date, nullable=False)
-    estado: Mapped[PeriodoEstado] = mapped_column(Enum(PeriodoEstado, name="periodoestado", native_enum=False), nullable=False, default=PeriodoEstado.open)
+    estado: Mapped[PeriodoEstado] = mapped_column(
+        Enum(PeriodoEstado, name="periodoestado", native_enum=False),
+        nullable=False,
+        default=PeriodoEstado.open,
+    )
+
+
+class NovedadesConfig(AuditMixin, Base):
+    __tablename__ = "novedades_config"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    valor_hora: Mapped[Decimal] = mapped_column(Numeric(12, 2), nullable=False, default=Decimal("0"))
 
 
 class NovedadesJefeServicio(AuditMixin, Base):
@@ -74,6 +96,8 @@ class NovedadesNovedad(AuditMixin, Base):
     periodo_id: Mapped[int] = mapped_column(ForeignKey("novedades_periodo.id"), nullable=False)
     servicio_id: Mapped[int] = mapped_column(ForeignKey("novedades_servicio.id"), nullable=False)
     professional_id: Mapped[int] = mapped_column(ForeignKey("professionals.id"), nullable=False)
-    modulo_id: Mapped[int] = mapped_column(ForeignKey("novedades_modulo.id"), nullable=False)
-    valor: Mapped[Decimal] = mapped_column(Numeric(12, 2), nullable=False)
-    justificacion: Mapped[str] = mapped_column(String(1000), nullable=False)
+    tipo: Mapped[NovedadTipo] = mapped_column(
+        Enum(NovedadTipo, name="novedadtipo", native_enum=False),
+        nullable=False,
+    )
+    horas: Mapped[Decimal] = mapped_column(Numeric(10, 2), nullable=False)

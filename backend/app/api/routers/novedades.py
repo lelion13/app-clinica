@@ -6,7 +6,7 @@ from sqlalchemy.orm import Session
 
 from app.api.deps import require_admin_or_jefe, require_admin_or_rrhh, require_novedades_reader
 from app.db.session import get_db
-from app.models.novedades import PeriodoEstado
+from app.models.novedades import NOVEDAD_TIPO_LABELS, NovedadTipo, PeriodoEstado
 from app.models.user import User, UserRole
 from app.schemas.novedades import (
     AsignacionCreateRequest,
@@ -29,11 +29,14 @@ from app.schemas.novedades import (
     ServicioCreateRequest,
     ServicioResponse,
     ServicioUpdateRequest,
+    ValorHoraResponse,
+    ValorHoraUpdateRequest,
 )
 from app.services.novedades import cargas as cargas_service
+from app.services.novedades import config_service
 from app.services.novedades import export_xls
 from app.services.novedades import masters as masters_service
-from app.services.novedades.helpers import list_servicios_for_user
+from app.services.novedades.helpers import get_or_create_config, list_servicios_for_user
 from app.services.novedades.professional_directory import list_professionals_for_servicio
 
 router = APIRouter()
@@ -76,6 +79,42 @@ def _periodo_response(item) -> PeriodoResponse:
         estado=estado,
         created_at=item.created_at,
         updated_at=item.updated_at,
+    )
+
+
+def _novedad_response(db: Session, item) -> NovedadResponse:
+    tipo = item.tipo if isinstance(item.tipo, NovedadTipo) else NovedadTipo(item.tipo)
+    valor_hora = get_or_create_config(db).valor_hora
+    return NovedadResponse(
+        id=item.id,
+        periodo_id=item.periodo_id,
+        servicio_id=item.servicio_id,
+        professional_id=item.professional_id,
+        tipo=tipo.value,
+        tipo_label=NOVEDAD_TIPO_LABELS.get(tipo, tipo.value),
+        horas=item.horas,
+        valor_calculado=item.horas * valor_hora,
+        created_at=item.created_at,
+        updated_at=item.updated_at,
+        created_by=item.created_by,
+    )
+
+
+def _asignacion_response(db: Session, item) -> AsignacionResponse:
+    from app.models.novedades import NovedadesModulo
+
+    modulo = db.execute(select(NovedadesModulo).where(NovedadesModulo.id == item.modulo_id)).scalar_one_or_none()
+    return AsignacionResponse(
+        id=item.id,
+        periodo_id=item.periodo_id,
+        servicio_id=item.servicio_id,
+        professional_id=item.professional_id,
+        modulo_id=item.modulo_id,
+        modulo_descripcion=modulo.descripcion if modulo else None,
+        modulo_valor=modulo.valor if modulo else None,
+        created_at=item.created_at,
+        updated_at=item.updated_at,
+        created_by=item.created_by,
     )
 
 
@@ -305,19 +344,7 @@ def profesionales_directory(
 @router.get("/asignaciones-modulos", response_model=list[AsignacionResponse])
 def asignaciones_list(db: Session = Depends(get_db), user: User = Depends(require_admin_or_jefe)) -> list[AsignacionResponse]:
     _ = user
-    return [
-        AsignacionResponse(
-            id=item.id,
-            periodo_id=item.periodo_id,
-            servicio_id=item.servicio_id,
-            professional_id=item.professional_id,
-            modulo_id=item.modulo_id,
-            created_at=item.created_at,
-            updated_at=item.updated_at,
-            created_by=item.created_by,
-        )
-        for item in cargas_service.list_asignaciones(db)
-    ]
+    return [_asignacion_response(db, item) for item in cargas_service.list_asignaciones(db)]
 
 
 @router.post("/asignaciones-modulos", response_model=AsignacionResponse, status_code=status.HTTP_201_CREATED)
@@ -327,16 +354,7 @@ def asignaciones_create(
     user: User = Depends(require_admin_or_jefe),
 ) -> AsignacionResponse:
     item = cargas_service.create_asignacion(db, payload, user=user)
-    return AsignacionResponse(
-        id=item.id,
-        periodo_id=item.periodo_id,
-        servicio_id=item.servicio_id,
-        professional_id=item.professional_id,
-        modulo_id=item.modulo_id,
-        created_at=item.created_at,
-        updated_at=item.updated_at,
-        created_by=item.created_by,
-    )
+    return _asignacion_response(db, item)
 
 
 @router.put("/asignaciones-modulos/{item_id}", response_model=AsignacionResponse)
@@ -347,16 +365,7 @@ def asignaciones_update(
     user: User = Depends(require_admin_or_jefe),
 ) -> AsignacionResponse:
     item = cargas_service.update_asignacion(db, item_id, payload, user=user)
-    return AsignacionResponse(
-        id=item.id,
-        periodo_id=item.periodo_id,
-        servicio_id=item.servicio_id,
-        professional_id=item.professional_id,
-        modulo_id=item.modulo_id,
-        created_at=item.created_at,
-        updated_at=item.updated_at,
-        created_by=item.created_by,
-    )
+    return _asignacion_response(db, item)
 
 
 @router.delete("/asignaciones-modulos/{item_id}", status_code=status.HTTP_204_NO_CONTENT)
@@ -371,21 +380,7 @@ def asignaciones_delete(
 @router.get("/cargas", response_model=list[NovedadResponse])
 def novedades_list(db: Session = Depends(get_db), user: User = Depends(require_admin_or_jefe)) -> list[NovedadResponse]:
     _ = user
-    return [
-        NovedadResponse(
-            id=item.id,
-            periodo_id=item.periodo_id,
-            servicio_id=item.servicio_id,
-            professional_id=item.professional_id,
-            modulo_id=item.modulo_id,
-            valor=item.valor,
-            justificacion=item.justificacion,
-            created_at=item.created_at,
-            updated_at=item.updated_at,
-            created_by=item.created_by,
-        )
-        for item in cargas_service.list_novedades(db)
-    ]
+    return [_novedad_response(db, item) for item in cargas_service.list_novedades(db)]
 
 
 @router.post("/cargas", response_model=NovedadResponse, status_code=status.HTTP_201_CREATED)
@@ -395,18 +390,7 @@ def novedades_create(
     user: User = Depends(require_admin_or_jefe),
 ) -> NovedadResponse:
     item = cargas_service.create_novedad(db, payload, user=user)
-    return NovedadResponse(
-        id=item.id,
-        periodo_id=item.periodo_id,
-        servicio_id=item.servicio_id,
-        professional_id=item.professional_id,
-        modulo_id=item.modulo_id,
-        valor=item.valor,
-        justificacion=item.justificacion,
-        created_at=item.created_at,
-        updated_at=item.updated_at,
-        created_by=item.created_by,
-    )
+    return _novedad_response(db, item)
 
 
 @router.put("/cargas/{item_id}", response_model=NovedadResponse)
@@ -417,18 +401,7 @@ def novedades_update(
     user: User = Depends(require_admin_or_jefe),
 ) -> NovedadResponse:
     item = cargas_service.update_novedad(db, item_id, payload, user=user)
-    return NovedadResponse(
-        id=item.id,
-        periodo_id=item.periodo_id,
-        servicio_id=item.servicio_id,
-        professional_id=item.professional_id,
-        modulo_id=item.modulo_id,
-        valor=item.valor,
-        justificacion=item.justificacion,
-        created_at=item.created_at,
-        updated_at=item.updated_at,
-        created_by=item.created_by,
-    )
+    return _novedad_response(db, item)
 
 
 @router.delete("/cargas/{item_id}", status_code=status.HTTP_204_NO_CONTENT)
@@ -440,17 +413,34 @@ def novedades_delete(
     cargas_service.delete_novedad(db, item_id, user=user)
 
 
+@router.get("/valor-hora", response_model=ValorHoraResponse)
+def valor_hora_get(db: Session = Depends(get_db), user: User = Depends(require_novedades_reader)) -> ValorHoraResponse:
+    _ = user
+    valor, updated_at = config_service.get_valor_hora(db)
+    return ValorHoraResponse(valor_hora=valor, updated_at=updated_at)
+
+
+@router.put("/valor-hora", response_model=ValorHoraResponse)
+def valor_hora_put(
+    payload: ValorHoraUpdateRequest,
+    db: Session = Depends(get_db),
+    user: User = Depends(require_admin_or_rrhh),
+) -> ValorHoraResponse:
+    valor, updated_at = config_service.set_valor_hora(db, payload, actor_id=user.id)
+    return ValorHoraResponse(valor_hora=valor, updated_at=updated_at)
+
+
 @router.get("/grilla", response_model=list[GridRowResponse])
 def grilla_list(
     periodo_id: int | None = Query(default=None),
     servicio_id: int | None = Query(default=None),
     q: str | None = Query(default=None),
-    modulo: str | None = Query(default=None),
+    concepto: str | None = Query(default=None),
     db: Session = Depends(get_db),
     user: User = Depends(require_admin_or_rrhh),
 ) -> list[GridRowResponse]:
     _ = user
-    return export_xls.build_grid_rows(db, periodo_id=periodo_id, servicio_id=servicio_id, q=q, modulo_q=modulo)
+    return export_xls.build_grid_rows(db, periodo_id=periodo_id, servicio_id=servicio_id, q=q, concepto_q=concepto)
 
 
 @router.get("/export.xlsx")
@@ -458,12 +448,12 @@ def export_xlsx(
     periodo_id: int | None = Query(default=None),
     servicio_id: int | None = Query(default=None),
     q: str | None = Query(default=None),
-    modulo: str | None = Query(default=None),
+    concepto: str | None = Query(default=None),
     db: Session = Depends(get_db),
     user: User = Depends(require_admin_or_rrhh),
 ) -> Response:
     _ = user
-    content = export_xls.export_xlsx_bytes(db, periodo_id=periodo_id, servicio_id=servicio_id, q=q, modulo_q=modulo)
+    content = export_xls.export_xlsx_bytes(db, periodo_id=periodo_id, servicio_id=servicio_id, q=q, concepto_q=concepto)
     return Response(
         content=content,
         media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",

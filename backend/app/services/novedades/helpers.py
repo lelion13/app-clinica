@@ -5,6 +5,7 @@ from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from app.models.novedades import (
+    NovedadesConfig,
     NovedadesJefeServicio,
     NovedadesModulo,
     NovedadesPeriodo,
@@ -79,6 +80,21 @@ def assert_can_load_servicio(db: Session, user: User, servicio_id: int) -> None:
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Servicio fuera de alcance")
 
 
+def require_profesional_en_servicio(db: Session, professional_id: int, servicio_id: int) -> None:
+    link = db.execute(
+        select(NovedadesProfesionalServicio).where(
+            NovedadesProfesionalServicio.professional_id == professional_id,
+            NovedadesProfesionalServicio.servicio_id == servicio_id,
+            NovedadesProfesionalServicio.deleted_at.is_(None),
+        )
+    ).scalar_one_or_none()
+    if not link:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail="El profesional no esta asociado al servicio (ABM Parametrizacion)",
+        )
+
+
 def list_servicios_for_user(db: Session, user: User) -> list[NovedadesServicio]:
     query = select(NovedadesServicio).where(NovedadesServicio.deleted_at.is_(None)).order_by(NovedadesServicio.id)
     if user.role == UserRole.jefe_medico:
@@ -95,28 +111,24 @@ def list_servicios_for_user(db: Session, user: User) -> list[NovedadesServicio]:
     return list(db.execute(query).scalars().all())
 
 
-def ensure_profesional_servicio_link(db: Session, professional_id: int, servicio_id: int, actor_id: int) -> None:
-    existing = db.execute(
-        select(NovedadesProfesionalServicio).where(
-            NovedadesProfesionalServicio.professional_id == professional_id,
-            NovedadesProfesionalServicio.servicio_id == servicio_id,
-            NovedadesProfesionalServicio.deleted_at.is_(None),
-        )
-    ).scalar_one_or_none()
-    if existing:
-        return
+def get_or_create_config(db: Session) -> NovedadesConfig:
+    item = db.execute(select(NovedadesConfig).where(NovedadesConfig.id == 1)).scalar_one_or_none()
+    if item:
+        return item
     now = datetime.utcnow()
-    db.add(
-        NovedadesProfesionalServicio(
-            professional_id=professional_id,
-            servicio_id=servicio_id,
-            created_at=now,
-            updated_at=now,
-            created_by=actor_id,
-            updated_by=actor_id,
-            deleted_at=None,
-        )
+    item = NovedadesConfig(
+        id=1,
+        valor_hora=0,
+        created_at=now,
+        updated_at=now,
+        created_by=None,
+        updated_by=None,
+        deleted_at=None,
     )
+    db.add(item)
+    db.commit()
+    db.refresh(item)
+    return item
 
 
 def soft_delete(item, actor_id: int) -> None:

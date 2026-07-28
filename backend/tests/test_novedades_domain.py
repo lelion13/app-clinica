@@ -27,13 +27,11 @@ class FakeResult:
 
 
 class FakeDB:
-    def __init__(self, mapping):
-        self.mapping = mapping
+    def __init__(self):
         self.added = []
         self.committed = False
 
     def execute(self, _stmt):
-        # Very small stub: callers pass through helpers that we monkeypatch in tests.
         return FakeResult(None)
 
     def add(self, item):
@@ -47,7 +45,7 @@ class FakeDB:
             item.id = 1
 
 
-def test_require_periodo_open_blocks_closed(monkeypatch):
+def test_require_periodo_open_blocks_closed():
     closed = SimpleNamespace(id=1, estado=PeriodoEstado.closed, deleted_at=None)
 
     class DB:
@@ -59,7 +57,7 @@ def test_require_periodo_open_blocks_closed(monkeypatch):
     assert exc.value.status_code == 409
 
 
-def test_assert_can_load_servicio_blocks_unscoped_jefe(monkeypatch):
+def test_assert_can_load_servicio_blocks_unscoped_jefe():
     user = SimpleNamespace(id=9, role=UserRole.jefe_medico)
 
     class DB:
@@ -72,7 +70,7 @@ def test_assert_can_load_servicio_blocks_unscoped_jefe(monkeypatch):
 
 
 def test_create_periodo_rejects_second_open(monkeypatch):
-    db = FakeDB({})
+    db = FakeDB()
     monkeypatch.setattr(cargas_service, "get_open_periodo", lambda _db: SimpleNamespace(id=99))
     payload = PeriodoCreateRequest(
         nombre="P2",
@@ -85,29 +83,33 @@ def test_create_periodo_rejects_second_open(monkeypatch):
     assert exc.value.status_code == 409
 
 
-def test_create_novedad_requires_justificacion():
-    user = SimpleNamespace(id=1, role=UserRole.admin)
-    payload = NovedadCreateRequest.model_construct(
+def test_novedad_create_request_requires_horas_positive():
+    with pytest.raises(Exception):
+        NovedadCreateRequest(
+            periodo_id=1,
+            servicio_id=1,
+            professional_id=1,
+            tipo="hora_extra",
+            horas=Decimal("0"),
+        )
+
+
+def test_novedad_tipos_validos():
+    payload = NovedadCreateRequest(
         periodo_id=1,
         servicio_id=1,
         professional_id=1,
-        modulo_id=1,
-        valor=Decimal("100.00"),
-        justificacion="   ",
+        tipo="hora_extra_por_ausencia",
+        horas=Decimal("2.5"),
     )
-    with pytest.raises(HTTPException) as exc:
-        cargas_service.create_novedad(FakeDB({}), payload, user=user)
-    assert exc.value.status_code == 422
+    assert payload.tipo == "hora_extra_por_ausencia"
+    assert payload.horas == Decimal("2.5")
 
 
 def test_export_xlsx_content_type_bytes(monkeypatch):
     from app.services.novedades import export_xls
 
-    monkeypatch.setattr(
-        export_xls,
-        "build_grid_rows",
-        lambda *args, **kwargs: [],
-    )
-    content = export_xls.export_xlsx_bytes(FakeDB({}))
+    monkeypatch.setattr(export_xls, "build_grid_rows", lambda *args, **kwargs: [])
+    content = export_xls.export_xlsx_bytes(FakeDB())
     assert isinstance(content, (bytes, bytearray))
-    assert content[:2] == b"PK"  # zip/xlsx signature
+    assert content[:2] == b"PK"

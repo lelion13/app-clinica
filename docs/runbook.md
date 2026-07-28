@@ -21,13 +21,17 @@
 ## Migraciones
 - Ejecutar migraciones despues de levantar backend:
 - `docker compose --env-file .env.prod -f docker-compose.prod.yml exec backend alembic upgrade head`
-- Cambio `novedades-modulos` (rev `0004_novedades_modulos`): extiende roles `jefe_medico` / `rrhh` y crea tablas `novedades_*`.
+- Cambio `novedades-modulos` (rev `0004` + `0005`): roles `jefe_medico` / `rrhh`, tablas `novedades_*`, novedades por tipo/horas y `valor_hora`.
 
 ## Roles (panel)
 - `admin`: distribución + novedades (todo) + usuarios
 - `operador`: solo distribución de consultorios
-- `jefe_medico`: solo carga de módulos/novedades (servicios asociados)
-- `rrhh`: parametrización + grilla/XLS + cierre/reapertura de período
+- `jefe_medico`: asignar módulos (valor de catálogo, no editable) y cargar novedades (tipo + horas) en sus servicios
+- `rrhh`: parametrización (incl. valor hora y profesional↔servicio) + grilla/XLS + cierre/reapertura de período
+
+## Flujo Novedades (resumen)
+1. Parametrización: servicios, módulos, **valor hora**, jefes↔servicios, **profesionales↔servicios**, período abierto.
+2. Carga: módulo solo / novedad solo / ambos. Valor novedad en reporte = horas × valor hora.
 
 ## Verificacion
 - App (mismo dominio): `GET https://<WEB_HOST>/health`

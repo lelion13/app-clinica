@@ -1,5 +1,6 @@
 from datetime import date, datetime
 from decimal import Decimal
+from typing import Literal
 
 from pydantic import BaseModel, Field
 
@@ -60,6 +61,15 @@ class PeriodoResponse(BaseModel):
     updated_at: datetime
 
 
+class ValorHoraUpdateRequest(BaseModel):
+    valor_hora: Decimal = Field(ge=0)
+
+
+class ValorHoraResponse(BaseModel):
+    valor_hora: Decimal
+    updated_at: datetime | None = None
+
+
 class JefeServicioCreateRequest(BaseModel):
     user_id: int
     servicio_id: int
@@ -114,24 +124,27 @@ class AsignacionResponse(BaseModel):
     servicio_id: int
     professional_id: int
     modulo_id: int
+    modulo_descripcion: str | None = None
+    modulo_valor: Decimal | None = None
     created_at: datetime
     updated_at: datetime
     created_by: int | None = None
+
+
+NovedadTipoLiteral = Literal["hora_extra", "hora_extra_por_ausencia"]
 
 
 class NovedadCreateRequest(BaseModel):
     periodo_id: int
     servicio_id: int
     professional_id: int
-    modulo_id: int
-    valor: Decimal = Field(ge=0)
-    justificacion: str = Field(min_length=1, max_length=1000)
+    tipo: NovedadTipoLiteral
+    horas: Decimal = Field(gt=0)
 
 
 class NovedadUpdateRequest(BaseModel):
-    modulo_id: int
-    valor: Decimal = Field(ge=0)
-    justificacion: str = Field(min_length=1, max_length=1000)
+    tipo: NovedadTipoLiteral
+    horas: Decimal = Field(gt=0)
 
 
 class NovedadResponse(BaseModel):
@@ -139,9 +152,10 @@ class NovedadResponse(BaseModel):
     periodo_id: int
     servicio_id: int
     professional_id: int
-    modulo_id: int
-    valor: Decimal
-    justificacion: str
+    tipo: str
+    tipo_label: str
+    horas: Decimal
+    valor_calculado: Decimal | None = None
     created_at: datetime
     updated_at: datetime
     created_by: int | None = None
@@ -156,9 +170,9 @@ class GridRowResponse(BaseModel):
     servicio_nombre: str
     professional_id: int
     professional_name: str
-    modulo_id: int
-    modulo_descripcion: str
+    concepto: str
+    horas: Decimal | None = None
     valor: Decimal | None
-    justificacion: str | None
+    valor_hora: Decimal | None = None
     cargado_por: str | None
     fecha_carga: datetime

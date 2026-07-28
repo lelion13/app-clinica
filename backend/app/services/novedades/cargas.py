@@ -24,11 +24,11 @@ from app.schemas.novedades import (
 )
 from app.services.novedades.helpers import (
     assert_can_load_servicio,
-    ensure_profesional_servicio_link,
     get_modulo_or_404,
     get_professional_or_404,
     get_servicio_or_404,
     require_periodo_open,
+    require_profesional_en_servicio,
     soft_delete,
 )
 from app.models.novedades import NovedadesPeriodo, PeriodoEstado
@@ -232,7 +232,7 @@ def create_asignacion(db: Session, payload: AsignacionCreateRequest, user: User)
     get_professional_or_404(db, payload.professional_id)
     get_modulo_or_404(db, payload.modulo_id)
     assert_can_load_servicio(db, user, payload.servicio_id)
-    ensure_profesional_servicio_link(db, payload.professional_id, payload.servicio_id, user.id)
+    require_profesional_en_servicio(db, payload.professional_id, payload.servicio_id)
     now = datetime.utcnow()
     item = NovedadesAsignacionModulo(
         periodo_id=payload.periodo_id,
@@ -295,22 +295,20 @@ def list_novedades(db: Session) -> list[NovedadesNovedad]:
 
 
 def create_novedad(db: Session, payload: NovedadCreateRequest, user: User) -> NovedadesNovedad:
-    if not payload.justificacion.strip():
-        raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail="Justificacion requerida")
+    from app.models.novedades import NovedadTipo
+
     require_periodo_open(db, payload.periodo_id)
     get_servicio_or_404(db, payload.servicio_id)
     get_professional_or_404(db, payload.professional_id)
-    get_modulo_or_404(db, payload.modulo_id)
     assert_can_load_servicio(db, user, payload.servicio_id)
-    ensure_profesional_servicio_link(db, payload.professional_id, payload.servicio_id, user.id)
+    require_profesional_en_servicio(db, payload.professional_id, payload.servicio_id)
     now = datetime.utcnow()
     item = NovedadesNovedad(
         periodo_id=payload.periodo_id,
         servicio_id=payload.servicio_id,
         professional_id=payload.professional_id,
-        modulo_id=payload.modulo_id,
-        valor=payload.valor,
-        justificacion=payload.justificacion.strip(),
+        tipo=NovedadTipo(payload.tipo),
+        horas=payload.horas,
         created_at=now,
         updated_at=now,
         created_by=user.id,
@@ -324,8 +322,8 @@ def create_novedad(db: Session, payload: NovedadCreateRequest, user: User) -> No
 
 
 def update_novedad(db: Session, item_id: int, payload: NovedadUpdateRequest, user: User) -> NovedadesNovedad:
-    if not payload.justificacion.strip():
-        raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail="Justificacion requerida")
+    from app.models.novedades import NovedadTipo
+
     item = db.execute(
         select(NovedadesNovedad).where(NovedadesNovedad.id == item_id, NovedadesNovedad.deleted_at.is_(None))
     ).scalar_one_or_none()
@@ -333,10 +331,8 @@ def update_novedad(db: Session, item_id: int, payload: NovedadUpdateRequest, use
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Novedad no encontrada")
     require_periodo_open(db, item.periodo_id)
     assert_can_load_servicio(db, user, item.servicio_id)
-    get_modulo_or_404(db, payload.modulo_id)
-    item.modulo_id = payload.modulo_id
-    item.valor = payload.valor
-    item.justificacion = payload.justificacion.strip()
+    item.tipo = NovedadTipo(payload.tipo)
+    item.horas = payload.horas
     item.updated_at = datetime.utcnow()
     item.updated_by = user.id
     db.commit()

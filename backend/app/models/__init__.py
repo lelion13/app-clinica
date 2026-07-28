@@ -3,6 +3,7 @@ from app.models.consulting_room import ConsultingRoom, RoomOperatingHour
 from app.models.location import Location
 from app.models.novedades import (
     NovedadesAsignacionModulo,
+    NovedadesConfig,
     NovedadesJefeServicio,
     NovedadesModulo,
     NovedadesNovedad,
@@ -25,6 +26,7 @@ __all__ = [
     "NovedadesServicio",
     "NovedadesModulo",
     "NovedadesPeriodo",
+    "NovedadesConfig",
     "NovedadesJefeServicio",
     "NovedadesProfesionalServicio",
     "NovedadesAsignacionModulo",

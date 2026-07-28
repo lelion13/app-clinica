@@ -11,14 +11,14 @@ export function NovedadesXlsPage() {
   const [periodoId, setPeriodoId] = useState("");
   const [servicioId, setServicioId] = useState("");
   const [q, setQ] = useState("");
-  const [modulo, setModulo] = useState("");
+  const [concepto, setConcepto] = useState("");
 
   const queryString = () => {
     const params = new URLSearchParams();
     if (periodoId) params.set("periodo_id", periodoId);
     if (servicioId) params.set("servicio_id", servicioId);
     if (q.trim()) params.set("q", q.trim());
-    if (modulo.trim()) params.set("modulo", modulo.trim());
+    if (concepto.trim()) params.set("concepto", concepto.trim());
     const qs = params.toString();
     return qs ? `?${qs}` : "";
   };
@@ -61,7 +61,9 @@ export function NovedadesXlsPage() {
   return (
     <section style={uiStyles.pageSection}>
       <h1 style={uiStyles.sectionTitle}>Generación archivo XLS</h1>
-      <p style={uiStyles.helpText}>Grilla de módulos asignados y novedades. Filtrá y descargá Excel.</p>
+      <p style={uiStyles.helpText}>
+        Grilla de módulos asignados y novedades. En novedades, valor = horas × valor hora.
+      </p>
       {error ? <p style={{ color: uiTheme.colors.danger }}>{error}</p> : null}
 
       <div style={{ display: "flex", gap: 8, flexWrap: "wrap", marginBottom: 12 }}>
@@ -78,7 +80,7 @@ export function NovedadesXlsPage() {
           ))}
         </select>
         <input value={q} onChange={(e) => setQ(e.target.value)} placeholder="Buscar profesional/servicio" style={uiStyles.formControl} />
-        <input value={modulo} onChange={(e) => setModulo(e.target.value)} placeholder="Módulo/concepto" style={uiStyles.formControl} />
+        <input value={concepto} onChange={(e) => setConcepto(e.target.value)} placeholder="Concepto / tipo" style={uiStyles.formControl} />
         <button type="button" style={uiStyles.buttonSecondary} onClick={load}>Buscar</button>
         <button type="button" style={uiStyles.buttonPrimary} onClick={download}>Descargar XLS</button>
       </div>
@@ -87,7 +89,7 @@ export function NovedadesXlsPage() {
         <table style={{ width: "100%", borderCollapse: "collapse", fontSize: "0.9rem" }}>
           <thead>
             <tr>
-              {["Período", "Servicio", "Profesional", "Tipo", "Concepto", "Valor", "Justificación", "Cargado por", "Fecha"].map((h) => (
+              {["Período", "Servicio", "Profesional", "Tipo", "Concepto", "Horas", "Valor hora", "Valor", "Cargado por", "Fecha"].map((h) => (
                 <th key={h} style={{ textAlign: "left", padding: 8, borderBottom: `1px solid ${uiTheme.colors.border}` }}>{h}</th>
               ))}
             </tr>
@@ -99,9 +101,10 @@ export function NovedadesXlsPage() {
                 <td style={{ padding: 8, borderBottom: `1px solid ${uiTheme.colors.border}` }}>{row.servicio_nombre}</td>
                 <td style={{ padding: 8, borderBottom: `1px solid ${uiTheme.colors.border}` }}>{row.professional_name}</td>
                 <td style={{ padding: 8, borderBottom: `1px solid ${uiTheme.colors.border}` }}>{row.tipo}</td>
-                <td style={{ padding: 8, borderBottom: `1px solid ${uiTheme.colors.border}` }}>{row.modulo_descripcion}</td>
+                <td style={{ padding: 8, borderBottom: `1px solid ${uiTheme.colors.border}` }}>{row.concepto}</td>
+                <td style={{ padding: 8, borderBottom: `1px solid ${uiTheme.colors.border}` }}>{row.horas ?? "—"}</td>
+                <td style={{ padding: 8, borderBottom: `1px solid ${uiTheme.colors.border}` }}>{row.valor_hora ?? "—"}</td>
                 <td style={{ padding: 8, borderBottom: `1px solid ${uiTheme.colors.border}` }}>{row.valor ?? "—"}</td>
-                <td style={{ padding: 8, borderBottom: `1px solid ${uiTheme.colors.border}` }}>{row.justificacion || "—"}</td>
                 <td style={{ padding: 8, borderBottom: `1px solid ${uiTheme.colors.border}` }}>{row.cargado_por || "—"}</td>
                 <td style={{ padding: 8, borderBottom: `1px solid ${uiTheme.colors.border}` }}>{row.fecha_carga}</td>
               </tr>

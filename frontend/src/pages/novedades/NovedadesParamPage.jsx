@@ -6,7 +6,9 @@ import { uiStyles, uiTheme } from "../../ui/theme";
 const tabs = [
   { id: "servicios", label: "Servicios" },
   { id: "modulos", label: "Módulos" },
+  { id: "valor_hora", label: "Valor hora" },
   { id: "jefes", label: "Jefes ↔ servicios" },
+  { id: "profesionales", label: "Profesionales ↔ servicios" },
   { id: "periodos", label: "Períodos" },
 ];
 
@@ -16,8 +18,11 @@ export function NovedadesParamPage() {
   const [servicios, setServicios] = useState([]);
   const [modulos, setModulos] = useState([]);
   const [jefes, setJefes] = useState([]);
+  const [profLinks, setProfLinks] = useState([]);
   const [periodos, setPeriodos] = useState([]);
   const [users, setUsers] = useState([]);
+  const [allPros, setAllPros] = useState([]);
+  const [valorHora, setValorHora] = useState("");
 
   const [servicioNombre, setServicioNombre] = useState("");
   const [moduloDesc, setModuloDesc] = useState("");
@@ -25,6 +30,8 @@ export function NovedadesParamPage() {
   const [moduloValor, setModuloValor] = useState("");
   const [jefeUserId, setJefeUserId] = useState("");
   const [jefeServicioId, setJefeServicioId] = useState("");
+  const [profId, setProfId] = useState("");
+  const [profServicioId, setProfServicioId] = useState("");
   const [periodoNombre, setPeriodoNombre] = useState("");
   const [periodoInicio, setPeriodoInicio] = useState("");
   const [periodoFin, setPeriodoFin] = useState("");
@@ -32,18 +39,24 @@ export function NovedadesParamPage() {
   const load = async () => {
     setError("");
     try {
-      const [s, m, j, p, u] = await Promise.all([
+      const [s, m, j, p, u, pl, pros, vh] = await Promise.all([
         apiRequestWithRefresh("/novedades/servicios"),
         apiRequestWithRefresh("/novedades/modulos"),
         apiRequestWithRefresh("/novedades/jefe-servicios"),
         apiRequestWithRefresh("/novedades/periodos"),
         apiRequestWithRefresh("/novedades/jefes-candidatos"),
+        apiRequestWithRefresh("/novedades/profesional-servicios"),
+        apiRequestWithRefresh("/novedades/profesionales"),
+        apiRequestWithRefresh("/novedades/valor-hora"),
       ]);
       setServicios(s);
       setModulos(m);
       setJefes(j);
       setPeriodos(p);
       setUsers(u || []);
+      setProfLinks(pl || []);
+      setAllPros(pros || []);
+      setValorHora(vh?.valor_hora != null ? String(vh.valor_hora) : "");
     } catch (err) {
       setError(err.message || "Error al cargar");
     }
@@ -79,6 +92,15 @@ export function NovedadesParamPage() {
     await load();
   };
 
+  const saveValorHora = async (event) => {
+    event.preventDefault();
+    await apiRequestWithRefresh("/novedades/valor-hora", {
+      method: "PUT",
+      body: JSON.stringify({ valor_hora: Number(valorHora) }),
+    });
+    await load();
+  };
+
   const createJefe = async (event) => {
     event.preventDefault();
     await apiRequestWithRefresh("/novedades/jefe-servicios", {
@@ -87,6 +109,17 @@ export function NovedadesParamPage() {
     });
     setJefeUserId("");
     setJefeServicioId("");
+    await load();
+  };
+
+  const createProfLink = async (event) => {
+    event.preventDefault();
+    await apiRequestWithRefresh("/novedades/profesional-servicios", {
+      method: "POST",
+      body: JSON.stringify({ professional_id: Number(profId), servicio_id: Number(profServicioId) }),
+    });
+    setProfId("");
+    setProfServicioId("");
     await load();
   };
 
@@ -110,7 +143,9 @@ export function NovedadesParamPage() {
   return (
     <section style={uiStyles.pageSection}>
       <h1 style={uiStyles.sectionTitle}>Parametrización — Novedades</h1>
-      <p style={uiStyles.helpText}>ABM de servicios, módulos, asociaciones jefe↔servicio y períodos.</p>
+      <p style={uiStyles.helpText}>
+        ABM de servicios, módulos, valor hora, asociaciones y períodos. Asociá profesionales a servicios antes de cargar.
+      </p>
       {error ? <p style={{ color: uiTheme.colors.danger }}>{error}</p> : null}
 
       <div style={{ display: "flex", gap: 8, flexWrap: "wrap", marginBottom: 16 }}>
@@ -166,6 +201,16 @@ export function NovedadesParamPage() {
         </>
       ) : null}
 
+      {tab === "valor_hora" ? (
+        <>
+          <p style={uiStyles.helpText}>Se usa para calcular el valor de novedades: horas × valor hora.</p>
+          <form onSubmit={saveValorHora} style={{ display: "flex", gap: 8, flexWrap: "wrap", marginBottom: 12 }}>
+            <input type="number" step="0.01" min="0" value={valorHora} onChange={(e) => setValorHora(e.target.value)} placeholder="Valor hora ARS" required style={uiStyles.formControl} />
+            <button type="submit" style={uiStyles.buttonPrimary}>Guardar valor hora</button>
+          </form>
+        </>
+      ) : null}
+
       {tab === "jefes" ? (
         <>
           <form onSubmit={createJefe} style={{ display: "flex", gap: 8, flexWrap: "wrap", marginBottom: 12 }}>
@@ -188,6 +233,37 @@ export function NovedadesParamPage() {
               <li key={item.id} style={{ padding: "8px 10px", borderBottom: `1px solid ${uiTheme.colors.border}` }}>
                 {item.user_name || item.user_id} → {item.servicio_nombre || item.servicio_id}{" "}
                 <button type="button" style={{ ...uiStyles.buttonDanger, marginLeft: 8 }} onClick={async () => { await apiRequestWithRefresh(`/novedades/jefe-servicios/${item.id}`, { method: "DELETE" }); await load(); }}>
+                  eliminar
+                </button>
+              </li>
+            ))}
+          </ul>
+        </>
+      ) : null}
+
+      {tab === "profesionales" ? (
+        <>
+          <p style={uiStyles.helpText}>Solo los profesionales asociados a un servicio aparecen en la carga de módulos/novedades.</p>
+          <form onSubmit={createProfLink} style={{ display: "flex", gap: 8, flexWrap: "wrap", marginBottom: 12 }}>
+            <select value={profId} onChange={(e) => setProfId(e.target.value)} required style={uiStyles.formControl}>
+              <option value="">Profesional</option>
+              {allPros.map((p) => (
+                <option key={p.id} value={p.id}>{p.full_name}</option>
+              ))}
+            </select>
+            <select value={profServicioId} onChange={(e) => setProfServicioId(e.target.value)} required style={uiStyles.formControl}>
+              <option value="">Servicio</option>
+              {servicios.map((s) => (
+                <option key={s.id} value={s.id}>{s.nombre}</option>
+              ))}
+            </select>
+            <button type="submit" style={uiStyles.buttonPrimary}>Asociar</button>
+          </form>
+          <ul style={uiStyles.listCard}>
+            {profLinks.map((item) => (
+              <li key={item.id} style={{ padding: "8px 10px", borderBottom: `1px solid ${uiTheme.colors.border}` }}>
+                {item.professional_name || item.professional_id} → {item.servicio_nombre || item.servicio_id}{" "}
+                <button type="button" style={{ ...uiStyles.buttonDanger, marginLeft: 8 }} onClick={async () => { await apiRequestWithRefresh(`/novedades/profesional-servicios/${item.id}`, { method: "DELETE" }); await load(); }}>
                   eliminar
                 </button>
               </li>
