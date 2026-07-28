@@ -1,6 +1,6 @@
 """modulo-servicio N:N + valor_hora por servicio
 
-Revision ID: 0006_novedades_modulo_servicio_valor_hora
+Revision ID: 0006_mod_svc_valor_hora
 Revises: 0005_novedades_horas_valor
 Create Date: 2026-07-28
 """
@@ -8,7 +8,7 @@ Create Date: 2026-07-28
 from alembic import op
 import sqlalchemy as sa
 
-revision = "0006_novedades_modulo_servicio_valor_hora"
+revision = "0006_mod_svc_valor_hora"
 down_revision = "0005_novedades_horas_valor"
 branch_labels = None
 depends_on = None
