@@ -306,17 +306,12 @@ export function NovedadesCargaPage() {
         <CargasListGrid
           rows={gridRows}
           onAnular={async (row) => {
-            setError("");
-            try {
-              const path =
-                row.kind === "modulo"
-                  ? `/novedades/asignaciones-modulos/${row.id}`
-                  : `/novedades/cargas/${row.id}`;
-              await apiRequestWithRefresh(path, { method: "DELETE" });
-              await load();
-            } catch (err) {
-              setError(err.message || "No se pudo anular");
-            }
+            const path =
+              row.kind === "modulo"
+                ? `/novedades/asignaciones-modulos/${row.id}`
+                : `/novedades/cargas/${row.id}`;
+            await apiRequestWithRefresh(path, { method: "DELETE" });
+            await load();
           }}
         />
       </div>

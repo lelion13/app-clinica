@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 
 import { uiStyles, uiTheme } from "../../ui/theme";
 
@@ -74,6 +74,24 @@ export function CargasListGrid({ rows, onAnular }) {
   const [filterServicio, setFilterServicio] = useState("");
   const [sortKey, setSortKey] = useState("servicio");
   const [sortDir, setSortDir] = useState("asc");
+  const [pendingAnular, setPendingAnular] = useState(null);
+  const [anularError, setAnularError] = useState("");
+  const [anularLoading, setAnularLoading] = useState(false);
+
+  const closeAnularModal = () => {
+    if (anularLoading) return;
+    setPendingAnular(null);
+    setAnularError("");
+  };
+
+  useEffect(() => {
+    if (!pendingAnular) return undefined;
+    const onKey = (e) => {
+      if (e.key === "Escape") closeAnularModal();
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [pendingAnular, anularLoading]);
 
   const serviciosOptions = useMemo(() => {
     const map = new Map();
@@ -159,9 +177,23 @@ export function CargasListGrid({ rows, onAnular }) {
     return sortDir === "asc" ? " ↑" : " ↓";
   };
 
-  const anular = async (row) => {
-    if (!onAnular) return;
-    await onAnular(row);
+  const openAnularModal = (row) => {
+    setAnularError("");
+    setPendingAnular(row);
+  };
+
+  const confirmAnular = async () => {
+    if (!pendingAnular || !onAnular) return;
+    setAnularError("");
+    setAnularLoading(true);
+    try {
+      await onAnular(pendingAnular);
+      setPendingAnular(null);
+    } catch (err) {
+      setAnularError(err?.message || "No se pudo anular");
+    } finally {
+      setAnularLoading(false);
+    }
   };
 
   return (
@@ -244,7 +276,7 @@ export function CargasListGrid({ rows, onAnular }) {
                   {formatDate(row.fecha_carga)}
                 </td>
                 <td style={tdStyle}>
-                  <button type="button" style={uiStyles.buttonDanger} onClick={() => anular(row)}>
+                  <button type="button" style={uiStyles.buttonDanger} onClick={() => openAnularModal(row)}>
                     anular
                   </button>
                 </td>
@@ -258,6 +290,98 @@ export function CargasListGrid({ rows, onAnular }) {
           </p>
         ) : null}
       </div>
+
+      {pendingAnular ? (
+        <div
+          role="presentation"
+          style={{
+            position: "fixed",
+            inset: 0,
+            zIndex: 1000,
+            background: "rgba(15, 43, 39, 0.45)",
+            display: "flex",
+            alignItems: "flex-start",
+            justifyContent: "center",
+            padding: "max(16px, 4vh) 16px",
+            overflowY: "auto",
+          }}
+          onClick={closeAnularModal}
+        >
+          <div
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="anular-carga-modal-title"
+            onClick={(e) => e.stopPropagation()}
+            style={{
+              background: "#fff",
+              borderRadius: uiTheme.radius.md,
+              maxWidth: 520,
+              width: "100%",
+              marginBottom: 24,
+              padding: 22,
+              boxShadow: uiTheme.shadow.md,
+              border: `1px solid ${uiTheme.colors.border}`,
+            }}
+          >
+            <h2 id="anular-carga-modal-title" style={{ marginTop: 0, marginBottom: 10, fontSize: "1.1rem" }}>
+              ¿Anular esta carga?
+            </h2>
+            <p style={{ marginTop: 0, marginBottom: 12, color: uiTheme.colors.textMuted, fontSize: 14 }}>
+              Vas a anular el siguiente registro. Esta acción no se puede deshacer desde acá.
+            </p>
+            <div style={{ ...uiStyles.kpiCard, marginBottom: 14, lineHeight: 1.55, fontSize: 14 }}>
+              <div>
+                <strong>Tipo:</strong> {pendingAnular.kind_label}
+              </div>
+              <div>
+                <strong>Servicio:</strong> {pendingAnular.servicio_nombre || "—"}
+              </div>
+              <div>
+                <strong>Profesional:</strong> {pendingAnular.professional_name || "—"}
+              </div>
+              <div>
+                <strong>Concepto:</strong> {pendingAnular.concepto || "—"}
+              </div>
+              {pendingAnular.horas != null ? (
+                <div>
+                  <strong>Horas:</strong> {pendingAnular.horas}
+                </div>
+              ) : null}
+              <div>
+                <strong>Valor:</strong> {formatMoney(pendingAnular.valor)}
+              </div>
+              <div>
+                <strong>Período:</strong>{" "}
+                {pendingAnular.periodo_nombre || `#${pendingAnular.periodo_id}`}
+              </div>
+              <div>
+                <strong>Fecha de carga:</strong> {formatDate(pendingAnular.fecha_carga)}
+              </div>
+            </div>
+            {anularError ? (
+              <p style={{ color: uiTheme.colors.danger, margin: "0 0 10px", fontSize: 14 }}>{anularError}</p>
+            ) : null}
+            <div style={{ display: "flex", gap: 8, justifyContent: "flex-end", flexWrap: "wrap" }}>
+              <button
+                type="button"
+                onClick={closeAnularModal}
+                style={uiStyles.buttonSecondary}
+                disabled={anularLoading}
+              >
+                Cancelar
+              </button>
+              <button
+                type="button"
+                onClick={confirmAnular}
+                style={uiStyles.buttonDanger}
+                disabled={anularLoading}
+              >
+                {anularLoading ? "Anulando…" : "Confirmar"}
+              </button>
+            </div>
+          </div>
+        </div>
+      ) : null}
     </div>
   );
 }
