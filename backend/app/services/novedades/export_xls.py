@@ -70,6 +70,7 @@ def export_xlsx_bytes(
             "valor_hora",
             "valor",
             "cargado_por",
+            "fecha_realizacion",
             "fecha_carga",
         ]
     )
@@ -85,6 +86,7 @@ def export_xlsx_bytes(
                 float(row.valor_hora) if row.valor_hora is not None else None,
                 float(row.valor) if row.valor is not None else None,
                 row.cargado_por,
+                row.fecha_realizacion.isoformat() if row.fecha_realizacion else None,
                 row.fecha_carga.isoformat() if row.fecha_carga else None,
             ]
         )
@@ -139,6 +141,7 @@ def _asignacion_row(db: Session, item: NovedadesAsignacionModulo) -> GridRowResp
         valor=Decimal(modulo.valor),
         valor_hora=None,
         cargado_por=actor.name if actor else None,
+        fecha_realizacion=item.fecha_realizacion,
         fecha_carga=item.created_at,
     )
 
@@ -167,6 +170,7 @@ def _novedad_row(db: Session, item: NovedadesNovedad) -> GridRowResponse | None:
         valor=horas * valor_hora,
         valor_hora=valor_hora,
         cargado_por=actor.name if actor else None,
+        fecha_realizacion=item.fecha_realizacion,
         fecha_carga=item.created_at,
     )
 

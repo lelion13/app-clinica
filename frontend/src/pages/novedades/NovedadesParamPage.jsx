@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 
+import { ProfessionalCombobox } from "../../components/ProfessionalCombobox";
 import { apiRequestWithRefresh } from "../../services/api";
 import { uiStyles, uiTheme } from "../../ui/theme";
 
@@ -288,14 +289,18 @@ export function NovedadesParamPage() {
 
       {tab === "profesionales" ? (
         <>
-          <p style={uiStyles.helpText}>Solo los profesionales asociados a un servicio aparecen en la carga.</p>
-          <form onSubmit={createProfLink} style={{ display: "flex", gap: 8, flexWrap: "wrap", marginBottom: 12 }}>
-            <select value={profId} onChange={(e) => setProfId(e.target.value)} required style={uiStyles.formControl}>
-              <option value="">Profesional</option>
-              {allPros.map((p) => (
-                <option key={p.id} value={p.id}>{p.full_name}</option>
-              ))}
-            </select>
+          <p style={uiStyles.helpText}>
+            Solo los profesionales asociados a un servicio aparecen en la carga.
+            También podés gestionarlos en Mis profesionales.
+          </p>
+          <form onSubmit={createProfLink} style={{ display: "grid", gap: 10, marginBottom: 12, maxWidth: 480 }}>
+            <ProfessionalCombobox
+              label="Profesional"
+              professionals={allPros}
+              value={profId}
+              onChange={setProfId}
+              required
+            />
             <select value={profServicioId} onChange={(e) => setProfServicioId(e.target.value)} required style={uiStyles.formControl}>
               <option value="">Servicio</option>
               {servicios.map((s) => (

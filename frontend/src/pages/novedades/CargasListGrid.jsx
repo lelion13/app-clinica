@@ -65,10 +65,19 @@ function compareNumber(a, b) {
   return na - nb;
 }
 
+function formatDateOnly(value) {
+  if (!value) return "—";
+  if (typeof value === "string" && /^\d{4}-\d{2}-\d{2}/.test(value)) {
+    const [y, m, d] = value.slice(0, 10).split("-");
+    return `${d}/${m}/${y}`;
+  }
+  return formatDate(value);
+}
+
 /**
  * Unified sortable/filterable grid for módulo assignments + novedades.
  */
-export function CargasListGrid({ rows, onAnular }) {
+export function CargasListGrid({ rows, onAnular, onUpdateFecha }) {
   const [filterText, setFilterText] = useState("");
   const [filterTipo, setFilterTipo] = useState("");
   const [filterServicio, setFilterServicio] = useState("");
@@ -77,6 +86,10 @@ export function CargasListGrid({ rows, onAnular }) {
   const [pendingAnular, setPendingAnular] = useState(null);
   const [anularError, setAnularError] = useState("");
   const [anularLoading, setAnularLoading] = useState(false);
+  const [pendingFecha, setPendingFecha] = useState(null);
+  const [fechaEdit, setFechaEdit] = useState("");
+  const [fechaError, setFechaError] = useState("");
+  const [fechaLoading, setFechaLoading] = useState(false);
 
   const closeAnularModal = () => {
     if (anularLoading) return;
@@ -84,14 +97,23 @@ export function CargasListGrid({ rows, onAnular }) {
     setAnularError("");
   };
 
+  const closeFechaModal = () => {
+    if (fechaLoading) return;
+    setPendingFecha(null);
+    setFechaError("");
+  };
+
   useEffect(() => {
-    if (!pendingAnular) return undefined;
+    if (!pendingAnular && !pendingFecha) return undefined;
     const onKey = (e) => {
-      if (e.key === "Escape") closeAnularModal();
+      if (e.key === "Escape") {
+        closeAnularModal();
+        closeFechaModal();
+      }
     };
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
-  }, [pendingAnular, anularLoading]);
+  }, [pendingAnular, pendingFecha, anularLoading, fechaLoading]);
 
   const serviciosOptions = useMemo(() => {
     const map = new Map();
@@ -147,6 +169,9 @@ export function CargasListGrid({ rows, onAnular }) {
         case "fecha":
           cmp = compareText(a.fecha_carga, b.fecha_carga);
           break;
+        case "fecha_realizacion":
+          cmp = compareText(a.fecha_realizacion, b.fecha_realizacion);
+          break;
         case "periodo":
           cmp = compareText(a.periodo_nombre || a.periodo_id, b.periodo_nombre || b.periodo_id);
           break;
@@ -182,6 +207,12 @@ export function CargasListGrid({ rows, onAnular }) {
     setPendingAnular(row);
   };
 
+  const openFechaModal = (row) => {
+    setFechaError("");
+    setPendingFecha(row);
+    setFechaEdit(String(row.fecha_realizacion || "").slice(0, 10));
+  };
+
   const confirmAnular = async () => {
     if (!pendingAnular || !onAnular) return;
     setAnularError("");
@@ -193,6 +224,20 @@ export function CargasListGrid({ rows, onAnular }) {
       setAnularError(err?.message || "No se pudo anular");
     } finally {
       setAnularLoading(false);
+    }
+  };
+
+  const confirmFecha = async () => {
+    if (!pendingFecha || !onUpdateFecha || !fechaEdit) return;
+    setFechaError("");
+    setFechaLoading(true);
+    try {
+      await onUpdateFecha(pendingFecha, fechaEdit);
+      setPendingFecha(null);
+    } catch (err) {
+      setFechaError(err?.message || "No se pudo actualizar la fecha");
+    } finally {
+      setFechaLoading(false);
     }
   };
 
@@ -246,8 +291,9 @@ export function CargasListGrid({ rows, onAnular }) {
               <th style={thStyle} onClick={() => toggleSort("concepto")}>Concepto{sortMark("concepto")}</th>
               <th style={thStyle} onClick={() => toggleSort("horas")}>Horas{sortMark("horas")}</th>
               <th style={thStyle} onClick={() => toggleSort("valor")}>Valor{sortMark("valor")}</th>
+              <th style={thStyle} onClick={() => toggleSort("fecha_realizacion")}>F. realización{sortMark("fecha_realizacion")}</th>
               <th style={thStyle} onClick={() => toggleSort("periodo")}>Período{sortMark("periodo")}</th>
-              <th style={thStyle} onClick={() => toggleSort("fecha")}>Fecha{sortMark("fecha")}</th>
+              <th style={thStyle} onClick={() => toggleSort("fecha")}>F. carga{sortMark("fecha")}</th>
               <th style={{ ...thStyle, cursor: "default" }}> </th>
             </tr>
           </thead>
@@ -271,11 +317,17 @@ export function CargasListGrid({ rows, onAnular }) {
                 <td style={tdStyle}>{row.concepto}</td>
                 <td style={tdStyle}>{row.horas != null ? row.horas : "—"}</td>
                 <td style={{ ...tdStyle, fontVariantNumeric: "tabular-nums" }}>{formatMoney(row.valor)}</td>
+                <td style={tdStyle}>{formatDateOnly(row.fecha_realizacion)}</td>
                 <td style={tdStyle}>{row.periodo_nombre || `#${row.periodo_id}`}</td>
                 <td style={{ ...tdStyle, whiteSpace: "nowrap", color: uiTheme.colors.textMuted, fontSize: 13 }}>
                   {formatDate(row.fecha_carga)}
                 </td>
-                <td style={tdStyle}>
+                <td style={{ ...tdStyle, whiteSpace: "nowrap" }}>
+                  {row.periodo_estado === "open" && onUpdateFecha ? (
+                    <button type="button" style={{ ...uiStyles.buttonSecondary, marginRight: 6 }} onClick={() => openFechaModal(row)}>
+                      fecha
+                    </button>
+                  ) : null}
                   <button type="button" style={uiStyles.buttonDanger} onClick={() => openAnularModal(row)}>
                     anular
                   </button>
@@ -351,6 +403,9 @@ export function CargasListGrid({ rows, onAnular }) {
                 <strong>Valor:</strong> {formatMoney(pendingAnular.valor)}
               </div>
               <div>
+                <strong>Fecha de realización:</strong> {formatDateOnly(pendingAnular.fecha_realizacion)}
+              </div>
+              <div>
                 <strong>Período:</strong>{" "}
                 {pendingAnular.periodo_nombre || `#${pendingAnular.periodo_id}`}
               </div>
@@ -377,6 +432,65 @@ export function CargasListGrid({ rows, onAnular }) {
                 disabled={anularLoading}
               >
                 {anularLoading ? "Anulando…" : "Confirmar"}
+              </button>
+            </div>
+          </div>
+        </div>
+      ) : null}
+
+      {pendingFecha ? (
+        <div
+          role="presentation"
+          style={{
+            position: "fixed",
+            inset: 0,
+            zIndex: 1000,
+            background: "rgba(15, 43, 39, 0.45)",
+            display: "flex",
+            alignItems: "flex-start",
+            justifyContent: "center",
+            padding: "max(16px, 4vh) 16px",
+            overflowY: "auto",
+          }}
+          onClick={closeFechaModal}
+        >
+          <div
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="editar-fecha-modal-title"
+            onClick={(e) => e.stopPropagation()}
+            style={{
+              background: "#fff",
+              borderRadius: uiTheme.radius.md,
+              maxWidth: 420,
+              width: "100%",
+              marginBottom: 24,
+              padding: 22,
+              boxShadow: uiTheme.shadow.md,
+              border: `1px solid ${uiTheme.colors.border}`,
+            }}
+          >
+            <h2 id="editar-fecha-modal-title" style={{ marginTop: 0, marginBottom: 10, fontSize: "1.1rem" }}>
+              Editar fecha de realización
+            </h2>
+            <p style={{ marginTop: 0, marginBottom: 12, color: uiTheme.colors.textMuted, fontSize: 14 }}>
+              {pendingFecha.kind_label} · {pendingFecha.professional_name} · {pendingFecha.concepto}
+            </p>
+            <input
+              type="date"
+              value={fechaEdit}
+              onChange={(e) => setFechaEdit(e.target.value)}
+              style={{ ...uiStyles.formControl, width: "100%", marginBottom: 12 }}
+            />
+            {fechaError ? (
+              <p style={{ color: uiTheme.colors.danger, margin: "0 0 10px", fontSize: 14 }}>{fechaError}</p>
+            ) : null}
+            <div style={{ display: "flex", gap: 8, justifyContent: "flex-end", flexWrap: "wrap" }}>
+              <button type="button" onClick={closeFechaModal} style={uiStyles.buttonSecondary} disabled={fechaLoading}>
+                Cancelar
+              </button>
+              <button type="button" onClick={confirmFecha} style={uiStyles.buttonPrimary} disabled={fechaLoading || !fechaEdit}>
+                {fechaLoading ? "Guardando…" : "Confirmar"}
               </button>
             </div>
           </div>

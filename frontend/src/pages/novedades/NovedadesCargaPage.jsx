@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 
+import { ProfessionalCombobox } from "../../components/ProfessionalCombobox";
 import { apiRequestWithRefresh } from "../../services/api";
 import { uiStyles, uiTheme } from "../../ui/theme";
 import { CargasListGrid } from "./CargasListGrid";
@@ -8,6 +9,11 @@ const TIPO_OPTIONS = [
   { value: "hora_extra", label: "Hora extra" },
   { value: "hora_extra_por_ausencia", label: "Hora extra por ausencia" },
 ];
+
+function todayISO() {
+  const d = new Date();
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+}
 
 export function NovedadesCargaPage() {
   const [error, setError] = useState("");
@@ -26,6 +32,7 @@ export function NovedadesCargaPage() {
   const [tipo, setTipo] = useState("hora_extra");
   const [horas, setHoras] = useState("");
   const [incluirNovedad, setIncluirNovedad] = useState(false);
+  const [fechaRealizacion, setFechaRealizacion] = useState(todayISO());
   const [loadingServicio, setLoadingServicio] = useState(false);
 
   const openPeriodo = useMemo(() => periodos.find((p) => p.estado === "open"), [periodos]);
@@ -33,6 +40,14 @@ export function NovedadesCargaPage() {
     () => modulos.find((m) => String(m.id) === String(moduloId)),
     [modulos, moduloId]
   );
+
+  const fechaBounds = useMemo(() => {
+    const periodo = periodos.find((p) => String(p.id) === String(periodoId)) || openPeriodo;
+    if (!periodo) return { min: undefined, max: todayISO() };
+    const today = todayISO();
+    const max = periodo.fecha_fin < today ? periodo.fecha_fin : today;
+    return { min: periodo.fecha_inicio, max };
+  }, [periodos, periodoId, openPeriodo]);
 
   const gridRows = useMemo(() => {
     const moduloRows = asignaciones.map((item) => ({
@@ -48,7 +63,9 @@ export function NovedadesCargaPage() {
       concepto: item.modulo_descripcion || `Módulo #${item.modulo_id}`,
       horas: null,
       valor: item.modulo_valor,
+      fecha_realizacion: item.fecha_realizacion,
       fecha_carga: item.created_at,
+      periodo_estado: periodos.find((p) => p.id === item.periodo_id)?.estado,
     }));
     const novedadRows = novedades.map((item) => ({
       kind: "novedad",
@@ -63,10 +80,12 @@ export function NovedadesCargaPage() {
       concepto: item.tipo_label || item.tipo,
       horas: item.horas,
       valor: item.valor_calculado,
+      fecha_realizacion: item.fecha_realizacion,
       fecha_carga: item.created_at,
+      periodo_estado: periodos.find((p) => p.id === item.periodo_id)?.estado,
     }));
     return [...moduloRows, ...novedadRows];
-  }, [asignaciones, novedades]);
+  }, [asignaciones, novedades, periodos]);
 
   const clearCargaFields = () => {
     setProfessionalId("");
@@ -74,6 +93,7 @@ export function NovedadesCargaPage() {
     setTipo("hora_extra");
     setHoras("");
     setIncluirNovedad(false);
+    setFechaRealizacion(todayISO());
   };
 
   const load = async () => {
@@ -155,8 +175,8 @@ export function NovedadesCargaPage() {
     event.preventDefault();
     setError("");
 
-    if (!periodoId || !servicioId || !professionalId) {
-      setError("Completá período, servicio y profesional");
+    if (!periodoId || !servicioId || !professionalId || !fechaRealizacion) {
+      setError("Completá período, servicio, profesional y fecha de realización");
       return;
     }
 
@@ -184,6 +204,7 @@ export function NovedadesCargaPage() {
             servicio_id: Number(servicioId),
             professional_id: Number(professionalId),
             modulo_id: Number(moduloId),
+            fecha_realizacion: fechaRealizacion,
           }),
         });
       }
@@ -196,6 +217,7 @@ export function NovedadesCargaPage() {
             professional_id: Number(professionalId),
             tipo,
             horas: Number(horas),
+            fecha_realizacion: fechaRealizacion,
           }),
         });
       }
@@ -212,7 +234,7 @@ export function NovedadesCargaPage() {
         <h1 style={uiStyles.sectionTitle}>Carga de módulos / novedades</h1>
         <p style={uiStyles.helpText}>
           Podés cargar módulo, novedad (tipo + horas enteras) o ambos.
-          Los módulos listados son los asociados al servicio elegido. El valor hora es el del servicio.
+          Indicá el día de realización (dentro del período y no posterior a hoy).
           {openPeriodo ? ` Período abierto: #${openPeriodo.id}.` : " No hay período abierto."}
           {valorHora != null ? ` Valor hora del servicio: $${valorHora}.` : ""}
         </p>
@@ -233,19 +255,37 @@ export function NovedadesCargaPage() {
                 <option key={s.id} value={s.id}>{s.nombre}</option>
               ))}
             </select>
-            <select value={professionalId} onChange={(e) => setProfessionalId(e.target.value)} style={uiStyles.formControl} required>
-              <option value="">{servicioId ? "Profesional del servicio" : "Elegí servicio primero"}</option>
-              {profesionales.map((p) => (
-                <option key={p.id} value={p.id}>{p.full_name}</option>
-              ))}
-            </select>
+            <label style={{ display: "grid", gap: 4 }}>
+              <span style={{ fontSize: 12, color: uiTheme.colors.textMuted }}>Fecha realización</span>
+              <input
+                type="date"
+                value={fechaRealizacion}
+                min={fechaBounds.min}
+                max={fechaBounds.max}
+                onChange={(e) => setFechaRealizacion(e.target.value)}
+                required
+                style={uiStyles.formControl}
+              />
+            </label>
           </div>
+
+          <div style={{ marginBottom: 16, maxWidth: 420 }}>
+            <ProfessionalCombobox
+              label="Profesional"
+              professionals={profesionales}
+              value={professionalId}
+              onChange={setProfessionalId}
+              required
+              placeholder={servicioId ? "Buscar profesional del servicio…" : "Elegí servicio primero"}
+            />
+          </div>
+
           {loadingServicio ? (
             <p style={uiStyles.helpText}>Cargando profesionales y módulos del servicio…</p>
           ) : null}
           {!loadingServicio && servicioId && !profesionales.length ? (
             <p style={{ ...uiStyles.helpText, color: uiTheme.colors.danger }}>
-              No hay profesionales asociados a este servicio. Asociarlos en Parametrización → Profesionales ↔ servicios.
+              No hay profesionales asociados a este servicio. Asociarlos en Mis profesionales.
             </p>
           ) : null}
 
@@ -301,7 +341,7 @@ export function NovedadesCargaPage() {
         <h2 style={{ marginTop: 0, fontSize: "1.05rem" }}>Cargas</h2>
         <p style={{ ...uiStyles.helpText, marginTop: 0 }}>
           Módulos y novedades de tus servicios. Orden por defecto: servicio → profesional.
-          Podés filtrar y ordenar por columna.
+          Podés filtrar, ordenar y editar la fecha de realización si el período está abierto.
         </p>
         <CargasListGrid
           rows={gridRows}
@@ -311,6 +351,17 @@ export function NovedadesCargaPage() {
                 ? `/novedades/asignaciones-modulos/${row.id}`
                 : `/novedades/cargas/${row.id}`;
             await apiRequestWithRefresh(path, { method: "DELETE" });
+            await load();
+          }}
+          onUpdateFecha={async (row, fecha) => {
+            const path =
+              row.kind === "modulo"
+                ? `/novedades/asignaciones-modulos/${row.id}`
+                : `/novedades/cargas/${row.id}`;
+            await apiRequestWithRefresh(path, {
+              method: "PUT",
+              body: JSON.stringify({ fecha_realizacion: fecha }),
+            });
             await load();
           }}
         />

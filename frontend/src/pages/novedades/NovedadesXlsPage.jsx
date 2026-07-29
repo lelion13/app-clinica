@@ -89,7 +89,7 @@ export function NovedadesXlsPage() {
         <table style={{ width: "100%", borderCollapse: "collapse", fontSize: "0.9rem" }}>
           <thead>
             <tr>
-              {["Período", "Servicio", "Profesional", "Tipo", "Concepto", "Horas", "Valor hora", "Valor", "Cargado por", "Fecha"].map((h) => (
+              {["Período", "Servicio", "Profesional", "Tipo", "Concepto", "Horas", "Valor hora", "Valor", "Cargado por", "F. realización", "Fecha carga"].map((h) => (
                 <th key={h} style={{ textAlign: "left", padding: 8, borderBottom: `1px solid ${uiTheme.colors.border}` }}>{h}</th>
               ))}
             </tr>
@@ -106,6 +106,7 @@ export function NovedadesXlsPage() {
                 <td style={{ padding: 8, borderBottom: `1px solid ${uiTheme.colors.border}` }}>{row.valor_hora ?? "—"}</td>
                 <td style={{ padding: 8, borderBottom: `1px solid ${uiTheme.colors.border}` }}>{row.valor ?? "—"}</td>
                 <td style={{ padding: 8, borderBottom: `1px solid ${uiTheme.colors.border}` }}>{row.cargado_por || "—"}</td>
+                <td style={{ padding: 8, borderBottom: `1px solid ${uiTheme.colors.border}` }}>{row.fecha_realizacion || "—"}</td>
                 <td style={{ padding: 8, borderBottom: `1px solid ${uiTheme.colors.border}` }}>{row.fecha_carga}</td>
               </tr>
             ))}

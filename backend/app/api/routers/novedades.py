@@ -107,6 +107,7 @@ def _novedad_response(db: Session, item) -> NovedadResponse:
         tipo_label=NOVEDAD_TIPO_LABELS.get(tipo, tipo.value),
         horas=item.horas,
         valor_calculado=item.horas * valor_hora,
+        fecha_realizacion=item.fecha_realizacion,
         created_at=item.created_at,
         updated_at=item.updated_at,
         created_by=item.created_by,
@@ -136,6 +137,7 @@ def _asignacion_response(db: Session, item) -> AsignacionResponse:
         modulo_id=item.modulo_id,
         modulo_descripcion=modulo.descripcion if modulo else None,
         modulo_valor=modulo.valor if modulo else None,
+        fecha_realizacion=item.fecha_realizacion,
         created_at=item.created_at,
         updated_at=item.updated_at,
         created_by=item.created_by,
@@ -318,11 +320,10 @@ def jefe_servicios_delete(
 
 @router.get("/profesional-servicios", response_model=list[ProfesionalServicioResponse])
 def profesional_servicios_list(
-    db: Session = Depends(get_db), user: User = Depends(require_admin_or_rrhh)
+    db: Session = Depends(get_db), user: User = Depends(require_novedades_reader)
 ) -> list[ProfesionalServicioResponse]:
-    _ = user
     result = []
-    for link, professional, servicio in cargas_service.list_profesional_servicios(db):
+    for link, professional, servicio in cargas_service.list_profesional_servicios(db, user):
         result.append(
             ProfesionalServicioResponse(
                 id=link.id,
@@ -340,9 +341,9 @@ def profesional_servicios_list(
 def profesional_servicios_create(
     payload: ProfesionalServicioCreateRequest,
     db: Session = Depends(get_db),
-    user: User = Depends(require_admin_or_rrhh),
+    user: User = Depends(require_novedades_reader),
 ) -> ProfesionalServicioResponse:
-    item = cargas_service.create_profesional_servicio(db, payload, actor_id=user.id)
+    item = cargas_service.create_profesional_servicio(db, payload, user=user)
     return ProfesionalServicioResponse(
         id=item.id,
         professional_id=item.professional_id,
@@ -355,19 +356,23 @@ def profesional_servicios_create(
 def profesional_servicios_delete(
     link_id: int,
     db: Session = Depends(get_db),
-    user: User = Depends(require_admin_or_rrhh),
+    user: User = Depends(require_novedades_reader),
 ) -> None:
-    cargas_service.delete_profesional_servicio(db, link_id, actor_id=user.id)
+    cargas_service.delete_profesional_servicio(db, link_id, user=user)
 
 
 @router.get("/profesionales", response_model=list[ProfesionalDirectoryItem])
 def profesionales_directory(
     servicio_id: int | None = Query(default=None),
+    q: str | None = Query(default=None),
+    exclude_linked: bool = Query(default=False),
     db: Session = Depends(get_db),
     user: User = Depends(require_novedades_reader),
 ) -> list[ProfesionalDirectoryItem]:
     _ = user
-    return list_professionals_for_servicio(db, servicio_id=servicio_id)
+    return list_professionals_for_servicio(
+        db, servicio_id=servicio_id, q=q, exclude_linked=exclude_linked
+    )
 
 
 @router.get("/asignaciones-modulos", response_model=list[AsignacionResponse])

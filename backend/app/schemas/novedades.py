@@ -101,6 +101,7 @@ class ProfesionalDirectoryItem(BaseModel):
     id: int
     full_name: str
     license_number: str | None = None
+    external_document: str | None = None
     specialty: str | None = None
     is_active: bool
 
@@ -110,10 +111,12 @@ class AsignacionCreateRequest(BaseModel):
     servicio_id: int
     professional_id: int
     modulo_id: int
+    fecha_realizacion: date
 
 
 class AsignacionUpdateRequest(BaseModel):
-    modulo_id: int
+    modulo_id: int | None = None
+    fecha_realizacion: date | None = None
 
 
 class AsignacionResponse(BaseModel):
@@ -127,6 +130,7 @@ class AsignacionResponse(BaseModel):
     modulo_id: int
     modulo_descripcion: str | None = None
     modulo_valor: Decimal | None = None
+    fecha_realizacion: date
     created_at: datetime
     updated_at: datetime
     created_by: int | None = None
@@ -141,11 +145,13 @@ class NovedadCreateRequest(BaseModel):
     professional_id: int
     tipo: NovedadTipoLiteral
     horas: int = Field(ge=1)
+    fecha_realizacion: date
 
 
 class NovedadUpdateRequest(BaseModel):
-    tipo: NovedadTipoLiteral
-    horas: int = Field(ge=1)
+    tipo: NovedadTipoLiteral | None = None
+    horas: int | None = Field(default=None, ge=1)
+    fecha_realizacion: date | None = None
 
 
 class NovedadResponse(BaseModel):
@@ -160,6 +166,7 @@ class NovedadResponse(BaseModel):
     tipo_label: str
     horas: Decimal
     valor_calculado: Decimal | None = None
+    fecha_realizacion: date
     created_at: datetime
     updated_at: datetime
     created_by: int | None = None
@@ -179,4 +186,5 @@ class GridRowResponse(BaseModel):
     valor: Decimal | None
     valor_hora: Decimal | None = None
     cargado_por: str | None
+    fecha_realizacion: date | None = None
     fecha_carga: datetime

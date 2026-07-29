@@ -2,4 +2,7 @@
 
 Aquí van las especificaciones **de producto** que aplican más allá de un solo cambio (capacidades permanentes, reglas de negocio globales).
 
-Mientras el equipo no las externalice desde openspec delta, esta carpeta puede permanecer vacía o contener un único documento por dominio (`agenda.md`, `usuarios-auth.md`, etc.).
+| Dominio | Spec | Origen |
+|---------|------|--------|
+| `novedades/` | `spec.md` | Archive `2026-07-29-novedades-modulos` |
+| `auth-roles/` | `spec.md` | Archive `2026-07-29-novedades-modulos` (delta roles) |

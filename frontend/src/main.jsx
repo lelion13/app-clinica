@@ -16,6 +16,7 @@ import { UsersPage } from "./pages/UsersPage";
 import { HomePage } from "./pages/HomePage";
 import { WeeklyOccupancyPage } from "./pages/WeeklyOccupancyPage";
 import { NovedadesCargaPage } from "./pages/novedades/NovedadesCargaPage";
+import { NovedadesMisProfesionalesPage } from "./pages/novedades/NovedadesMisProfesionalesPage";
 import { NovedadesParamPage } from "./pages/novedades/NovedadesParamPage";
 import { NovedadesXlsPage } from "./pages/novedades/NovedadesXlsPage";
 import { ProtectedRoute } from "./router/ProtectedRoute";
@@ -46,6 +47,14 @@ function AppRouter() {
           element={
             <ProtectedRoute roles={["admin", "jefe_medico"]}>
               <NovedadesCargaPage />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="novedades/mis-profesionales"
+          element={
+            <ProtectedRoute roles={["admin", "rrhh", "jefe_medico"]}>
+              <NovedadesMisProfesionalesPage />
             </ProtectedRoute>
           }
         />

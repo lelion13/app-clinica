@@ -109,6 +109,7 @@ def test_novedad_create_request_requires_horas_positive():
             professional_id=1,
             tipo="hora_extra",
             horas=0,
+            fecha_realizacion=date(2026, 7, 15),
         )
 
 
@@ -119,9 +120,11 @@ def test_novedad_tipos_validos():
         professional_id=1,
         tipo="hora_extra_por_ausencia",
         horas=3,
+        fecha_realizacion=date(2026, 7, 15),
     )
     assert payload.tipo == "hora_extra_por_ausencia"
     assert payload.horas == 3
+    assert payload.fecha_realizacion == date(2026, 7, 15)
 
 
 def test_novedad_horas_rechaza_decimal():
@@ -132,7 +135,37 @@ def test_novedad_horas_rechaza_decimal():
             professional_id=1,
             tipo="hora_extra",
             horas=1.5,
+            fecha_realizacion=date(2026, 7, 15),
         )
+
+
+def test_validate_fecha_realizacion_fuera_periodo(monkeypatch):
+    from app.services.novedades.helpers import validate_fecha_realizacion
+
+    periodo = SimpleNamespace(fecha_inicio=date(2026, 7, 1), fecha_fin=date(2026, 7, 31))
+    monkeypatch.setattr("app.services.novedades.helpers.business_today", lambda: date(2026, 7, 20))
+    with pytest.raises(HTTPException) as exc:
+        validate_fecha_realizacion(periodo, date(2026, 6, 15))
+    assert exc.value.status_code == 422
+
+
+def test_validate_fecha_realizacion_futura(monkeypatch):
+    from app.services.novedades.helpers import validate_fecha_realizacion
+
+    periodo = SimpleNamespace(fecha_inicio=date(2026, 7, 1), fecha_fin=date(2026, 7, 31))
+    monkeypatch.setattr("app.services.novedades.helpers.business_today", lambda: date(2026, 7, 20))
+    with pytest.raises(HTTPException) as exc:
+        validate_fecha_realizacion(periodo, date(2026, 7, 21))
+    assert exc.value.status_code == 422
+
+
+def test_validate_fecha_realizacion_ok(monkeypatch):
+    from app.services.novedades.helpers import validate_fecha_realizacion
+
+    periodo = SimpleNamespace(fecha_inicio=date(2026, 7, 1), fecha_fin=date(2026, 7, 31))
+    monkeypatch.setattr("app.services.novedades.helpers.business_today", lambda: date(2026, 7, 20))
+    validate_fecha_realizacion(periodo, date(2026, 7, 15))
+
 
 def test_export_xlsx_content_type_bytes(monkeypatch):
     from app.services.novedades import export_xls

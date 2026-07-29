@@ -21,17 +21,33 @@
 ## Migraciones
 - Ejecutar migraciones despues de levantar backend:
 - `docker compose --env-file .env.prod -f docker-compose.prod.yml exec backend alembic upgrade head`
-- Cambio `novedades-modulos` (rev `0004`–`0006`): roles, tablas, novedades por tipo/horas, módulos↔servicios N:N, valor hora por servicio.
+- Cambio `novedades-modulos` (rev `0004` → `0005` → `0006_mod_svc_valor_hora`):
+  - `0004`: roles `jefe_medico`/`rrhh` + tablas base Novedades
+  - `0005`: novedades por **tipo + horas** (deja justificación/concepto-módulo)
+  - `0006`: módulos↔servicios N:N + **valor_hora por servicio**
+  - Importante: el `revision` id de `0006` es corto (`0006_mod_svc_valor_hora`) porque `alembic_version.version_num` es VARCHAR(32).
+- Cambio `novedades-jefe-profesionales-fecha-carga` (rev `0007_fecha_realizacion`):
+  - `fecha_realizacion` en asignaciones y novedades (dentro del período y ≤ hoy)
+  - menú **Mis profesionales** (jefe/admin/rrhh) para asociar/desasociar scoped
+  - grilla/XLS con Fecha realización + Fecha carga
 
 ## Roles (panel)
 - `admin`: distribución + novedades (todo) + usuarios
 - `operador`: solo distribución de consultorios
-- `jefe_medico`: asignar módulos (valor de catálogo, no editable) y cargar novedades (tipo + horas) en sus servicios
-- `rrhh`: parametrización (incl. valor hora y profesional↔servicio) + grilla/XLS + cierre/reapertura de período
+- `jefe_medico`: asignar módulos (valor de catálogo, no editable) y cargar novedades (tipo + horas) **solo en sus servicios**; el listado de cargas de la página Carga está **scoped** a esos servicios (orden servicio → profesional); gestiona **Mis profesionales** de sus servicios
+- `rrhh`: parametrización + Mis profesionales (todos) + grilla/XLS + cierre/reapertura de período (**sin** carga)
 
 ## Flujo Novedades (resumen)
 1. Parametrización: servicios (**con valor hora**), módulos (**asociados a uno o más servicios**), jefes↔servicios, profesionales↔servicios, período abierto.
-2. Carga: módulo solo / novedad solo / ambos. Valor novedad = horas × valor hora **del servicio**.
+2. Mis profesionales: asociar/quitar profesionales al servicio (typeahead); desasociar no borra cargas históricas.
+3. Carga: módulo solo / novedad solo / ambos + **fecha de realización** (calendario). Valor novedad = horas × valor hora **del servicio**.
+4. Listado inferior (Carga): grilla unificada con F. realización y F. carga; editar fecha si período abierto; **anular** con modal.
+5. Generación XLS (admin/rrhh): grilla + filtros + descarga (incluye ambas fechas).
+
+## Docs del change
+- OpenSpec activo: `openspec/changes/novedades-jefe-profesionales-fecha-carga/`
+- Archivado: `openspec/changes/archive/2026-07-29-novedades-modulos/`
+- Specs estables: `openspec/specs/novedades/`, `openspec/specs/auth-roles/`
 
 ## Verificacion
 - App (mismo dominio): `GET https://<WEB_HOST>/health`

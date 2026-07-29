@@ -24,6 +24,7 @@ from app.schemas.novedades import (
 )
 from app.services.novedades.helpers import (
     assert_can_load_servicio,
+    assert_can_manage_profesional_servicio,
     get_modulo_or_404,
     get_professional_or_404,
     get_servicio_or_404,
@@ -31,6 +32,7 @@ from app.services.novedades.helpers import (
     require_profesional_en_servicio,
     scoped_servicio_ids,
     soft_delete,
+    validate_fecha_realizacion,
 )
 from app.models.novedades import NovedadesPeriodo, PeriodoEstado
 from app.services.novedades.helpers import get_open_periodo
@@ -156,7 +158,7 @@ def delete_jefe_servicio(db: Session, link_id: int, actor_id: int) -> None:
     db.commit()
 
 
-def list_profesional_servicios(db: Session) -> list[tuple]:
+def list_profesional_servicios(db: Session, user: User) -> list[tuple]:
     links = list(
         db.execute(
             select(NovedadesProfesionalServicio)
@@ -166,6 +168,11 @@ def list_profesional_servicios(db: Session) -> list[tuple]:
         .scalars()
         .all()
     )
+    alcance = scoped_servicio_ids(db, user)
+    if alcance is not None:
+        if not alcance:
+            return []
+        links = [link for link in links if link.servicio_id in alcance]
     result = []
     for link in links:
         professional = db.execute(select(Professional).where(Professional.id == link.professional_id)).scalar_one_or_none()
@@ -174,9 +181,12 @@ def list_profesional_servicios(db: Session) -> list[tuple]:
     return result
 
 
-def create_profesional_servicio(db: Session, payload: ProfesionalServicioCreateRequest, actor_id: int) -> NovedadesProfesionalServicio:
+def create_profesional_servicio(
+    db: Session, payload: ProfesionalServicioCreateRequest, user: User
+) -> NovedadesProfesionalServicio:
     get_servicio_or_404(db, payload.servicio_id)
     get_professional_or_404(db, payload.professional_id)
+    assert_can_manage_profesional_servicio(db, user, payload.servicio_id)
     existing = db.execute(
         select(NovedadesProfesionalServicio).where(
             NovedadesProfesionalServicio.professional_id == payload.professional_id,
@@ -192,8 +202,8 @@ def create_profesional_servicio(db: Session, payload: ProfesionalServicioCreateR
         servicio_id=payload.servicio_id,
         created_at=now,
         updated_at=now,
-        created_by=actor_id,
-        updated_by=actor_id,
+        created_by=user.id,
+        updated_by=user.id,
         deleted_at=None,
     )
     db.add(item)
@@ -202,7 +212,7 @@ def create_profesional_servicio(db: Session, payload: ProfesionalServicioCreateR
     return item
 
 
-def delete_profesional_servicio(db: Session, link_id: int, actor_id: int) -> None:
+def delete_profesional_servicio(db: Session, link_id: int, user: User) -> None:
     item = db.execute(
         select(NovedadesProfesionalServicio).where(
             NovedadesProfesionalServicio.id == link_id,
@@ -211,7 +221,8 @@ def delete_profesional_servicio(db: Session, link_id: int, actor_id: int) -> Non
     ).scalar_one_or_none()
     if not item:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Asociacion no encontrada")
-    soft_delete(item, actor_id)
+    assert_can_manage_profesional_servicio(db, user, item.servicio_id)
+    soft_delete(item, user.id)
     db.commit()
 
 
@@ -236,7 +247,8 @@ def list_asignaciones(db: Session, user: User) -> list[NovedadesAsignacionModulo
 
 
 def create_asignacion(db: Session, payload: AsignacionCreateRequest, user: User) -> NovedadesAsignacionModulo:
-    require_periodo_open(db, payload.periodo_id)
+    periodo = require_periodo_open(db, payload.periodo_id)
+    validate_fecha_realizacion(periodo, payload.fecha_realizacion)
     get_servicio_or_404(db, payload.servicio_id)
     get_professional_or_404(db, payload.professional_id)
     get_modulo_or_404(db, payload.modulo_id)
@@ -251,6 +263,7 @@ def create_asignacion(db: Session, payload: AsignacionCreateRequest, user: User)
         servicio_id=payload.servicio_id,
         professional_id=payload.professional_id,
         modulo_id=payload.modulo_id,
+        fecha_realizacion=payload.fecha_realizacion,
         created_at=now,
         updated_at=now,
         created_by=user.id,
@@ -272,13 +285,19 @@ def update_asignacion(db: Session, item_id: int, payload: AsignacionUpdateReques
     ).scalar_one_or_none()
     if not item:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Asignacion no encontrada")
-    require_periodo_open(db, item.periodo_id)
+    periodo = require_periodo_open(db, item.periodo_id)
     assert_can_load_servicio(db, user, item.servicio_id)
-    get_modulo_or_404(db, payload.modulo_id)
-    from app.services.novedades.masters import require_modulo_en_servicio
+    if payload.modulo_id is None and payload.fecha_realizacion is None:
+        raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail="Nada para actualizar")
+    if payload.modulo_id is not None:
+        get_modulo_or_404(db, payload.modulo_id)
+        from app.services.novedades.masters import require_modulo_en_servicio
 
-    require_modulo_en_servicio(db, payload.modulo_id, item.servicio_id)
-    item.modulo_id = payload.modulo_id
+        require_modulo_en_servicio(db, payload.modulo_id, item.servicio_id)
+        item.modulo_id = payload.modulo_id
+    if payload.fecha_realizacion is not None:
+        validate_fecha_realizacion(periodo, payload.fecha_realizacion)
+        item.fecha_realizacion = payload.fecha_realizacion
     item.updated_at = datetime.utcnow()
     item.updated_by = user.id
     db.commit()
@@ -324,7 +343,8 @@ def list_novedades(db: Session, user: User) -> list[NovedadesNovedad]:
 def create_novedad(db: Session, payload: NovedadCreateRequest, user: User) -> NovedadesNovedad:
     from app.models.novedades import NovedadTipo
 
-    require_periodo_open(db, payload.periodo_id)
+    periodo = require_periodo_open(db, payload.periodo_id)
+    validate_fecha_realizacion(periodo, payload.fecha_realizacion)
     get_servicio_or_404(db, payload.servicio_id)
     get_professional_or_404(db, payload.professional_id)
     assert_can_load_servicio(db, user, payload.servicio_id)
@@ -336,6 +356,7 @@ def create_novedad(db: Session, payload: NovedadCreateRequest, user: User) -> No
         professional_id=payload.professional_id,
         tipo=NovedadTipo(payload.tipo),
         horas=payload.horas,
+        fecha_realizacion=payload.fecha_realizacion,
         created_at=now,
         updated_at=now,
         created_by=user.id,
@@ -356,10 +377,17 @@ def update_novedad(db: Session, item_id: int, payload: NovedadUpdateRequest, use
     ).scalar_one_or_none()
     if not item:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Novedad no encontrada")
-    require_periodo_open(db, item.periodo_id)
+    periodo = require_periodo_open(db, item.periodo_id)
     assert_can_load_servicio(db, user, item.servicio_id)
-    item.tipo = NovedadTipo(payload.tipo)
-    item.horas = payload.horas
+    if payload.tipo is None and payload.horas is None and payload.fecha_realizacion is None:
+        raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail="Nada para actualizar")
+    if payload.tipo is not None:
+        item.tipo = NovedadTipo(payload.tipo)
+    if payload.horas is not None:
+        item.horas = payload.horas
+    if payload.fecha_realizacion is not None:
+        validate_fecha_realizacion(periodo, payload.fecha_realizacion)
+        item.fecha_realizacion = payload.fecha_realizacion
     item.updated_at = datetime.utcnow()
     item.updated_by = user.id
     db.commit()

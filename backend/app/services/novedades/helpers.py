@@ -1,9 +1,11 @@
-from datetime import datetime
+from datetime import date, datetime
+from zoneinfo import ZoneInfo
 
 from fastapi import HTTPException, status
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
+from app.core.config import settings
 from app.models.novedades import (
     NovedadesConfig,
     NovedadesJefeServicio,
@@ -15,6 +17,10 @@ from app.models.novedades import (
 )
 from app.models.professional import Professional
 from app.models.user import User, UserRole
+
+
+def business_today() -> date:
+    return datetime.now(ZoneInfo(settings.business_tz)).date()
 
 
 def get_open_periodo(db: Session) -> NovedadesPeriodo | None:
@@ -35,6 +41,20 @@ def require_periodo_open(db: Session, periodo_id: int) -> NovedadesPeriodo:
     if periodo.estado != PeriodoEstado.open:
         raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="El periodo esta cerrado")
     return periodo
+
+
+def validate_fecha_realizacion(periodo: NovedadesPeriodo, fecha: date) -> None:
+    if fecha < periodo.fecha_inicio or fecha > periodo.fecha_fin:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail="La fecha de realizacion debe estar dentro del rango del periodo",
+        )
+    today = business_today()
+    if fecha > today:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail="La fecha de realizacion no puede ser posterior a hoy",
+        )
 
 
 def get_servicio_or_404(db: Session, servicio_id: int) -> NovedadesServicio:
@@ -78,6 +98,13 @@ def assert_can_load_servicio(db: Session, user: User, servicio_id: int) -> None:
     ).scalar_one_or_none()
     if not link:
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Servicio fuera de alcance")
+
+
+def assert_can_manage_profesional_servicio(db: Session, user: User, servicio_id: int) -> None:
+    """Admin/rrhh: todos los servicios. Jefe: solo los asociados."""
+    if user.role in (UserRole.admin, UserRole.rrhh):
+        return
+    assert_can_load_servicio(db, user, servicio_id)
 
 
 def require_profesional_en_servicio(db: Session, professional_id: int, servicio_id: int) -> None:

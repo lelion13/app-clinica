@@ -96,6 +96,7 @@ class NovedadesAsignacionModulo(AuditMixin, Base):
     servicio_id: Mapped[int] = mapped_column(ForeignKey("novedades_servicio.id"), nullable=False)
     professional_id: Mapped[int] = mapped_column(ForeignKey("professionals.id"), nullable=False)
     modulo_id: Mapped[int] = mapped_column(ForeignKey("novedades_modulo.id"), nullable=False)
+    fecha_realizacion: Mapped[date] = mapped_column(Date, nullable=False)
 
 
 class NovedadesNovedad(AuditMixin, Base):
@@ -110,3 +111,4 @@ class NovedadesNovedad(AuditMixin, Base):
         nullable=False,
     )
     horas: Mapped[Decimal] = mapped_column(Numeric(10, 2), nullable=False)
+    fecha_realizacion: Mapped[date] = mapped_column(Date, nullable=False)
