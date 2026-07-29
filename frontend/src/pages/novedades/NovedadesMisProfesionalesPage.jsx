@@ -7,12 +7,14 @@ import { uiStyles, uiTheme } from "../../ui/theme";
 
 export function NovedadesMisProfesionalesPage() {
   const [error, setError] = useState("");
+  const [infoMessage, setInfoMessage] = useState("");
   const [servicios, setServicios] = useState([]);
   const [links, setLinks] = useState([]);
   const [candidatos, setCandidatos] = useState([]);
   const [servicioId, setServicioId] = useState("");
   const [professionalId, setProfessionalId] = useState("");
   const [loading, setLoading] = useState(false);
+  const [syncing, setSyncing] = useState(false);
 
   const linksDelServicio = useMemo(
     () => links.filter((l) => String(l.servicio_id) === String(servicioId)),
@@ -102,14 +104,37 @@ export function NovedadesMisProfesionalesPage() {
     }
   };
 
+  const runSync = async () => {
+    setError("");
+    setSyncing(true);
+    try {
+      const summary = await apiRequestWithRefresh("/novedades/profesionales/sync", { method: "POST" });
+      setInfoMessage(
+        `Sincronización OK · creados ${summary.created} · actualizados ${summary.updated} · inactivados ${summary.inactivated}` +
+          (summary.errors?.length ? ` · avisos: ${summary.errors.slice(0, 3).join("; ")}` : "")
+      );
+      await load();
+    } catch (err) {
+      setError(err.message || "Error al sincronizar profesionales");
+    } finally {
+      setSyncing(false);
+    }
+  };
+
   return (
     <section style={uiStyles.pageSection}>
       <h1 style={uiStyles.sectionTitle}>Mis profesionales</h1>
       <p style={uiStyles.helpText}>
         Asociá o quitá profesionales de tus servicios. Al quitar, las cargas históricas se conservan;
-        el profesional deja de aparecer para cargas nuevas.
+        el profesional deja de aparecer para cargas nuevas. Los inactivos del sync quedan visibles para limpieza manual.
       </p>
+      <div style={{ marginBottom: 16 }}>
+        <button type="button" style={uiStyles.buttonSecondary} onClick={runSync} disabled={syncing}>
+          {syncing ? "Sincronizando…" : "Actualizar listado de profesionales"}
+        </button>
+      </div>
       <AlertModal open={Boolean(error)} title="Atención" message={error} onClose={() => setError("")} />
+      <AlertModal open={Boolean(infoMessage)} title="Listo" message={infoMessage} onClose={() => setInfoMessage("")} />
 
       <form onSubmit={asociar} style={{ display: "grid", gap: 12, marginBottom: 20, maxWidth: 520 }}>
         <label style={{ display: "grid", gap: 4 }}>
@@ -133,11 +158,11 @@ export function NovedadesMisProfesionalesPage() {
           value={professionalId}
           onChange={setProfessionalId}
           required
-          placeholder="Buscar por nombre, DNI o matrícula…"
+          placeholder="Buscar por nombre o código…"
         />
         {loading ? <p style={uiStyles.helpText}>Cargando candidatos…</p> : null}
         {!loading && servicioId && !candidatos.length ? (
-          <p style={uiStyles.helpText}>No hay más profesionales activos para asociar a este servicio.</p>
+          <p style={uiStyles.helpText}>No hay más profesionales activos para asociar a este servicio. Sincronizá el listado si hace falta.</p>
         ) : null}
 
         <button type="submit" style={uiStyles.buttonPrimary}>Asociar</button>
@@ -158,9 +183,16 @@ export function NovedadesMisProfesionalesPage() {
               gap: 8,
               alignItems: "center",
               flexWrap: "wrap",
+              opacity: item.professional_is_active === false ? 0.85 : 1,
             }}
           >
-            <span>{item.professional_name || `Prof #${item.professional_id}`}</span>
+            <span>
+              {item.professional_name || `Prof #${item.professional_id}`}
+              {item.professional_codprof ? ` · ${item.professional_codprof}` : ""}
+              {item.professional_is_active === false ? (
+                <span style={{ marginLeft: 8, color: uiTheme.colors.danger, fontSize: 13 }}>Inactivo</span>
+              ) : null}
+            </span>
             <button type="button" style={uiStyles.buttonDanger} onClick={() => quitar(item.id)}>
               Quitar
             </button>

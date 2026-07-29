@@ -8,10 +8,10 @@ from app.models.novedades import (
     NovedadesAsignacionModulo,
     NovedadesJefeServicio,
     NovedadesNovedad,
+    NovedadesProfesional,
     NovedadesProfesionalServicio,
     NovedadesServicio,
 )
-from app.models.professional import Professional
 from app.models.user import User, UserRole
 from app.schemas.novedades import (
     AsignacionCreateRequest,
@@ -175,7 +175,9 @@ def list_profesional_servicios(db: Session, user: User) -> list[tuple]:
         links = [link for link in links if link.servicio_id in alcance]
     result = []
     for link in links:
-        professional = db.execute(select(Professional).where(Professional.id == link.professional_id)).scalar_one_or_none()
+        professional = db.execute(
+            select(NovedadesProfesional).where(NovedadesProfesional.id == link.professional_id)
+        ).scalar_one_or_none()
         servicio = db.execute(select(NovedadesServicio).where(NovedadesServicio.id == link.servicio_id)).scalar_one_or_none()
         result.append((link, professional, servicio))
     return result
@@ -185,11 +187,11 @@ def create_profesional_servicio(
     db: Session, payload: ProfesionalServicioCreateRequest, user: User
 ) -> NovedadesProfesionalServicio:
     get_servicio_or_404(db, payload.servicio_id)
-    get_professional_or_404(db, payload.professional_id)
+    professional = get_professional_or_404(db, payload.professional_id, require_active=True)
     assert_can_manage_profesional_servicio(db, user, payload.servicio_id)
     existing = db.execute(
         select(NovedadesProfesionalServicio).where(
-            NovedadesProfesionalServicio.professional_id == payload.professional_id,
+            NovedadesProfesionalServicio.professional_id == professional.id,
             NovedadesProfesionalServicio.servicio_id == payload.servicio_id,
             NovedadesProfesionalServicio.deleted_at.is_(None),
         )
@@ -198,7 +200,7 @@ def create_profesional_servicio(
         raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="La asociacion ya existe")
     now = datetime.utcnow()
     item = NovedadesProfesionalServicio(
-        professional_id=payload.professional_id,
+        professional_id=professional.id,
         servicio_id=payload.servicio_id,
         created_at=now,
         updated_at=now,
@@ -230,7 +232,7 @@ def list_asignaciones(db: Session, user: User) -> list[NovedadesAsignacionModulo
     query = (
         select(NovedadesAsignacionModulo)
         .join(NovedadesServicio, NovedadesServicio.id == NovedadesAsignacionModulo.servicio_id)
-        .join(Professional, Professional.id == NovedadesAsignacionModulo.professional_id)
+        .join(NovedadesProfesional, NovedadesProfesional.id == NovedadesAsignacionModulo.professional_id)
         .where(NovedadesAsignacionModulo.deleted_at.is_(None))
     )
     alcance = scoped_servicio_ids(db, user)
@@ -240,7 +242,7 @@ def list_asignaciones(db: Session, user: User) -> list[NovedadesAsignacionModulo
         query = query.where(NovedadesAsignacionModulo.servicio_id.in_(alcance))
     query = query.order_by(
         NovedadesServicio.nombre.asc(),
-        Professional.full_name.asc(),
+        NovedadesProfesional.full_name.asc(),
         NovedadesAsignacionModulo.id.desc(),
     )
     return list(db.execute(query).scalars().all())
@@ -250,7 +252,7 @@ def create_asignacion(db: Session, payload: AsignacionCreateRequest, user: User)
     periodo = require_periodo_open(db, payload.periodo_id)
     validate_fecha_realizacion(periodo, payload.fecha_realizacion)
     get_servicio_or_404(db, payload.servicio_id)
-    get_professional_or_404(db, payload.professional_id)
+    get_professional_or_404(db, payload.professional_id, require_active=True)
     get_modulo_or_404(db, payload.modulo_id)
     assert_can_load_servicio(db, user, payload.servicio_id)
     require_profesional_en_servicio(db, payload.professional_id, payload.servicio_id)
@@ -324,7 +326,7 @@ def list_novedades(db: Session, user: User) -> list[NovedadesNovedad]:
     query = (
         select(NovedadesNovedad)
         .join(NovedadesServicio, NovedadesServicio.id == NovedadesNovedad.servicio_id)
-        .join(Professional, Professional.id == NovedadesNovedad.professional_id)
+        .join(NovedadesProfesional, NovedadesProfesional.id == NovedadesNovedad.professional_id)
         .where(NovedadesNovedad.deleted_at.is_(None))
     )
     alcance = scoped_servicio_ids(db, user)
@@ -334,7 +336,7 @@ def list_novedades(db: Session, user: User) -> list[NovedadesNovedad]:
         query = query.where(NovedadesNovedad.servicio_id.in_(alcance))
     query = query.order_by(
         NovedadesServicio.nombre.asc(),
-        Professional.full_name.asc(),
+        NovedadesProfesional.full_name.asc(),
         NovedadesNovedad.id.desc(),
     )
     return list(db.execute(query).scalars().all())
@@ -346,7 +348,7 @@ def create_novedad(db: Session, payload: NovedadCreateRequest, user: User) -> No
     periodo = require_periodo_open(db, payload.periodo_id)
     validate_fecha_realizacion(periodo, payload.fecha_realizacion)
     get_servicio_or_404(db, payload.servicio_id)
-    get_professional_or_404(db, payload.professional_id)
+    get_professional_or_404(db, payload.professional_id, require_active=True)
     assert_can_load_servicio(db, user, payload.servicio_id)
     require_profesional_en_servicio(db, payload.professional_id, payload.servicio_id)
     now = datetime.utcnow()

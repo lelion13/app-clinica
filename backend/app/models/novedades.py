@@ -80,11 +80,23 @@ class NovedadesJefeServicio(AuditMixin, Base):
     servicio_id: Mapped[int] = mapped_column(ForeignKey("novedades_servicio.id"), nullable=False)
 
 
+class NovedadesProfesional(AuditMixin, Base):
+    """Catálogo de profesionales solo para Novedades (sync HTTP por CODPROF)."""
+
+    __tablename__ = "novedades_profesional"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    codprof: Mapped[str] = mapped_column(String(40), nullable=False, unique=True)
+    full_name: Mapped[str] = mapped_column(String(200), nullable=False)
+    codprov: Mapped[str | None] = mapped_column(String(40), nullable=True)
+    is_active: Mapped[bool] = mapped_column(Boolean, nullable=False, default=True)
+
+
 class NovedadesProfesionalServicio(AuditMixin, Base):
     __tablename__ = "novedades_profesional_servicio"
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True)
-    professional_id: Mapped[int] = mapped_column(ForeignKey("professionals.id"), nullable=False)
+    professional_id: Mapped[int] = mapped_column(ForeignKey("novedades_profesional.id"), nullable=False)
     servicio_id: Mapped[int] = mapped_column(ForeignKey("novedades_servicio.id"), nullable=False)
 
 
@@ -94,7 +106,7 @@ class NovedadesAsignacionModulo(AuditMixin, Base):
     id: Mapped[int] = mapped_column(Integer, primary_key=True)
     periodo_id: Mapped[int] = mapped_column(ForeignKey("novedades_periodo.id"), nullable=False)
     servicio_id: Mapped[int] = mapped_column(ForeignKey("novedades_servicio.id"), nullable=False)
-    professional_id: Mapped[int] = mapped_column(ForeignKey("professionals.id"), nullable=False)
+    professional_id: Mapped[int] = mapped_column(ForeignKey("novedades_profesional.id"), nullable=False)
     modulo_id: Mapped[int] = mapped_column(ForeignKey("novedades_modulo.id"), nullable=False)
     fecha_realizacion: Mapped[date] = mapped_column(Date, nullable=False)
 
@@ -105,7 +117,7 @@ class NovedadesNovedad(AuditMixin, Base):
     id: Mapped[int] = mapped_column(Integer, primary_key=True)
     periodo_id: Mapped[int] = mapped_column(ForeignKey("novedades_periodo.id"), nullable=False)
     servicio_id: Mapped[int] = mapped_column(ForeignKey("novedades_servicio.id"), nullable=False)
-    professional_id: Mapped[int] = mapped_column(ForeignKey("professionals.id"), nullable=False)
+    professional_id: Mapped[int] = mapped_column(ForeignKey("novedades_profesional.id"), nullable=False)
     tipo: Mapped[NovedadTipo] = mapped_column(
         Enum(NovedadTipo, name="novedadtipo", native_enum=False),
         nullable=False,

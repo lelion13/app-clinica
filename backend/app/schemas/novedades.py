@@ -92,6 +92,8 @@ class ProfesionalServicioResponse(BaseModel):
     id: int
     professional_id: int
     professional_name: str | None = None
+    professional_codprof: str | None = None
+    professional_is_active: bool | None = None
     servicio_id: int
     servicio_nombre: str | None = None
     created_at: datetime
@@ -100,10 +102,26 @@ class ProfesionalServicioResponse(BaseModel):
 class ProfesionalDirectoryItem(BaseModel):
     id: int
     full_name: str
+    codprof: str | None = None
     license_number: str | None = None
     external_document: str | None = None
     specialty: str | None = None
     is_active: bool
+
+
+class NovedadesProfSyncResponse(BaseModel):
+    created: int
+    updated: int
+    inactivated: int
+    skipped: int
+    errors: list[str]
+    synced_at: datetime
+
+
+class NovedadesTransaccionalPurgeResponse(BaseModel):
+    deleted_asignaciones: int
+    deleted_novedades: int
+    deleted_profesional_servicios: int
 
 
 class AsignacionCreateRequest(BaseModel):

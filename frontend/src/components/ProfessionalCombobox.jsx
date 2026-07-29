@@ -10,7 +10,9 @@ function normalize(s) {
 
 function profHaystack(p) {
   return normalize(
-    [p.full_name, p.external_document, p.license_number, p.email, String(p.id)].filter(Boolean).join(" ")
+    [p.full_name, p.codprof, p.external_document, p.license_number, p.email, String(p.id)]
+      .filter(Boolean)
+      .join(" ")
   );
 }
 
@@ -29,8 +31,8 @@ export const alignedNativeFormControlStyle = {
 
 export function formatProfessionalLabel(p) {
   if (!p) return "";
-  const doc = p.external_document ? ` · DNI ${p.external_document}` : "";
-  return `#${p.id} · ${p.full_name}${doc}`;
+  const code = p.codprof ? ` · ${p.codprof}` : p.external_document ? ` · DNI ${p.external_document}` : "";
+  return `#${p.id} · ${p.full_name}${code}`;
 }
 
 /**

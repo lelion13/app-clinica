@@ -21,6 +21,8 @@ from app.schemas.novedades import (
     NovedadCreateRequest,
     NovedadResponse,
     NovedadUpdateRequest,
+    NovedadesProfSyncResponse,
+    NovedadesTransaccionalPurgeResponse,
     PeriodoCreateRequest,
     PeriodoResponse,
     ProfesionalDirectoryItem,
@@ -33,6 +35,8 @@ from app.schemas.novedades import (
 from app.services.novedades import cargas as cargas_service
 from app.services.novedades import export_xls
 from app.services.novedades import masters as masters_service
+from app.services.novedades import prof_sync as prof_sync_service
+from app.services.novedades import purge as purge_service
 from app.services.novedades.helpers import get_servicio_or_404, list_servicios_for_user
 from app.services.novedades.professional_directory import list_professionals_for_servicio
 
@@ -83,14 +87,13 @@ def _periodo_response(item) -> PeriodoResponse:
 
 
 def _novedad_response(db: Session, item) -> NovedadResponse:
-    from app.models.novedades import NovedadesPeriodo
-    from app.models.professional import Professional
+    from app.models.novedades import NovedadesPeriodo, NovedadesProfesional
 
     tipo = item.tipo if isinstance(item.tipo, NovedadTipo) else NovedadTipo(item.tipo)
     servicio = get_servicio_or_404(db, item.servicio_id)
     valor_hora = servicio.valor_hora
     professional = db.execute(
-        select(Professional).where(Professional.id == item.professional_id)
+        select(NovedadesProfesional).where(NovedadesProfesional.id == item.professional_id)
     ).scalar_one_or_none()
     periodo = db.execute(
         select(NovedadesPeriodo).where(NovedadesPeriodo.id == item.periodo_id)
@@ -115,13 +118,12 @@ def _novedad_response(db: Session, item) -> NovedadResponse:
 
 
 def _asignacion_response(db: Session, item) -> AsignacionResponse:
-    from app.models.novedades import NovedadesModulo, NovedadesPeriodo
-    from app.models.professional import Professional
+    from app.models.novedades import NovedadesModulo, NovedadesPeriodo, NovedadesProfesional
 
     modulo = db.execute(select(NovedadesModulo).where(NovedadesModulo.id == item.modulo_id)).scalar_one_or_none()
     servicio = get_servicio_or_404(db, item.servicio_id)
     professional = db.execute(
-        select(Professional).where(Professional.id == item.professional_id)
+        select(NovedadesProfesional).where(NovedadesProfesional.id == item.professional_id)
     ).scalar_one_or_none()
     periodo = db.execute(
         select(NovedadesPeriodo).where(NovedadesPeriodo.id == item.periodo_id)
@@ -329,6 +331,8 @@ def profesional_servicios_list(
                 id=link.id,
                 professional_id=link.professional_id,
                 professional_name=professional.full_name if professional else None,
+                professional_codprof=professional.codprof if professional else None,
+                professional_is_active=professional.is_active if professional else None,
                 servicio_id=link.servicio_id,
                 servicio_nombre=servicio.nombre if servicio else None,
                 created_at=link.created_at,
@@ -373,6 +377,22 @@ def profesionales_directory(
     return list_professionals_for_servicio(
         db, servicio_id=servicio_id, q=q, exclude_linked=exclude_linked
     )
+
+
+@router.post("/profesionales/sync", response_model=NovedadesProfSyncResponse)
+def profesionales_sync(
+    db: Session = Depends(get_db),
+    user: User = Depends(require_novedades_reader),
+) -> NovedadesProfSyncResponse:
+    return prof_sync_service.sync_novedades_professionals(db, actor_id=user.id)
+
+
+@router.post("/transaccional/purge", response_model=NovedadesTransaccionalPurgeResponse)
+def transaccional_purge(
+    db: Session = Depends(get_db),
+    user: User = Depends(require_admin_or_rrhh),
+) -> NovedadesTransaccionalPurgeResponse:
+    return purge_service.purge_novedades_transaccional(db, user=user)
 
 
 @router.get("/asignaciones-modulos", response_model=list[AsignacionResponse])

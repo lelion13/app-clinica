@@ -48,6 +48,10 @@ class Settings(BaseSettings):
         "AND TRIM(upe.numero_documento) <> '' "
         "GROUP BY upe.numero_documento"
     )
+    # Sync HTTP de profesionales para Novedades (no Distribución).
+    novedades_prof_sync_url: str = Field(default="", validation_alias="NOVEDADES_PROF_SYNC_URL")
+    novedades_prof_sync_token: str = Field(default="", validation_alias="NOVEDADES_PROF_SYNC_TOKEN")
+    novedades_prof_sync_timeout: float = Field(default=30.0, validation_alias="NOVEDADES_PROF_SYNC_TIMEOUT")
 
     @property
     def cors_origins_list(self) -> list[str]:

@@ -102,3 +102,7 @@ The unified grid MUST include a **Fecha realización** column in addition to fec
 ### Requirement: Grilla y XLS (Generación)
 
 Export and RRHH grid MUST add column **Fecha realización** alongside existing **Fecha carga**.
+
+### Requirement: Alertas UI Novedades
+
+Validation and API error messages on Novedades screens (Carga, Mis profesionales, Parametrización, XLS) MUST be presented in a modal dialog with an explicit **OK** action to dismiss. Inline red labels alone MUST NOT be the primary error presentation for those actions.

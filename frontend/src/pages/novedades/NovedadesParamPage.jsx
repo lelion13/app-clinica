@@ -37,6 +37,10 @@ export function NovedadesParamPage() {
   const [periodoNombre, setPeriodoNombre] = useState("");
   const [periodoInicio, setPeriodoInicio] = useState("");
   const [periodoFin, setPeriodoFin] = useState("");
+  const [syncing, setSyncing] = useState(false);
+  const [purging, setPurging] = useState(false);
+  const [confirmPurge, setConfirmPurge] = useState(false);
+  const [infoMessage, setInfoMessage] = useState("");
 
   const load = async () => {
     setError("");
@@ -160,13 +164,102 @@ export function NovedadesParamPage() {
     await load();
   };
 
+  const runSync = async () => {
+    setError("");
+    setSyncing(true);
+    try {
+      const summary = await apiRequestWithRefresh("/novedades/profesionales/sync", { method: "POST" });
+      setInfoMessage(
+        `Sincronización OK · creados ${summary.created} · actualizados ${summary.updated} · inactivados ${summary.inactivated}` +
+          (summary.errors?.length ? ` · avisos: ${summary.errors.slice(0, 3).join("; ")}` : "")
+      );
+      await load();
+    } catch (err) {
+      setError(err.message || "Error al sincronizar profesionales");
+    } finally {
+      setSyncing(false);
+    }
+  };
+
+  const runPurge = async () => {
+    setError("");
+    setPurging(true);
+    try {
+      const result = await apiRequestWithRefresh("/novedades/transaccional/purge", { method: "POST" });
+      setConfirmPurge(false);
+      setInfoMessage(
+        `Limpieza OK · asignaciones ${result.deleted_asignaciones} · novedades ${result.deleted_novedades} · vínculos ${result.deleted_profesional_servicios}`
+      );
+      await load();
+    } catch (err) {
+      setError(err.message || "Error al limpiar cargas");
+    } finally {
+      setPurging(false);
+    }
+  };
+
   return (
     <section style={uiStyles.pageSection}>
       <h1 style={uiStyles.sectionTitle}>Parametrización — Novedades</h1>
       <p style={uiStyles.helpText}>
         Servicios con valor hora propio; módulos asociados a uno o más servicios; asociaciones de jefes y profesionales.
+        El catálogo de profesionales de Novedades se sincroniza desde el sistema externo (no usa Distribución).
       </p>
+      <div style={{ display: "flex", gap: 8, flexWrap: "wrap", marginBottom: 16 }}>
+        <button type="button" style={uiStyles.buttonPrimary} onClick={runSync} disabled={syncing}>
+          {syncing ? "Sincronizando…" : "Sincronizar profesionales"}
+        </button>
+        <button type="button" style={uiStyles.buttonDanger} onClick={() => setConfirmPurge(true)} disabled={purging}>
+          Limpiar cargas
+        </button>
+      </div>
       <AlertModal open={Boolean(error)} title="Atención" message={error} onClose={() => setError("")} />
+      <AlertModal open={Boolean(infoMessage)} title="Listo" message={infoMessage} onClose={() => setInfoMessage("")} />
+      {confirmPurge ? (
+        <div
+          role="presentation"
+          style={{
+            position: "fixed",
+            inset: 0,
+            zIndex: 1100,
+            background: "rgba(15, 43, 39, 0.45)",
+            display: "flex",
+            alignItems: "flex-start",
+            justifyContent: "center",
+            padding: "max(16px, 4vh) 16px",
+          }}
+          onClick={() => !purging && setConfirmPurge(false)}
+        >
+          <div
+            role="alertdialog"
+            aria-modal="true"
+            onClick={(e) => e.stopPropagation()}
+            style={{
+              background: "#fff",
+              borderRadius: uiTheme.radius.md,
+              maxWidth: 440,
+              width: "100%",
+              padding: 22,
+              boxShadow: uiTheme.shadow.md,
+              border: `1px solid ${uiTheme.colors.border}`,
+            }}
+          >
+            <h2 style={{ marginTop: 0, marginBottom: 10, fontSize: "1.1rem" }}>¿Limpiar cargas?</h2>
+            <p style={{ marginTop: 0, marginBottom: 18, fontSize: 14, lineHeight: 1.45 }}>
+              Se eliminarán de forma permanente asignaciones de módulo, novedades y vínculos profesional↔servicio.
+              Se conservan servicios, módulos, períodos y jefes. Esta acción no se puede deshacer.
+            </p>
+            <div style={{ display: "flex", justifyContent: "flex-end", gap: 8 }}>
+              <button type="button" style={uiStyles.buttonSecondary} disabled={purging} onClick={() => setConfirmPurge(false)}>
+                Cancelar
+              </button>
+              <button type="button" style={uiStyles.buttonDanger} disabled={purging} onClick={runPurge}>
+                {purging ? "Eliminando…" : "Confirmar"}
+              </button>
+            </div>
+          </div>
+        </div>
+      ) : null}
 
       <div style={{ display: "flex", gap: 8, flexWrap: "wrap", marginBottom: 16 }}>
         {tabs.map((item) => (

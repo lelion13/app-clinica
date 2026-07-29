@@ -11,10 +11,10 @@ from app.models.novedades import (
     NovedadesModulo,
     NovedadesNovedad,
     NovedadesPeriodo,
+    NovedadesProfesional,
     NovedadesServicio,
     NovedadTipo,
 )
-from app.models.professional import Professional
 from app.models.user import User
 from app.schemas.novedades import GridRowResponse
 
@@ -178,6 +178,8 @@ def _novedad_row(db: Session, item: NovedadesNovedad) -> GridRowResponse | None:
 def _base_context(db: Session, periodo_id: int, servicio_id: int, professional_id: int, actor_id: int | None):
     periodo = db.execute(select(NovedadesPeriodo).where(NovedadesPeriodo.id == periodo_id)).scalar_one_or_none()
     servicio = db.execute(select(NovedadesServicio).where(NovedadesServicio.id == servicio_id)).scalar_one_or_none()
-    professional = db.execute(select(Professional).where(Professional.id == professional_id)).scalar_one_or_none()
+    professional = db.execute(
+        select(NovedadesProfesional).where(NovedadesProfesional.id == professional_id)
+    ).scalar_one_or_none()
     actor = db.execute(select(User).where(User.id == actor_id)).scalar_one_or_none() if actor_id else None
     return periodo, servicio, professional, actor

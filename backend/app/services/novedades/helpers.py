@@ -11,11 +11,11 @@ from app.models.novedades import (
     NovedadesJefeServicio,
     NovedadesModulo,
     NovedadesPeriodo,
+    NovedadesProfesional,
     NovedadesProfesionalServicio,
     NovedadesServicio,
     PeriodoEstado,
 )
-from app.models.professional import Professional
 from app.models.user import User, UserRole
 
 
@@ -75,12 +75,20 @@ def get_modulo_or_404(db: Session, modulo_id: int) -> NovedadesModulo:
     return item
 
 
-def get_professional_or_404(db: Session, professional_id: int) -> Professional:
+def get_professional_or_404(db: Session, professional_id: int, *, require_active: bool = False) -> NovedadesProfesional:
     item = db.execute(
-        select(Professional).where(Professional.id == professional_id, Professional.deleted_at.is_(None))
+        select(NovedadesProfesional).where(
+            NovedadesProfesional.id == professional_id,
+            NovedadesProfesional.deleted_at.is_(None),
+        )
     ).scalar_one_or_none()
     if not item:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Profesional no encontrado")
+    if require_active and not item.is_active:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail="El profesional esta inactivo; no se pueden cargar modulos ni novedades",
+        )
     return item
 
 

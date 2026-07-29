@@ -30,6 +30,14 @@
   - `fecha_realizacion` en asignaciones y novedades (dentro del período y ≤ hoy)
   - menú **Mis profesionales** (jefe/admin/rrhh) para asociar/desasociar scoped
   - grilla/XLS con Fecha realización + Fecha carga
+  - **Tras cada deploy de backend con migraciones nuevas: ejecutar `alembic upgrade head`** (si no → 500 por columnas faltantes)
+- Cambio `novedades-sincro-profesionales` (rev `0008_novedades_profesional`):
+  - Tabla `novedades_profesional` (match `CODPROF` string; catálogo aparte de Distribución)
+  - Migración **borra** asignaciones/novedades/vínculos profesional↔servicio al retarget de FKs — **backup antes**
+  - Env: `NOVEDADES_PROF_SYNC_URL`, `NOVEDADES_PROF_SYNC_TOKEN`, `NOVEDADES_PROF_SYNC_TIMEOUT`
+  - Ops: migrar → setear token (rotar si se expuso) → sync en Parametrización → reasociar Mis profesionales → cargas
+  - Botón **Limpiar cargas** (Param, admin/rrhh): hard-delete transaccional con confirmación
+  - Sync también desde Mis profesionales (admin/rrhh/jefe); si el API falla **no** inactiva locales
 
 ## Roles (panel)
 - `admin`: distribución + novedades (todo) + usuarios
@@ -40,13 +48,12 @@
 ## Flujo Novedades (resumen)
 1. Parametrización: servicios (**con valor hora**), módulos (**asociados a uno o más servicios**), jefes↔servicios, profesionales↔servicios, período abierto.
 2. Mis profesionales: asociar/quitar profesionales al servicio (typeahead); desasociar no borra cargas históricas.
-3. Carga: módulo solo / novedad solo / ambos + **fecha de realización** (calendario). Valor novedad = horas × valor hora **del servicio**.
+3. Carga: módulo solo / novedad solo / ambos + **fecha de realización** (calendario; sin días si el período aún no empezó). Valor novedad = horas × valor hora **del servicio**. Errores en modal OK.
 4. Listado inferior (Carga): grilla unificada con F. realización y F. carga; editar fecha si período abierto; **anular** con modal.
 5. Generación XLS (admin/rrhh): grilla + filtros + descarga (incluye ambas fechas).
 
 ## Docs del change
-- OpenSpec activo: `openspec/changes/novedades-jefe-profesionales-fecha-carga/`
-- Archivado: `openspec/changes/archive/2026-07-29-novedades-modulos/`
+- Archivados: `openspec/changes/archive/2026-07-29-novedades-modulos/`, `openspec/changes/archive/2026-07-29-novedades-jefe-profesionales-fecha-carga/`
 - Specs estables: `openspec/specs/novedades/`, `openspec/specs/auth-roles/`
 
 ## Verificacion
