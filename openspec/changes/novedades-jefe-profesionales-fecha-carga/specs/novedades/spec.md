@@ -48,7 +48,9 @@ Module assignments and novedades MUST require `fecha_realizacion` (calendar date
 1. `periodo.fecha_inicio` ≤ `fecha_realizacion` ≤ `periodo.fecha_fin`
 2. `fecha_realizacion` ≤ today (load day; no future dates)
 
-Carga UI MUST use a date control (calendar/date picker). While the period is open, `admin` and scoped `jefe_medico` MUST be able to update `fecha_realizacion`. While closed, updates MUST be rejected.
+Carga UI MUST use a date control (calendar/date picker) with labels aligned for período, servicio and fecha. While the period is open, `admin` and scoped `jefe_medico` MUST be able to update `fecha_realizacion`. While closed, updates MUST be rejected.
+
+If the selected period has not started yet relative to today (`fecha_inicio` > today), there are no selectable realization dates: the UI MUST NOT present a broken min/max range, MUST disable or clear the date control, and MUST show an explanatory message. When the period is in progress, selectable days MUST be those in `[fecha_inicio, min(fecha_fin, today)]`.
 
 Grilla Carga and XLS/export MUST include **both** “Fecha realización” and “Fecha carga” (`created_at`).
 
@@ -63,6 +65,13 @@ Grilla Carga and XLS/export MUST include **both** “Fecha realización” and �
 - GIVEN hoy = 2026-07-29 y período que incluye 2026-07-30
 - WHEN se carga con `fecha_realizacion` = 2026-07-30
 - THEN MUST fail validation
+
+#### Scenario: Período aún no iniciado
+
+- GIVEN hoy = 2026-07-29 y período abierto 2026-08-01..2026-08-31
+- WHEN se muestra el date picker de realización
+- THEN no MUST haber días seleccionables
+- AND la UI MUST explicar que el período aún no está en curso
 
 #### Scenario: Editar fecha con período abierto
 

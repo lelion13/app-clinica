@@ -20,6 +20,8 @@
 - [x] 3.1 Nav “Mis profesionales” (roles admin, rrhh, jefe_medico)
 - [x] 3.2 Página Mis profesionales: servicio (scoped) + `ProfessionalCombobox` (filtra al tipear) + asociar/quitar
 - [x] 3.3 Carga: date picker obligatorio; default hoy si válido; clear tras submit; profesional con typeahead (no select plano)
+- [x] 3.3b Labels Período/Servicio/Fecha alineados; manejo período futuro (sin días válidos + aviso)
+- [x] 3.3c Alertas de error/validación vía `AlertModal` (OK) en Carga / Mis profesionales / Param / XLS
 - [x] 3.4 Grilla Carga: columna + sort/filter; editar fecha (período abierto) o flujo mínimo de update
 - [x] 3.5 XLS page: mostrar nueva columna
 - [x] 3.6 Param tab profesionales: alinear picker al mismo typeahead

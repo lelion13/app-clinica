@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
 
 import { ProfessionalCombobox } from "../../components/ProfessionalCombobox";
+import { AlertModal } from "../../components/AlertModal";
 import { apiRequestWithRefresh } from "../../services/api";
 import { uiStyles, uiTheme } from "../../ui/theme";
 import { CargasListGrid } from "./CargasListGrid";
@@ -266,7 +267,7 @@ export function NovedadesCargaPage() {
           {openPeriodo ? ` Período abierto: #${openPeriodo.id}.` : " No hay período abierto."}
           {valorHora != null ? ` Valor hora del servicio: $${valorHora}.` : ""}
         </p>
-        {error ? <p style={{ color: uiTheme.colors.danger }}>{error}</p> : null}
+        <AlertModal open={Boolean(error)} title="Atención" message={error} onClose={() => setError("")} />
 
         <form onSubmit={submitCarga}>
           <h2 style={{ margin: "12px 0 8px", fontSize: "1rem" }}>Contexto</h2>

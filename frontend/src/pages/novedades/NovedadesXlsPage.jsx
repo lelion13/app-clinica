@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 
 import { apiDownloadWithRefresh, apiRequestWithRefresh } from "../../services/api";
+import { AlertModal } from "../../components/AlertModal";
 import { uiStyles, uiTheme } from "../../ui/theme";
 
 export function NovedadesXlsPage() {
@@ -64,7 +65,7 @@ export function NovedadesXlsPage() {
       <p style={uiStyles.helpText}>
         Grilla de módulos asignados y novedades. En novedades, valor = horas × valor hora.
       </p>
-      {error ? <p style={{ color: uiTheme.colors.danger }}>{error}</p> : null}
+      <AlertModal open={Boolean(error)} title="Atención" message={error} onClose={() => setError("")} />
 
       <div style={{ display: "flex", gap: 8, flexWrap: "wrap", marginBottom: 12 }}>
         <select value={periodoId} onChange={(e) => setPeriodoId(e.target.value)} style={uiStyles.formControl}>

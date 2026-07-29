@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
 
 import { ProfessionalCombobox } from "../../components/ProfessionalCombobox";
+import { AlertModal } from "../../components/AlertModal";
 import { apiRequestWithRefresh } from "../../services/api";
 import { uiStyles, uiTheme } from "../../ui/theme";
 
@@ -108,7 +109,7 @@ export function NovedadesMisProfesionalesPage() {
         Asociá o quitá profesionales de tus servicios. Al quitar, las cargas históricas se conservan;
         el profesional deja de aparecer para cargas nuevas.
       </p>
-      {error ? <p style={{ color: uiTheme.colors.danger }}>{error}</p> : null}
+      <AlertModal open={Boolean(error)} title="Atención" message={error} onClose={() => setError("")} />
 
       <form onSubmit={asociar} style={{ display: "grid", gap: 12, marginBottom: 20, maxWidth: 520 }}>
         <label style={{ display: "grid", gap: 4 }}>

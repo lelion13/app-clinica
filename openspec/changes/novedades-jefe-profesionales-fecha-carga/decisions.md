@@ -15,6 +15,8 @@
 | Q8 | Grilla / XLS | **A** | Columnas: Fecha realización **+** Fecha carga |
 | Q9 | Editar fecha post-carga | **B** | Editable mientras período **abierto** (admin/jefe scoped); cerrado → no |
 | R12 | Búsqueda profesionales (typeahead) | **A** | Mismo patrón que `ProfessionalCombobox` (ocupación semanal): filtrar al tipear y mostrar matches |
+| R13 | UI fecha + labels contexto | **A** | Labels en Período/Servicio/Fecha (alineados). Si período aún no empezó (`min > hoy`), no hay días válidos: aviso + input deshabilitado (no `min>max` roto en el date picker) |
+| R14 | Alertas Novedades | **A** | Errores/validación con modal (`AlertModal`) + botón OK; no label rojo inline |
 
 ## Matriz RBAC (delta)
 

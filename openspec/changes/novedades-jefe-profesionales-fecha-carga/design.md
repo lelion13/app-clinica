@@ -12,6 +12,7 @@ Extend Novedades domain: (1) RBAC + UI “Mis profesionales” for profesional�
 | Who sees it | admin + rrhh + jefe | Q4=C |
 | Disassociate | Always soft-delete link | Q3=A; cargas untouched |
 | Date field | `DATE` `fecha_realizacion` on both carga tables | Q5=A |
+| Date picker bounds | UI clamps to `[inicio, min(fin, today)]`; if empty range → disable + message | R13 |
 | Validation | In period range AND ≤ today | Q6=D |
 | Edit date | PUT while period open | Q9=B |
 | Catalog pick | Active professionals, **typeahead** (reuse `ProfessionalCombobox` pattern), exclude already linked | Q1=B + R12 |

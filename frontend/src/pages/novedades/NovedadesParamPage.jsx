@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 
 import { ProfessionalCombobox } from "../../components/ProfessionalCombobox";
+import { AlertModal } from "../../components/AlertModal";
 import { apiRequestWithRefresh } from "../../services/api";
 import { uiStyles, uiTheme } from "../../ui/theme";
 
@@ -165,7 +166,7 @@ export function NovedadesParamPage() {
       <p style={uiStyles.helpText}>
         Servicios con valor hora propio; módulos asociados a uno o más servicios; asociaciones de jefes y profesionales.
       </p>
-      {error ? <p style={{ color: uiTheme.colors.danger }}>{error}</p> : null}
+      <AlertModal open={Boolean(error)} title="Atención" message={error} onClose={() => setError("")} />
 
       <div style={{ display: "flex", gap: 8, flexWrap: "wrap", marginBottom: 16 }}>
         {tabs.map((item) => (
