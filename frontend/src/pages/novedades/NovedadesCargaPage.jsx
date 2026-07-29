@@ -43,11 +43,35 @@ export function NovedadesCargaPage() {
 
   const fechaBounds = useMemo(() => {
     const periodo = periodos.find((p) => String(p.id) === String(periodoId)) || openPeriodo;
-    if (!periodo) return { min: undefined, max: todayISO() };
     const today = todayISO();
+    if (!periodo?.fecha_inicio || !periodo?.fecha_fin) {
+      return { min: undefined, max: today, valid: true };
+    }
+    const min = periodo.fecha_inicio;
     const max = periodo.fecha_fin < today ? periodo.fecha_fin : today;
-    return { min: periodo.fecha_inicio, max };
+    // Si el período aún no empezó (o min > max), no hay días seleccionables.
+    const valid = min <= max;
+    return {
+      min: valid ? min : undefined,
+      max: valid ? max : undefined,
+      valid,
+      periodoInicio: periodo.fecha_inicio,
+      periodoFin: periodo.fecha_fin,
+    };
   }, [periodos, periodoId, openPeriodo]);
+
+  useEffect(() => {
+    if (!fechaBounds.valid) {
+      setFechaRealizacion("");
+      return;
+    }
+    setFechaRealizacion((current) => {
+      if (current && fechaBounds.min && fechaBounds.max) {
+        if (current >= fechaBounds.min && current <= fechaBounds.max) return current;
+      }
+      return fechaBounds.max || todayISO();
+    });
+  }, [fechaBounds.min, fechaBounds.max, fechaBounds.valid]);
 
   const gridRows = useMemo(() => {
     const moduloRows = asignaciones.map((item) => ({
@@ -179,6 +203,10 @@ export function NovedadesCargaPage() {
       setError("Completá período, servicio, profesional y fecha de realización");
       return;
     }
+    if (!fechaBounds.valid) {
+      setError("No hay fechas de realización válidas para este período (debe estar en curso y no ser futura)");
+      return;
+    }
 
     const hasModulo = Boolean(moduloId);
     const hasNovedad = incluirNovedad || Boolean(horas);
@@ -242,19 +270,25 @@ export function NovedadesCargaPage() {
 
         <form onSubmit={submitCarga}>
           <h2 style={{ margin: "12px 0 8px", fontSize: "1rem" }}>Contexto</h2>
-          <div style={{ display: "grid", gap: 8, gridTemplateColumns: "repeat(auto-fill, minmax(180px, 1fr))", marginBottom: 16 }}>
-            <select value={periodoId} onChange={(e) => setPeriodoId(e.target.value)} style={uiStyles.formControl} required>
-              <option value="">Período</option>
-              {periodos.map((p) => (
-                <option key={p.id} value={p.id}>#{p.id} {p.nombre || ""} ({p.estado})</option>
-              ))}
-            </select>
-            <select value={servicioId} onChange={(e) => setServicioId(e.target.value)} style={uiStyles.formControl} required>
-              <option value="">Servicio</option>
-              {servicios.map((s) => (
-                <option key={s.id} value={s.id}>{s.nombre}</option>
-              ))}
-            </select>
+          <div style={{ display: "grid", gap: 8, gridTemplateColumns: "repeat(auto-fill, minmax(180px, 1fr))", marginBottom: 8, alignItems: "end" }}>
+            <label style={{ display: "grid", gap: 4 }}>
+              <span style={{ fontSize: 12, color: uiTheme.colors.textMuted }}>Período</span>
+              <select value={periodoId} onChange={(e) => setPeriodoId(e.target.value)} style={uiStyles.formControl} required>
+                <option value="">Elegí período</option>
+                {periodos.map((p) => (
+                  <option key={p.id} value={p.id}>#{p.id} {p.nombre || ""} ({p.estado})</option>
+                ))}
+              </select>
+            </label>
+            <label style={{ display: "grid", gap: 4 }}>
+              <span style={{ fontSize: 12, color: uiTheme.colors.textMuted }}>Servicio</span>
+              <select value={servicioId} onChange={(e) => setServicioId(e.target.value)} style={uiStyles.formControl} required>
+                <option value="">Elegí servicio</option>
+                {servicios.map((s) => (
+                  <option key={s.id} value={s.id}>{s.nombre}</option>
+                ))}
+              </select>
+            </label>
             <label style={{ display: "grid", gap: 4 }}>
               <span style={{ fontSize: 12, color: uiTheme.colors.textMuted }}>Fecha realización</span>
               <input
@@ -263,11 +297,20 @@ export function NovedadesCargaPage() {
                 min={fechaBounds.min}
                 max={fechaBounds.max}
                 onChange={(e) => setFechaRealizacion(e.target.value)}
-                required
+                required={fechaBounds.valid}
+                disabled={!fechaBounds.valid}
                 style={uiStyles.formControl}
               />
             </label>
           </div>
+          {!fechaBounds.valid && periodoId ? (
+            <p style={{ ...uiStyles.helpText, color: uiTheme.colors.danger, marginTop: 0, marginBottom: 16 }}>
+              El período va del {fechaBounds.periodoInicio} al {fechaBounds.periodoFin} y aún no hay días
+              realizables (la fecha no puede ser posterior a hoy). Cuando el período esté en curso vas a poder elegir días.
+            </p>
+          ) : (
+            <div style={{ marginBottom: 8 }} />
+          )}
 
           <div style={{ marginBottom: 16, maxWidth: 420 }}>
             <ProfessionalCombobox
