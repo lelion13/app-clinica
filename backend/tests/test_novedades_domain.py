@@ -68,6 +68,25 @@ def test_assert_can_load_servicio_blocks_unscoped_jefe():
     assert exc.value.status_code == 403
 
 
+def test_scoped_servicio_ids_none_for_admin():
+    from app.services.novedades.helpers import scoped_servicio_ids
+
+    user = SimpleNamespace(id=1, role=UserRole.admin)
+    assert scoped_servicio_ids(FakeDB(), user) is None
+
+
+def test_scoped_servicio_ids_returns_list_for_jefe(monkeypatch):
+    from app.services.novedades import helpers as helpers_mod
+
+    user = SimpleNamespace(id=9, role=UserRole.jefe_medico)
+    monkeypatch.setattr(
+        helpers_mod,
+        "list_servicios_for_user",
+        lambda _db, _user: [SimpleNamespace(id=2), SimpleNamespace(id=5)],
+    )
+    assert helpers_mod.scoped_servicio_ids(FakeDB(), user) == [2, 5]
+
+
 def test_create_periodo_rejects_second_open(monkeypatch):
     db = FakeDB()
     monkeypatch.setattr(cargas_service, "get_open_periodo", lambda _db: SimpleNamespace(id=99))

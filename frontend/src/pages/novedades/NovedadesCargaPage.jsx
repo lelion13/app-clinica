@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from "react";
 
 import { apiRequestWithRefresh } from "../../services/api";
 import { uiStyles, uiTheme } from "../../ui/theme";
+import { CargasListGrid } from "./CargasListGrid";
 
 const TIPO_OPTIONS = [
   { value: "hora_extra", label: "Hora extra" },
@@ -25,12 +26,47 @@ export function NovedadesCargaPage() {
   const [tipo, setTipo] = useState("hora_extra");
   const [horas, setHoras] = useState("");
   const [incluirNovedad, setIncluirNovedad] = useState(false);
+  const [loadingServicio, setLoadingServicio] = useState(false);
 
   const openPeriodo = useMemo(() => periodos.find((p) => p.estado === "open"), [periodos]);
   const selectedModulo = useMemo(
     () => modulos.find((m) => String(m.id) === String(moduloId)),
     [modulos, moduloId]
   );
+
+  const gridRows = useMemo(() => {
+    const moduloRows = asignaciones.map((item) => ({
+      kind: "modulo",
+      kind_label: "Módulo",
+      id: item.id,
+      periodo_id: item.periodo_id,
+      periodo_nombre: item.periodo_nombre,
+      servicio_id: item.servicio_id,
+      servicio_nombre: item.servicio_nombre,
+      professional_id: item.professional_id,
+      professional_name: item.professional_name,
+      concepto: item.modulo_descripcion || `Módulo #${item.modulo_id}`,
+      horas: null,
+      valor: item.modulo_valor,
+      fecha_carga: item.created_at,
+    }));
+    const novedadRows = novedades.map((item) => ({
+      kind: "novedad",
+      kind_label: "Novedad",
+      id: item.id,
+      periodo_id: item.periodo_id,
+      periodo_nombre: item.periodo_nombre,
+      servicio_id: item.servicio_id,
+      servicio_nombre: item.servicio_nombre,
+      professional_id: item.professional_id,
+      professional_name: item.professional_name,
+      concepto: item.tipo_label || item.tipo,
+      horas: item.horas,
+      valor: item.valor_calculado,
+      fecha_carga: item.created_at,
+    }));
+    return [...moduloRows, ...novedadRows];
+  }, [asignaciones, novedades]);
 
   const clearCargaFields = () => {
     setProfessionalId("");
@@ -68,6 +104,8 @@ export function NovedadesCargaPage() {
   }, []);
 
   useEffect(() => {
+    let cancelled = false;
+
     const fetchProsAndModulos = async () => {
       if (!servicioId) {
         setProfesionales([]);
@@ -75,23 +113,42 @@ export function NovedadesCargaPage() {
         setValorHora(null);
         setProfessionalId("");
         setModuloId("");
+        setLoadingServicio(false);
         return;
       }
+
+      setLoadingServicio(true);
+      setProfesionales([]);
+      setModulos([]);
+      setProfessionalId("");
+      setModuloId("");
+
       const selected = servicios.find((s) => String(s.id) === String(servicioId));
       setValorHora(selected?.valor_hora ?? null);
+
       try {
         const [rows, mods] = await Promise.all([
           apiRequestWithRefresh(`/novedades/profesionales?servicio_id=${servicioId}`),
           apiRequestWithRefresh(`/novedades/modulos?servicio_id=${servicioId}`),
         ]);
+        if (cancelled) return;
         setProfesionales(rows);
         setModulos(mods);
-        setModuloId("");
       } catch (err) {
-        setError(err.message || "Error al cargar datos del servicio");
+        if (!cancelled) {
+          setError(err.message || "Error al cargar datos del servicio");
+        }
+      } finally {
+        if (!cancelled) {
+          setLoadingServicio(false);
+        }
       }
     };
+
     fetchProsAndModulos();
+    return () => {
+      cancelled = true;
+    };
   }, [servicioId, servicios]);
 
   const submitCarga = async (event) => {
@@ -183,7 +240,10 @@ export function NovedadesCargaPage() {
               ))}
             </select>
           </div>
-          {servicioId && !profesionales.length ? (
+          {loadingServicio ? (
+            <p style={uiStyles.helpText}>Cargando profesionales y módulos del servicio…</p>
+          ) : null}
+          {!loadingServicio && servicioId && !profesionales.length ? (
             <p style={{ ...uiStyles.helpText, color: uiTheme.colors.danger }}>
               No hay profesionales asociados a este servicio. Asociarlos en Parametrización → Profesionales ↔ servicios.
             </p>
@@ -238,31 +298,27 @@ export function NovedadesCargaPage() {
       </div>
 
       <div style={uiStyles.pageSection}>
-        <h2 style={{ marginTop: 0, fontSize: "1.05rem" }}>Módulos asignados</h2>
-        <ul style={uiStyles.listCard}>
-          {asignaciones.slice(0, 20).map((item) => (
-            <li key={item.id} style={{ padding: "8px 10px", borderBottom: `1px solid ${uiTheme.colors.border}` }}>
-              #{item.id} · {item.modulo_descripcion || item.modulo_id} · valor catálogo ${item.modulo_valor ?? "—"} · prof {item.professional_id}{" "}
-              <button type="button" style={{ ...uiStyles.buttonDanger, marginLeft: 8 }} onClick={async () => { await apiRequestWithRefresh(`/novedades/asignaciones-modulos/${item.id}`, { method: "DELETE" }); await load(); }}>
-                anular
-              </button>
-            </li>
-          ))}
-        </ul>
-      </div>
-
-      <div style={uiStyles.pageSection}>
-        <h2 style={{ marginTop: 0, fontSize: "1.05rem" }}>Novedades</h2>
-        <ul style={uiStyles.listCard}>
-          {novedades.slice(0, 20).map((item) => (
-            <li key={item.id} style={{ padding: "8px 10px", borderBottom: `1px solid ${uiTheme.colors.border}` }}>
-              #{item.id} · {item.tipo_label || item.tipo} · {item.horas} hs · ${item.valor_calculado ?? "—"}{" "}
-              <button type="button" style={{ ...uiStyles.buttonDanger, marginLeft: 8 }} onClick={async () => { await apiRequestWithRefresh(`/novedades/cargas/${item.id}`, { method: "DELETE" }); await load(); }}>
-                anular
-              </button>
-            </li>
-          ))}
-        </ul>
+        <h2 style={{ marginTop: 0, fontSize: "1.05rem" }}>Cargas</h2>
+        <p style={{ ...uiStyles.helpText, marginTop: 0 }}>
+          Módulos y novedades de tus servicios. Orden por defecto: servicio → profesional.
+          Podés filtrar y ordenar por columna.
+        </p>
+        <CargasListGrid
+          rows={gridRows}
+          onAnular={async (row) => {
+            setError("");
+            try {
+              const path =
+                row.kind === "modulo"
+                  ? `/novedades/asignaciones-modulos/${row.id}`
+                  : `/novedades/cargas/${row.id}`;
+              await apiRequestWithRefresh(path, { method: "DELETE" });
+              await load();
+            } catch (err) {
+              setError(err.message || "No se pudo anular");
+            }
+          }}
+        />
       </div>
     </section>
   );

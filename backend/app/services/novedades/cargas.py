@@ -29,6 +29,7 @@ from app.services.novedades.helpers import (
     get_servicio_or_404,
     require_periodo_open,
     require_profesional_en_servicio,
+    scoped_servicio_ids,
     soft_delete,
 )
 from app.models.novedades import NovedadesPeriodo, PeriodoEstado
@@ -214,16 +215,24 @@ def delete_profesional_servicio(db: Session, link_id: int, actor_id: int) -> Non
     db.commit()
 
 
-def list_asignaciones(db: Session) -> list[NovedadesAsignacionModulo]:
-    return list(
-        db.execute(
-            select(NovedadesAsignacionModulo)
-            .where(NovedadesAsignacionModulo.deleted_at.is_(None))
-            .order_by(NovedadesAsignacionModulo.id.desc())
-        )
-        .scalars()
-        .all()
+def list_asignaciones(db: Session, user: User) -> list[NovedadesAsignacionModulo]:
+    query = (
+        select(NovedadesAsignacionModulo)
+        .join(NovedadesServicio, NovedadesServicio.id == NovedadesAsignacionModulo.servicio_id)
+        .join(Professional, Professional.id == NovedadesAsignacionModulo.professional_id)
+        .where(NovedadesAsignacionModulo.deleted_at.is_(None))
     )
+    alcance = scoped_servicio_ids(db, user)
+    if alcance is not None:
+        if not alcance:
+            return []
+        query = query.where(NovedadesAsignacionModulo.servicio_id.in_(alcance))
+    query = query.order_by(
+        NovedadesServicio.nombre.asc(),
+        Professional.full_name.asc(),
+        NovedadesAsignacionModulo.id.desc(),
+    )
+    return list(db.execute(query).scalars().all())
 
 
 def create_asignacion(db: Session, payload: AsignacionCreateRequest, user: User) -> NovedadesAsignacionModulo:
@@ -292,12 +301,24 @@ def delete_asignacion(db: Session, item_id: int, user: User) -> None:
     db.commit()
 
 
-def list_novedades(db: Session) -> list[NovedadesNovedad]:
-    return list(
-        db.execute(select(NovedadesNovedad).where(NovedadesNovedad.deleted_at.is_(None)).order_by(NovedadesNovedad.id.desc()))
-        .scalars()
-        .all()
+def list_novedades(db: Session, user: User) -> list[NovedadesNovedad]:
+    query = (
+        select(NovedadesNovedad)
+        .join(NovedadesServicio, NovedadesServicio.id == NovedadesNovedad.servicio_id)
+        .join(Professional, Professional.id == NovedadesNovedad.professional_id)
+        .where(NovedadesNovedad.deleted_at.is_(None))
     )
+    alcance = scoped_servicio_ids(db, user)
+    if alcance is not None:
+        if not alcance:
+            return []
+        query = query.where(NovedadesNovedad.servicio_id.in_(alcance))
+    query = query.order_by(
+        NovedadesServicio.nombre.asc(),
+        Professional.full_name.asc(),
+        NovedadesNovedad.id.desc(),
+    )
+    return list(db.execute(query).scalars().all())
 
 
 def create_novedad(db: Session, payload: NovedadCreateRequest, user: User) -> NovedadesNovedad:

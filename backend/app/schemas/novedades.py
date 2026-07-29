@@ -119,8 +119,11 @@ class AsignacionUpdateRequest(BaseModel):
 class AsignacionResponse(BaseModel):
     id: int
     periodo_id: int
+    periodo_nombre: str | None = None
     servicio_id: int
+    servicio_nombre: str | None = None
     professional_id: int
+    professional_name: str | None = None
     modulo_id: int
     modulo_descripcion: str | None = None
     modulo_valor: Decimal | None = None
@@ -148,8 +151,11 @@ class NovedadUpdateRequest(BaseModel):
 class NovedadResponse(BaseModel):
     id: int
     periodo_id: int
+    periodo_nombre: str | None = None
     servicio_id: int
+    servicio_nombre: str | None = None
     professional_id: int
+    professional_name: str | None = None
     tipo: str
     tipo_label: str
     horas: Decimal

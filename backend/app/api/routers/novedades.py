@@ -83,14 +83,26 @@ def _periodo_response(item) -> PeriodoResponse:
 
 
 def _novedad_response(db: Session, item) -> NovedadResponse:
+    from app.models.novedades import NovedadesPeriodo
+    from app.models.professional import Professional
+
     tipo = item.tipo if isinstance(item.tipo, NovedadTipo) else NovedadTipo(item.tipo)
     servicio = get_servicio_or_404(db, item.servicio_id)
     valor_hora = servicio.valor_hora
+    professional = db.execute(
+        select(Professional).where(Professional.id == item.professional_id)
+    ).scalar_one_or_none()
+    periodo = db.execute(
+        select(NovedadesPeriodo).where(NovedadesPeriodo.id == item.periodo_id)
+    ).scalar_one_or_none()
     return NovedadResponse(
         id=item.id,
         periodo_id=item.periodo_id,
+        periodo_nombre=periodo.nombre if periodo else None,
         servicio_id=item.servicio_id,
+        servicio_nombre=servicio.nombre,
         professional_id=item.professional_id,
+        professional_name=professional.full_name if professional else None,
         tipo=tipo.value,
         tipo_label=NOVEDAD_TIPO_LABELS.get(tipo, tipo.value),
         horas=item.horas,
@@ -102,14 +114,25 @@ def _novedad_response(db: Session, item) -> NovedadResponse:
 
 
 def _asignacion_response(db: Session, item) -> AsignacionResponse:
-    from app.models.novedades import NovedadesModulo
+    from app.models.novedades import NovedadesModulo, NovedadesPeriodo
+    from app.models.professional import Professional
 
     modulo = db.execute(select(NovedadesModulo).where(NovedadesModulo.id == item.modulo_id)).scalar_one_or_none()
+    servicio = get_servicio_or_404(db, item.servicio_id)
+    professional = db.execute(
+        select(Professional).where(Professional.id == item.professional_id)
+    ).scalar_one_or_none()
+    periodo = db.execute(
+        select(NovedadesPeriodo).where(NovedadesPeriodo.id == item.periodo_id)
+    ).scalar_one_or_none()
     return AsignacionResponse(
         id=item.id,
         periodo_id=item.periodo_id,
+        periodo_nombre=periodo.nombre if periodo else None,
         servicio_id=item.servicio_id,
+        servicio_nombre=servicio.nombre,
         professional_id=item.professional_id,
+        professional_name=professional.full_name if professional else None,
         modulo_id=item.modulo_id,
         modulo_descripcion=modulo.descripcion if modulo else None,
         modulo_valor=modulo.valor if modulo else None,
@@ -349,8 +372,7 @@ def profesionales_directory(
 
 @router.get("/asignaciones-modulos", response_model=list[AsignacionResponse])
 def asignaciones_list(db: Session = Depends(get_db), user: User = Depends(require_admin_or_jefe)) -> list[AsignacionResponse]:
-    _ = user
-    return [_asignacion_response(db, item) for item in cargas_service.list_asignaciones(db)]
+    return [_asignacion_response(db, item) for item in cargas_service.list_asignaciones(db, user)]
 
 
 @router.post("/asignaciones-modulos", response_model=AsignacionResponse, status_code=status.HTTP_201_CREATED)
@@ -385,8 +407,7 @@ def asignaciones_delete(
 
 @router.get("/cargas", response_model=list[NovedadResponse])
 def novedades_list(db: Session = Depends(get_db), user: User = Depends(require_admin_or_jefe)) -> list[NovedadResponse]:
-    _ = user
-    return [_novedad_response(db, item) for item in cargas_service.list_novedades(db)]
+    return [_novedad_response(db, item) for item in cargas_service.list_novedades(db, user)]
 
 
 @router.post("/cargas", response_model=NovedadResponse, status_code=status.HTTP_201_CREATED)

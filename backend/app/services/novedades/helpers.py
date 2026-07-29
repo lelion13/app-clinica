@@ -111,6 +111,13 @@ def list_servicios_for_user(db: Session, user: User) -> list[NovedadesServicio]:
     return list(db.execute(query).scalars().all())
 
 
+def scoped_servicio_ids(db: Session, user: User) -> list[int] | None:
+    """None = sin filtro (admin/rrhh). Lista (posible vacía) = alcance de jefe_medico."""
+    if user.role != UserRole.jefe_medico:
+        return None
+    return [item.id for item in list_servicios_for_user(db, user)]
+
+
 def get_or_create_config(db: Session) -> NovedadesConfig:
     item = db.execute(select(NovedadesConfig).where(NovedadesConfig.id == 1)).scalar_one_or_none()
     if item:
