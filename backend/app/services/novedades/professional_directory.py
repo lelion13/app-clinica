@@ -60,6 +60,7 @@ def _to_item(row: NovedadesProfesional) -> ProfesionalDirectoryItem:
         id=row.id,
         full_name=row.full_name,
         codprof=row.codprof,
+        legajo=row.legajo,
         license_number=None,
         external_document=None,
         specialty=None,

@@ -13,7 +13,7 @@ export const DISTRIBUTION_ITEMS = [
 export const NOVEDADES_ITEMS = [
   { label: "Carga módulos", path: "/novedades/carga", roles: ["admin", "jefe_medico"] },
   { label: "Mis profesionales", path: "/novedades/mis-profesionales", roles: ["admin", "rrhh", "jefe_medico"] },
-  { label: "Generación archivo XLS", path: "/novedades/xls", roles: ["admin", "rrhh"] },
+  { label: "Capital Humano", path: "/novedades/xls", roles: ["admin", "rrhh"] },
   { label: "Parametrización", path: "/novedades/parametrizacion", roles: ["admin", "rrhh"] },
 ];
 

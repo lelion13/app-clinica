@@ -103,6 +103,7 @@ class ProfesionalDirectoryItem(BaseModel):
     id: int
     full_name: str
     codprof: str | None = None
+    legajo: str | None = None
     license_number: str | None = None
     external_document: str | None = None
     specialty: str | None = None
@@ -206,3 +207,32 @@ class GridRowResponse(BaseModel):
     cargado_por: str | None
     fecha_realizacion: date | None = None
     fecha_carga: datetime
+
+
+class CapitalHumanoRowResponse(BaseModel):
+    professional_id: int
+    legajo: str | None = None
+    professional_name: str
+    monto_cargas: Decimal
+    monto_ajustes: Decimal
+    monto_total: Decimal
+
+
+class AjusteCapitalCreateRequest(BaseModel):
+    professional_id: int
+    periodo_id: int
+    servicio_id: int | None = None
+    importe: Decimal
+    comentario: str = Field(min_length=1, max_length=500)
+
+
+class AjusteCapitalResponse(BaseModel):
+    id: int
+    professional_id: int
+    periodo_id: int
+    servicio_id: int | None
+    importe: Decimal
+    comentario: str
+    created_at: datetime
+    created_by: int | None = None
+    created_by_name: str | None = None

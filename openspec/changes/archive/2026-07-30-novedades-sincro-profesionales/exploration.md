@@ -1,8 +1,26 @@
 # Exploration: Sync profesionales (API externa) para Novedades
 
 **Change:** `novedades-sincro-profesionales`  
-**Status:** Survey cerrada → proposal listo  
-**Created:** 2026-07-29 · **Survey reset + closed:** 2026-07-29
+**Status:** Archived 2026-07-30  
+**Created:** 2026-07-29 · Survey cerrada → proposal/spec/design/tasks → apply → archive
+
+## Intent
+
+Ver `proposal.md` / `implementation-notes.md`. Catálogo Novedades HTTP aparte de Distribución.
+
+## Current State (al archivar)
+
+- Tabla `novedades_profesional` + sync HTTP + purge implementados.
+- Novedades FKs → `novedades_profesional.id`.
+- Distribución `professionals` / MySQL sync sin cambios.
+
+## Decisions
+
+Ver `decisions.md` (Q1–Q13). Resumen en `implementation-notes.md`.
+
+## Ready for Proposal
+
+N/A — change archivado. Spec estable: `openspec/specs/novedades/spec.md`.
 
 ## Intent
 

@@ -10,7 +10,7 @@ function normalize(s) {
 
 function profHaystack(p) {
   return normalize(
-    [p.full_name, p.codprof, p.external_document, p.license_number, p.email, String(p.id)]
+    [p.full_name, p.codprof, p.legajo, p.external_document, p.license_number, p.email, String(p.id)]
       .filter(Boolean)
       .join(" ")
   );
@@ -31,7 +31,13 @@ export const alignedNativeFormControlStyle = {
 
 export function formatProfessionalLabel(p) {
   if (!p) return "";
-  const code = p.codprof ? ` · ${p.codprof}` : p.external_document ? ` · DNI ${p.external_document}` : "";
+  const code = p.legajo
+    ? ` · Legajo ${p.legajo}`
+    : p.codprof
+      ? ` · ${p.codprof}`
+      : p.external_document
+        ? ` · DNI ${p.external_document}`
+        : "";
   return `#${p.id} · ${p.full_name}${code}`;
 }
 

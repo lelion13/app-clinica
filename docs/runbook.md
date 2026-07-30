@@ -38,6 +38,10 @@
   - Ops: migrar → setear token (rotar si se expuso) → sync en Parametrización → reasociar Mis profesionales → cargas
   - Botón **Limpiar cargas** (Param, admin/rrhh): hard-delete transaccional con confirmación
   - Sync también desde Mis profesionales (admin/rrhh/jefe); si el API falla **no** inactiva locales
+- Cambio `novedades-capital-humano-legajo` (rev `0009_capital_humano_legajo`):
+  - Campo `legajo` en sync (`LEGAJO`, string + trim + ceros)
+  - Pantalla **Capital Humano** (ex Generación XLS): grilla 1 fila/profesional + ajustes (+/−) + 2 XLS
+  - Tabla `novedades_ajuste_capital`; ajustes permitidos con período cerrado
 
 ## Roles (panel)
 - `admin`: distribución + novedades (todo) + usuarios
@@ -53,7 +57,7 @@
 5. Generación XLS (admin/rrhh): grilla + filtros + descarga (incluye ambas fechas).
 
 ## Docs del change
-- Archivados: `openspec/changes/archive/2026-07-29-novedades-modulos/`, `openspec/changes/archive/2026-07-29-novedades-jefe-profesionales-fecha-carga/`
+- Archivados: `openspec/changes/archive/2026-07-29-novedades-modulos/`, `openspec/changes/archive/2026-07-29-novedades-jefe-profesionales-fecha-carga/`, `openspec/changes/archive/2026-07-30-novedades-sincro-profesionales/`
 - Specs estables: `openspec/specs/novedades/`, `openspec/specs/auth-roles/`
 
 ## Verificacion

@@ -44,10 +44,22 @@ class SyncFakeDB:
 
 
 def test_normalize_preserves_leading_zeros():
-    assert prof_sync_service._normalize_row({"CODPROF": "001", "NOMBRES": "A", "CODPROV": "0001"}) == (
+    assert prof_sync_service._normalize_row(
+        {"CODPROF": "001", "NOMBRES": "A", "CODPROV": "0001", "LEGAJO": " 05100"}
+    ) == (
         "001",
         "A",
         "0001",
+        "05100",
+    )
+
+
+def test_normalize_legajo_optional():
+    assert prof_sync_service._normalize_row({"CODPROF": "032", "NOMBRES": "X", "CODPROV": "0032"}) == (
+        "032",
+        "X",
+        "0032",
+        None,
     )
 
 
@@ -56,6 +68,7 @@ def test_sync_inactivates_missing_and_reactivates(monkeypatch):
         codprof="001",
         full_name="OLD",
         codprov="0001",
+        legajo=None,
         is_active=False,
         deleted_at=None,
         updated_at=None,
@@ -65,6 +78,7 @@ def test_sync_inactivates_missing_and_reactivates(monkeypatch):
         codprof="002",
         full_name="Gone",
         codprov=None,
+        legajo=None,
         is_active=True,
         deleted_at=None,
         updated_at=None,
@@ -74,12 +88,13 @@ def test_sync_inactivates_missing_and_reactivates(monkeypatch):
     monkeypatch.setattr(
         prof_sync_service,
         "_fetch_remote_rows",
-        lambda: [{"CODPROF": "001", "NOMBRES": "NEW NAME", "CODPROV": "0009"}],
+        lambda: [{"CODPROF": "001", "NOMBRES": "NEW NAME", "CODPROV": "0009", "LEGAJO": "05100"}],
     )
     result = prof_sync_service.sync_novedades_professionals(db, actor_id=7)
     assert inactive.is_active is True
     assert inactive.full_name == "NEW NAME"
     assert inactive.codprov == "0009"
+    assert inactive.legajo == "05100"
     assert active_gone.is_active is False
     assert result.updated >= 1
     assert result.inactivated == 1
@@ -87,7 +102,9 @@ def test_sync_inactivates_missing_and_reactivates(monkeypatch):
 
 
 def test_sync_does_not_inactivate_when_fetch_fails(monkeypatch):
-    row = SimpleNamespace(codprof="001", full_name="A", codprov=None, is_active=True, deleted_at=None)
+    row = SimpleNamespace(
+        codprof="001", full_name="A", codprov=None, legajo=None, is_active=True, deleted_at=None
+    )
     db = SyncFakeDB([row])
 
     def boom():

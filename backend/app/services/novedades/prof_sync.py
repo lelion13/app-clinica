@@ -17,15 +17,20 @@ def _as_str(value) -> str | None:
     return s or None
 
 
-def _normalize_row(raw: dict) -> tuple[str, str, str | None] | None:
-    """Returns (codprof, full_name, codprov) or None if unusable."""
-    # Accept CODPROF / codprof variants.
+def _normalize_row(raw: dict) -> tuple[str, str, str | None, str | None] | None:
+    """Returns (codprof, full_name, codprov, legajo) or None if unusable."""
     codprof = _as_str(raw.get("CODPROF") if "CODPROF" in raw else raw.get("codprof"))
     nombres = _as_str(raw.get("NOMBRES") if "NOMBRES" in raw else raw.get("nombres"))
     codprov = _as_str(raw.get("CODPROV") if "CODPROV" in raw else raw.get("codprov"))
+    legajo = _as_str(raw.get("LEGAJO") if "LEGAJO" in raw else raw.get("legajo"))
     if not codprof or not nombres:
         return None
-    return codprof[:40], nombres[:200], (codprov[:40] if codprov else None)
+    return (
+        codprof[:40],
+        nombres[:200],
+        (codprov[:40] if codprov else None),
+        (legajo[:40] if legajo else None),
+    )
 
 
 def _fetch_remote_rows() -> list[dict]:
@@ -81,7 +86,7 @@ def sync_novedades_professionals(db: Session, actor_id: int) -> NovedadesProfSyn
             skipped += 1
             errors.append(f"fila {idx}: CODPROF/NOMBRES faltantes")
             continue
-        codprof, full_name, codprov = normalized
+        codprof, full_name, codprov, legajo = normalized
         if codprof in seen:
             skipped += 1
             errors.append(f"fila {idx}: CODPROF duplicado en respuesta ({codprof})")
@@ -94,6 +99,7 @@ def sync_novedades_professionals(db: Session, actor_id: int) -> NovedadesProfSyn
                 codprof=codprof,
                 full_name=full_name,
                 codprov=codprov,
+                legajo=legajo,
                 is_active=True,
                 created_at=now,
                 updated_at=now,
@@ -112,6 +118,9 @@ def sync_novedades_professionals(db: Session, actor_id: int) -> NovedadesProfSyn
             changed = True
         if row.codprov != codprov:
             row.codprov = codprov
+            changed = True
+        if row.legajo != legajo:
+            row.legajo = legajo
             changed = True
         if not row.is_active:
             row.is_active = True

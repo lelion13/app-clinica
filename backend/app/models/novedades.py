@@ -89,7 +89,21 @@ class NovedadesProfesional(AuditMixin, Base):
     codprof: Mapped[str] = mapped_column(String(40), nullable=False, unique=True)
     full_name: Mapped[str] = mapped_column(String(200), nullable=False)
     codprov: Mapped[str | None] = mapped_column(String(40), nullable=True)
+    legajo: Mapped[str | None] = mapped_column(String(40), nullable=True)
     is_active: Mapped[bool] = mapped_column(Boolean, nullable=False, default=True)
+
+
+class NovedadesAjusteCapital(AuditMixin, Base):
+    """Ajuste (+/−) de Capital Humano por profesional y período (± servicio)."""
+
+    __tablename__ = "novedades_ajuste_capital"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    professional_id: Mapped[int] = mapped_column(ForeignKey("novedades_profesional.id"), nullable=False)
+    periodo_id: Mapped[int] = mapped_column(ForeignKey("novedades_periodo.id"), nullable=False)
+    servicio_id: Mapped[int | None] = mapped_column(ForeignKey("novedades_servicio.id"), nullable=True)
+    importe: Mapped[Decimal] = mapped_column(Numeric(12, 2), nullable=False)
+    comentario: Mapped[str] = mapped_column(String(500), nullable=False)
 
 
 class NovedadesProfesionalServicio(AuditMixin, Base):

@@ -25,4 +25,8 @@
 - [x] 4.1 Tests: sync mock httpx (inactivate/reactivate/`001` zeros; no inactivate on fail)
 - [x] 4.2 Tests: purge RBAC (jefe 403); carga inactive 422; sync jefe 200
 - [x] 4.3 Update `docs/runbook.md` (env, migrate 0008, sync→reasociar, purge, rotate token)
-- [x] 4.4 Mark tasks done; ready for verify/archive when accepted
+- [x] 4.4 Mark tasks done; archive + implementation-notes (L1–L7)
+
+## Cierre
+
+- [x] Archivado 2026-07-30

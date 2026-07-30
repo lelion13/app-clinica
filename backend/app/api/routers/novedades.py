@@ -12,6 +12,9 @@ from app.schemas.novedades import (
     AsignacionCreateRequest,
     AsignacionResponse,
     AsignacionUpdateRequest,
+    AjusteCapitalCreateRequest,
+    AjusteCapitalResponse,
+    CapitalHumanoRowResponse,
     GridRowResponse,
     JefeServicioCreateRequest,
     JefeServicioResponse,
@@ -33,6 +36,7 @@ from app.schemas.novedades import (
     ServicioUpdateRequest,
 )
 from app.services.novedades import cargas as cargas_service
+from app.services.novedades import capital_humano as capital_humano_service
 from app.services.novedades import export_xls
 from app.services.novedades import masters as masters_service
 from app.services.novedades import prof_sync as prof_sync_service
@@ -478,6 +482,43 @@ def grilla_list(
     return export_xls.build_grid_rows(db, periodo_id=periodo_id, servicio_id=servicio_id, q=q, concepto_q=concepto)
 
 
+@router.get("/capital-humano", response_model=list[CapitalHumanoRowResponse])
+def capital_humano_list(
+    periodo_id: int | None = Query(default=None),
+    servicio_id: int | None = Query(default=None),
+    q: str | None = Query(default=None),
+    db: Session = Depends(get_db),
+    user: User = Depends(require_admin_or_rrhh),
+) -> list[CapitalHumanoRowResponse]:
+    _ = user
+    return capital_humano_service.build_capital_humano_rows(
+        db, periodo_id=periodo_id, servicio_id=servicio_id, q=q
+    )
+
+
+@router.get("/capital-humano/ajustes", response_model=list[AjusteCapitalResponse])
+def capital_humano_ajustes_list(
+    professional_id: int = Query(...),
+    periodo_id: int = Query(...),
+    servicio_id: int | None = Query(default=None),
+    db: Session = Depends(get_db),
+    user: User = Depends(require_admin_or_rrhh),
+) -> list[AjusteCapitalResponse]:
+    _ = user
+    return capital_humano_service.list_ajustes(
+        db, professional_id=professional_id, periodo_id=periodo_id, servicio_id=servicio_id
+    )
+
+
+@router.post("/capital-humano/ajustes", response_model=AjusteCapitalResponse, status_code=status.HTTP_201_CREATED)
+def capital_humano_ajustes_create(
+    payload: AjusteCapitalCreateRequest,
+    db: Session = Depends(get_db),
+    user: User = Depends(require_admin_or_rrhh),
+) -> AjusteCapitalResponse:
+    return capital_humano_service.create_ajuste(db, payload, user=user)
+
+
 @router.get("/export.xlsx")
 def export_xlsx(
     periodo_id: int | None = Query(default=None),
@@ -492,5 +533,24 @@ def export_xlsx(
     return Response(
         content=content,
         media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-        headers={"Content-Disposition": 'attachment; filename="novedades.xlsx"'},
+        headers={"Content-Disposition": 'attachment; filename="novedades-detalle.xlsx"'},
+    )
+
+
+@router.get("/export-capital.xlsx")
+def export_capital_xlsx(
+    periodo_id: int | None = Query(default=None),
+    servicio_id: int | None = Query(default=None),
+    q: str | None = Query(default=None),
+    db: Session = Depends(get_db),
+    user: User = Depends(require_admin_or_rrhh),
+) -> Response:
+    _ = user
+    content = capital_humano_service.export_capital_xlsx_bytes(
+        db, periodo_id=periodo_id, servicio_id=servicio_id, q=q
+    )
+    return Response(
+        content=content,
+        media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+        headers={"Content-Disposition": 'attachment; filename="capital-humano.xlsx"'},
     )
