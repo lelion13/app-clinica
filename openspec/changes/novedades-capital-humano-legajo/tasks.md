@@ -6,5 +6,6 @@
 - [x] 2.2 Schemas + router endpoints + export agregada
 - [x] 3.1 Frontend Capital Humano: grilla, sort/filter, modal, 2 downloads
 - [x] 3.2 Nav rename
+- [x] 3.3 Botón Detalle → modal con grilla de ítems del profesional
 - [x] 4.1 Tests sync legajo + ajustes + aggregate
 - [x] 4.2 Runbook + mark tasks

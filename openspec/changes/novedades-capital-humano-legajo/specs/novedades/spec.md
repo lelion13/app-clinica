@@ -37,6 +37,12 @@ Total cargas MUST be the sum of module + novedad valores in the filtered period 
 - WHEN intenta `GET /novedades/capital-humano`
 - THEN MUST recibir 403
 
+#### Scenario: Detalle por profesional
+
+- GIVEN profesional P con cargas en el filtro actual
+- WHEN admin pulsa **Detalle** en la fila de P
+- THEN MUST abrirse un modal con la grilla de ítems (módulos/novedades) de P en ese alcance
+
 ### Requirement: Ajustes de Capital Humano
 
 The system MUST persist create-only signed adjustments (`novedades_ajuste_capital`) with non-zero `importe` and required non-blank `comentario`. UI MUST open a modal from the ajustes column showing history and a create form. Edit/delete of adjustments MUST NOT be offered in this change. Scope of listed/created adjustments MUST match the current period filter and optional service filter.

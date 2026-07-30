@@ -473,13 +473,21 @@ def novedades_delete(
 def grilla_list(
     periodo_id: int | None = Query(default=None),
     servicio_id: int | None = Query(default=None),
+    professional_id: int | None = Query(default=None),
     q: str | None = Query(default=None),
     concepto: str | None = Query(default=None),
     db: Session = Depends(get_db),
     user: User = Depends(require_admin_or_rrhh),
 ) -> list[GridRowResponse]:
     _ = user
-    return export_xls.build_grid_rows(db, periodo_id=periodo_id, servicio_id=servicio_id, q=q, concepto_q=concepto)
+    return export_xls.build_grid_rows(
+        db,
+        periodo_id=periodo_id,
+        servicio_id=servicio_id,
+        professional_id=professional_id,
+        q=q,
+        concepto_q=concepto,
+    )
 
 
 @router.get("/capital-humano", response_model=list[CapitalHumanoRowResponse])

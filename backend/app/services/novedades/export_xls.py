@@ -24,6 +24,7 @@ def build_grid_rows(
     *,
     periodo_id: int | None = None,
     servicio_id: int | None = None,
+    professional_id: int | None = None,
     q: str | None = None,
     concepto_q: str | None = None,
 ) -> list[GridRowResponse]:
@@ -36,11 +37,11 @@ def build_grid_rows(
 
     for item in asignaciones:
         row = _asignacion_row(db, item)
-        if row and _matches(row, periodo_id, servicio_id, q, concepto_q):
+        if row and _matches(row, periodo_id, servicio_id, professional_id, q, concepto_q):
             rows.append(row)
     for item in novedades:
         row = _novedad_row(db, item)
-        if row and _matches(row, periodo_id, servicio_id, q, concepto_q):
+        if row and _matches(row, periodo_id, servicio_id, professional_id, q, concepto_q):
             rows.append(row)
 
     rows.sort(key=lambda r: r.fecha_carga, reverse=True)
@@ -99,12 +100,15 @@ def _matches(
     row: GridRowResponse,
     periodo_id: int | None,
     servicio_id: int | None,
+    professional_id: int | None,
     q: str | None,
     concepto_q: str | None,
 ) -> bool:
     if periodo_id is not None and row.periodo_id != periodo_id:
         return False
     if servicio_id is not None and row.servicio_id != servicio_id:
+        return False
+    if professional_id is not None and row.professional_id != professional_id:
         return False
     if q:
         needle = q.strip().lower()

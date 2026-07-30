@@ -43,6 +43,26 @@ function compareNumber(a, b) {
   return na - nb;
 }
 
+function formatDateOnly(value) {
+  if (!value) return "—";
+  const d = typeof value === "string" && value.length <= 10 ? new Date(`${value}T12:00:00`) : new Date(value);
+  if (Number.isNaN(d.getTime())) return String(value);
+  return d.toLocaleDateString("es-AR");
+}
+
+function formatDateTime(value) {
+  if (!value) return "—";
+  const d = new Date(value);
+  if (Number.isNaN(d.getTime())) return String(value);
+  return d.toLocaleString("es-AR");
+}
+
+function tipoLabel(tipo) {
+  if (tipo === "modulo_asignado") return "Módulo";
+  if (!tipo) return "—";
+  return "Novedad";
+}
+
 export function NovedadesXlsPage() {
   const [error, setError] = useState("");
   const [info, setInfo] = useState("");
@@ -61,6 +81,10 @@ export function NovedadesXlsPage() {
   const [importe, setImporte] = useState("");
   const [comentario, setComentario] = useState("");
   const [saving, setSaving] = useState(false);
+
+  const [detailRow, setDetailRow] = useState(null);
+  const [detailItems, setDetailItems] = useState([]);
+  const [detailLoading, setDetailLoading] = useState(false);
 
   const queryString = () => {
     const params = new URLSearchParams();
@@ -133,6 +157,32 @@ export function NovedadesXlsPage() {
     if (saving) return;
     setModalRow(null);
     setAjustes([]);
+  };
+
+  const openDetalle = async (row) => {
+    setError("");
+    setDetailRow(row);
+    setDetailItems([]);
+    setDetailLoading(true);
+    try {
+      const params = new URLSearchParams({
+        professional_id: String(row.professional_id),
+      });
+      if (periodoId) params.set("periodo_id", periodoId);
+      if (servicioId) params.set("servicio_id", servicioId);
+      const list = await apiRequestWithRefresh(`/novedades/grilla?${params}`);
+      setDetailItems(list);
+    } catch (err) {
+      setError(err.message || "Error al cargar el detalle");
+      setDetailRow(null);
+    } finally {
+      setDetailLoading(false);
+    }
+  };
+
+  const closeDetalle = () => {
+    setDetailRow(null);
+    setDetailItems([]);
   };
 
   const submitAjuste = async (event) => {
@@ -284,7 +334,7 @@ export function NovedadesXlsPage() {
               <th style={thStyle} onClick={() => toggleSort("monto_total")}>
                 Monto total{sortMark("monto_total")}
               </th>
-              <th style={{ ...thStyle, cursor: "default" }}>Acción</th>
+              <th style={{ ...thStyle, cursor: "default" }}>Acciones</th>
             </tr>
           </thead>
           <tbody>
@@ -308,7 +358,14 @@ export function NovedadesXlsPage() {
                   </button>
                 </td>
                 <td style={tdStyle}>{formatMoney(row.monto_total)}</td>
-                <td style={tdStyle}>
+                <td style={{ ...tdStyle, whiteSpace: "nowrap" }}>
+                  <button
+                    type="button"
+                    style={{ ...uiStyles.buttonSecondary, marginRight: 6 }}
+                    onClick={() => openDetalle(row)}
+                  >
+                    Detalle
+                  </button>
                   <button type="button" style={uiStyles.buttonPrimary} onClick={() => openModal(row)}>
                     Agregar importe
                   </button>
@@ -319,6 +376,100 @@ export function NovedadesXlsPage() {
         </table>
         {!visibleRows.length ? <p style={uiStyles.helpText}>Sin resultados.</p> : null}
       </div>
+
+      {detailRow ? (
+        <div
+          role="presentation"
+          style={{
+            position: "fixed",
+            inset: 0,
+            zIndex: 1100,
+            background: "rgba(15, 43, 39, 0.45)",
+            display: "flex",
+            alignItems: "flex-start",
+            justifyContent: "center",
+            padding: "max(16px, 4vh) 16px",
+            overflowY: "auto",
+          }}
+          onClick={closeDetalle}
+        >
+          <div
+            role="dialog"
+            aria-modal="true"
+            onClick={(e) => e.stopPropagation()}
+            style={{
+              background: "#fff",
+              borderRadius: uiTheme.radius.md,
+              maxWidth: 960,
+              width: "100%",
+              padding: 22,
+              boxShadow: uiTheme.shadow.md,
+              border: `1px solid ${uiTheme.colors.border}`,
+              marginBottom: 24,
+            }}
+          >
+            <div style={{ display: "flex", justifyContent: "space-between", gap: 12, alignItems: "flex-start" }}>
+              <div>
+                <h2 style={{ marginTop: 0, marginBottom: 8, fontSize: "1.1rem" }}>
+                  Detalle · {detailRow.professional_name}
+                </h2>
+                <p style={{ ...uiStyles.helpText, marginTop: 0 }}>
+                  Legajo: {detailRow.legajo || "—"}
+                  {periodoId ? ` · Período #${periodoId}` : " · Todos los períodos"}
+                  {servicioId ? " · Servicio filtrado" : ""}
+                </p>
+              </div>
+              <button type="button" style={uiStyles.buttonSecondary} onClick={closeDetalle}>
+                Cerrar
+              </button>
+            </div>
+
+            {detailLoading ? (
+              <p style={uiStyles.helpText}>Cargando ítems…</p>
+            ) : (
+              <div style={{ overflowX: "auto", maxHeight: "60vh" }}>
+                <table style={{ width: "100%", borderCollapse: "collapse", fontSize: "0.85rem", minWidth: 720 }}>
+                  <thead>
+                    <tr>
+                      <th style={{ ...thStyle, cursor: "default" }}>Tipo</th>
+                      <th style={{ ...thStyle, cursor: "default" }}>Servicio</th>
+                      <th style={{ ...thStyle, cursor: "default" }}>Concepto</th>
+                      <th style={{ ...thStyle, cursor: "default" }}>Horas</th>
+                      <th style={{ ...thStyle, cursor: "default" }}>Valor</th>
+                      <th style={{ ...thStyle, cursor: "default" }}>F. realización</th>
+                      <th style={{ ...thStyle, cursor: "default" }}>Período</th>
+                      <th style={{ ...thStyle, cursor: "default" }}>F. carga</th>
+                      <th style={{ ...thStyle, cursor: "default" }}>Cargado por</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {detailItems.map((item) => (
+                      <tr key={`${item.tipo}-${item.id}`}>
+                        <td style={tdStyle}>{tipoLabel(item.tipo)}</td>
+                        <td style={tdStyle}>{item.servicio_nombre || "—"}</td>
+                        <td style={tdStyle}>{item.concepto}</td>
+                        <td style={tdStyle}>{item.horas != null ? item.horas : "—"}</td>
+                        <td style={{ ...tdStyle, fontVariantNumeric: "tabular-nums" }}>
+                          {formatMoney(item.valor)}
+                        </td>
+                        <td style={tdStyle}>{formatDateOnly(item.fecha_realizacion)}</td>
+                        <td style={tdStyle}>{item.periodo_nombre || `#${item.periodo_id}`}</td>
+                        <td style={{ ...tdStyle, whiteSpace: "nowrap", fontSize: 12 }}>
+                          {formatDateTime(item.fecha_carga)}
+                        </td>
+                        <td style={tdStyle}>{item.cargado_por || "—"}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+                {!detailItems.length ? (
+                  <p style={uiStyles.helpText}>Sin cargas para este profesional en el filtro actual.</p>
+                ) : null}
+              </div>
+            )}
+          </div>
+        </div>
+      ) : null}
 
       {modalRow ? (
         <div
