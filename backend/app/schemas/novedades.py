@@ -209,6 +209,15 @@ class GridRowResponse(BaseModel):
     fecha_carga: datetime
 
 
+class BonoColumnaResponse(BaseModel):
+    key: str
+    label: str
+    centro: str
+    servicio: str
+    semana: str
+    horario: str
+
+
 class CapitalHumanoRowResponse(BaseModel):
     professional_id: int
     legajo: str | None = None
@@ -216,6 +225,33 @@ class CapitalHumanoRowResponse(BaseModel):
     monto_cargas: Decimal
     monto_ajustes: Decimal
     monto_total: Decimal
+    bonos: dict[str, int] = Field(default_factory=dict)
+
+
+class CapitalHumanoGridResponse(BaseModel):
+    columns: list[BonoColumnaResponse] = Field(default_factory=list)
+    rows: list[CapitalHumanoRowResponse] = Field(default_factory=list)
+
+
+class BonosImportRequest(BaseModel):
+    periodo_id: int
+
+
+class BonosImportResponse(BaseModel):
+    received: int
+    matched: int
+    solo_bonos: int
+    columns: int
+    ignored: int
+
+
+class SoloBonoRowResponse(BaseModel):
+    professional_id: int
+    codprof: str
+    legajo: str | None = None
+    professional_name: str
+    bonos: dict[str, int] = Field(default_factory=dict)
+    total_cantidad: int
 
 
 class AjusteCapitalCreateRequest(BaseModel):

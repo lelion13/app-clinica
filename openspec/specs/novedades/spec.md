@@ -2,13 +2,13 @@
 
 ## Purpose
 
-Dominio de carga de módulos/novedades por servicio, parametrización y export XLS con control de período.
+Dominio de carga de módulos/novedades por servicio, parametrización, Capital Humano (agregados + ajustes) y export XLS con control de período.
 
 ## Requirements
 
 ### Requirement: Navegación Novedades
 
-The system MUST show a top-level **Novedades** dropdown with at least: Carga módulos, Mis profesionales, Generación archivo XLS, Parametrización. Visibility MUST follow RBAC. `operador` MUST NOT see Novedades.
+The system MUST show a top-level **Novedades** dropdown with at least: Carga módulos, Mis profesionales, Capital Humano, Parametrización. Visibility MUST follow RBAC. `operador` MUST NOT see Novedades.
 
 #### Scenario: Admin ve Novedades
 
@@ -251,25 +251,25 @@ A period MUST have optional name, start date, end date, and status open/closed. 
 - WHEN jefe intenta cargar novedad
 - THEN MUST be rejected
 
-### Requirement: Grilla y XLS (Generación)
+### Requirement: Grilla y XLS (detalle)
 
-Admin/`rrhh` MUST view a searchable grid and download XLS with columns including: período, servicio, profesional, tipo, concepto, horas, valor hora, valor, cargado por, **fecha realización**, **fecha carga**. Filters: período, servicio, texto, concepto.
+Admin/`rrhh` MUST be able to download a detail XLS (`GET /novedades/export.xlsx`) with columns including: período, servicio, profesional, tipo, concepto, horas, valor hora, valor, cargado por, **fecha realización**, **fecha carga**. Filters: período, servicio, texto, concepto. The same detail rows MUST be available via `GET /novedades/grilla` (including optional `professional_id` for Capital Humano Detalle).
 
-#### Scenario: RRHH exporta XLS
+#### Scenario: RRHH exporta XLS detalle
 
 - GIVEN `rrhh` con cargas existentes
-- WHEN aplica filtros y descarga XLS
+- WHEN aplica filtros y descarga XLS detalle
 - THEN receives a file with the agreed columns
 
-#### Scenario: Jefe sin grilla XLS
+#### Scenario: Jefe sin Capital Humano / XLS
 
 - GIVEN `jefe_medico`
-- WHEN navega a Generación XLS
+- WHEN navega a Capital Humano o intenta export XLS
 - THEN MUST be denied (UI + API)
 
 ### Requirement: Alertas UI Novedades
 
-Validation and API error messages on Novedades screens (Carga, Mis profesionales, Parametrización, XLS) MUST be presented in a modal dialog with an explicit **OK** action to dismiss. Inline red labels alone MUST NOT be the primary error presentation for those actions.
+Validation and API error messages on Novedades screens (Carga, Mis profesionales, Parametrización, Capital Humano) MUST be presented in a modal dialog with an explicit **OK** action to dismiss. Inline red labels alone MUST NOT be the primary error presentation for those actions.
 
 #### Scenario: Error de validación en Carga
 
@@ -280,7 +280,7 @@ Validation and API error messages on Novedades screens (Carga, Mis profesionales
 
 ### Requirement: Catálogo de profesionales Novedades
 
-Novedades MUST use a **dedicated professionals catalog**, independent from Distribución (`professionals` / MySQL sync). Identity MUST be external code `CODPROF` stored as **string** preserving leading zeros. Stored fields MUST include display name from `NOMBRES` and `CODPROV` (persisted; MUST NOT be required in UI). Catalog MUST NOT support manual create/edit of professionals (sync-only).
+Novedades MUST use a **dedicated professionals catalog**, independent from Distribución (`professionals` / MySQL sync). Identity MUST be external code `CODPROF` stored as **string** preserving leading zeros. Stored fields MUST include display name from `NOMBRES`, `CODPROV` (persisted; MUST NOT be required in UI), and optional `LEGAJO`/`legajo` (string, trim, leading zeros preserved; null if absent). Catalog MUST NOT support manual create/edit of professionals (sync-only).
 
 #### Scenario: Distribución intacta
 
@@ -290,7 +290,7 @@ Novedades MUST use a **dedicated professionals catalog**, independent from Distr
 
 ### Requirement: Sincronización HTTP de profesionales
 
-The system MUST expose a manual sync that fetches active professionals from the configured external HTTP API (Bearer token from environment; secrets MUST NOT be logged or returned). Sync MUST upsert by `CODPROF`, set inactive any catalog row whose `CODPROF` is absent from a **successful** response, and reactivate + refresh name/`CODPROV` when a previously inactive code reappears. If the external call fails, the system MUST NOT mass-inactivate locals and MUST surface a clear error.
+The system MUST expose a manual sync that fetches active professionals from the configured external HTTP API (Bearer token from environment; secrets MUST NOT be logged or returned). Sync MUST upsert by `CODPROF`, set inactive any catalog row whose `CODPROF` is absent from a **successful** response, and reactivate + refresh name/`CODPROV`/`legajo` when a previously inactive code reappears. Each upsert MUST refresh `legajo` from remote `LEGAJO` when present (string trim, leading zeros preserved, max 40). Absence of LEGAJO MUST store null and MUST NOT fail the sync row. If the external call fails, the system MUST NOT mass-inactivate locals and MUST surface a clear error.
 
 Sync UI buttons MUST appear on **Parametrización** for `admin`/`rrhh` and on **Mis profesionales** for `admin`/`rrhh`/`jefe_medico`. After success, UI MUST show a modal summary: created / updated / inactivated / errors, dismissible with OK.
 
@@ -322,6 +322,26 @@ Sync UI buttons MUST appear on **Parametrización** for `admin`/`rrhh` and on **
 - WHEN pulsa sincronizar en Mis profesionales
 - THEN MUST ejecutarse el mismo sync de catálogo (no limitado a sus servicios)
 
+#### Scenario: LEGAJO con ceros a la izquierda
+
+- GIVEN response remoto con `CODPROF` "032" y `LEGAJO` " 05100"
+- WHEN corre sync
+- THEN el profesional MUST persistir `legajo` = "05100"
+
+#### Scenario: LEGAJO ausente
+
+- GIVEN fila remota sin `LEGAJO`
+- WHEN corre sync
+- THEN el upsert MUST completar con `legajo` null
+- AND el resto de campos MUST actualizarse normalmente
+
+#### Scenario: Actualiza legajo en re-sync
+
+- GIVEN profesional local con `legajo` null
+- AND response exitoso incluye LEGAJO "05100"
+- WHEN corre sync
+- THEN `legajo` MUST quedar "05100"
+
 ### Requirement: Limpieza transaccional Novedades
 
 Parametrización MUST offer **Limpiar cargas** to `admin`/`rrhh` only. After mandatory confirmation modal, the system MUST **hard-delete** module assignments, novedades, and profesional↔servicio links. It MUST NOT delete servicios, módulos catalog, períodos, or jefe↔servicio. Mis profesionales MUST NOT show this control.
@@ -338,3 +358,56 @@ Parametrización MUST offer **Limpiar cargas** to `admin`/`rrhh` only. After man
 - GIVEN `jefe_medico`
 - WHEN abre Mis profesionales o Parametrización
 - THEN MUST NOT ver ni invocar Limpiar cargas
+
+### Requirement: Pantalla Capital Humano
+
+The former **Generación archivo XLS** nav entry MUST be labeled **Capital Humano** and remain restricted to `admin`/`rrhh`. The page MUST show **one row per professional** with columns: legajo, name, monto cargas, monto ajustes, monto total. Rows MUST appear only when the professional has cargas and/or adjustments in the active filter scope (period ± optional service). Filter/sort MUST follow the same UX patterns as the Carga grid (period, service, text search including legajo/name).
+
+Total cargas MUST be the sum of module + novedad valores in the filtered period (and only that service when filtered). Total = cargas ± persisted adjustments. Adjustments MUST be allowed when the period is **closed**.
+
+Each row MUST offer **Detalle**, which opens a modal with the grid of that professional’s carga items (módulos/novedades) in the current filter scope.
+
+#### Scenario: Agregación por profesional
+
+- GIVEN profesional P con dos cargas (100 y 50) y un ajuste −10 en período abierto o cerrado
+- WHEN admin abre Capital Humano filtrado por ese período
+- THEN MUST ver una fila con monto_cargas 150, monto_ajustes −10, monto_total 140
+
+#### Scenario: Solo admin/rrhh
+
+- GIVEN `jefe_medico` autenticado
+- WHEN intenta `GET /novedades/capital-humano`
+- THEN MUST recibir 403
+
+#### Scenario: Detalle por profesional
+
+- GIVEN profesional P con cargas en el filtro actual
+- WHEN admin pulsa **Detalle** en la fila de P
+- THEN MUST abrirse un modal con la grilla de ítems (módulos/novedades) de P en ese alcance
+
+### Requirement: Ajustes de Capital Humano
+
+The system MUST persist create-only signed adjustments (`novedades_ajuste_capital`) with non-zero `importe` and required non-blank `comentario`. UI MUST open a modal from the ajustes column showing history and a create form. Edit/delete of adjustments MUST NOT be offered unless a later change adds them. Scope of listed/created adjustments MUST match the current period filter and optional service filter.
+
+#### Scenario: Alta con comentario
+
+- GIVEN período seleccionado y profesional en grilla
+- WHEN admin crea ajuste importe −25 con comentario "descuento guardia"
+- THEN MUST persistirse
+- AND la grilla MUST reflejar el nuevo monto_ajustes / monto_total
+
+#### Scenario: Importe cero rechazado
+
+- GIVEN payload con importe 0
+- WHEN POST `/novedades/capital-humano/ajustes`
+- THEN MUST rechazar 422
+
+### Requirement: Exportaciones XLS duales
+
+Capital Humano MUST offer **two** downloads: aggregated Capital Humano XLS (`GET /novedades/export-capital.xlsx`) and the detail XLS (`GET /novedades/export.xlsx`). Both MUST honor the same filters as the grid and require `admin`/`rrhh`.
+
+#### Scenario: Export agregada
+
+- GIVEN filas visibles en Capital Humano
+- WHEN descarga export-capital
+- THEN el XLS MUST contener una fila por profesional con legajo, nombre y montos

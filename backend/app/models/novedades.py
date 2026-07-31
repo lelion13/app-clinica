@@ -2,7 +2,7 @@ import enum
 from datetime import date
 from decimal import Decimal
 
-from sqlalchemy import Boolean, Date, Enum, ForeignKey, Integer, Numeric, String
+from sqlalchemy import Boolean, Date, Enum, ForeignKey, Integer, Numeric, String, UniqueConstraint
 from sqlalchemy.orm import Mapped, mapped_column
 
 from app.models.base import Base
@@ -104,6 +104,41 @@ class NovedadesAjusteCapital(AuditMixin, Base):
     servicio_id: Mapped[int | None] = mapped_column(ForeignKey("novedades_servicio.id"), nullable=True)
     importe: Mapped[Decimal] = mapped_column(Numeric(12, 2), nullable=False)
     comentario: Mapped[str] = mapped_column(String(500), nullable=False)
+
+
+class NovedadesBonoOpcion(AuditMixin, Base):
+    """Dimensión de columna de bonos (centro|servicio|semana|horario)."""
+
+    __tablename__ = "novedades_bono_opcion"
+    __table_args__ = (
+        UniqueConstraint("centro", "servicio", "semana", "horario", name="uq_novedades_bono_opcion"),
+    )
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    centro: Mapped[str] = mapped_column(String(80), nullable=False)
+    servicio: Mapped[str] = mapped_column(String(80), nullable=False)
+    semana: Mapped[str] = mapped_column(String(80), nullable=False)
+    horario: Mapped[str] = mapped_column(String(80), nullable=False)
+
+
+class NovedadesBonoCantidad(AuditMixin, Base):
+    """Cantidad de bonos por profesional, período y opción."""
+
+    __tablename__ = "novedades_bono_cantidad"
+    __table_args__ = (
+        UniqueConstraint(
+            "periodo_id",
+            "professional_id",
+            "opcion_id",
+            name="uq_novedades_bono_cantidad_scope",
+        ),
+    )
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    periodo_id: Mapped[int] = mapped_column(ForeignKey("novedades_periodo.id"), nullable=False)
+    professional_id: Mapped[int] = mapped_column(ForeignKey("novedades_profesional.id"), nullable=False)
+    opcion_id: Mapped[int] = mapped_column(ForeignKey("novedades_bono_opcion.id"), nullable=False)
+    cantidad: Mapped[int] = mapped_column(Integer, nullable=False)
 
 
 class NovedadesProfesionalServicio(AuditMixin, Base):

@@ -14,8 +14,11 @@ from app.schemas.novedades import (
     AsignacionUpdateRequest,
     AjusteCapitalCreateRequest,
     AjusteCapitalResponse,
-    CapitalHumanoRowResponse,
+    BonosImportRequest,
+    BonosImportResponse,
+    CapitalHumanoGridResponse,
     GridRowResponse,
+    SoloBonoRowResponse,
     JefeServicioCreateRequest,
     JefeServicioResponse,
     ModuloCreateRequest,
@@ -36,6 +39,7 @@ from app.schemas.novedades import (
     ServicioUpdateRequest,
 )
 from app.services.novedades import cargas as cargas_service
+from app.services.novedades import bonos_import as bonos_import_service
 from app.services.novedades import capital_humano as capital_humano_service
 from app.services.novedades import export_xls
 from app.services.novedades import masters as masters_service
@@ -490,18 +494,42 @@ def grilla_list(
     )
 
 
-@router.get("/capital-humano", response_model=list[CapitalHumanoRowResponse])
+@router.get("/capital-humano", response_model=CapitalHumanoGridResponse)
 def capital_humano_list(
     periodo_id: int | None = Query(default=None),
     servicio_id: int | None = Query(default=None),
     q: str | None = Query(default=None),
     db: Session = Depends(get_db),
     user: User = Depends(require_admin_or_rrhh),
-) -> list[CapitalHumanoRowResponse]:
+) -> CapitalHumanoGridResponse:
     _ = user
-    return capital_humano_service.build_capital_humano_rows(
+    return capital_humano_service.build_capital_humano_grid(
         db, periodo_id=periodo_id, servicio_id=servicio_id, q=q
     )
+
+
+@router.post(
+    "/capital-humano/bonos/import",
+    response_model=BonosImportResponse,
+    status_code=status.HTTP_200_OK,
+)
+def capital_humano_bonos_import(
+    payload: BonosImportRequest,
+    db: Session = Depends(get_db),
+    user: User = Depends(require_admin_or_rrhh),
+) -> BonosImportResponse:
+    return bonos_import_service.import_bonos_for_periodo(db, payload.periodo_id, user)
+
+
+@router.get("/capital-humano/bonos/solo", response_model=list[SoloBonoRowResponse])
+def capital_humano_bonos_solo(
+    periodo_id: int = Query(...),
+    servicio_id: int | None = Query(default=None),
+    db: Session = Depends(get_db),
+    user: User = Depends(require_admin_or_rrhh),
+) -> list[SoloBonoRowResponse]:
+    _ = user
+    return bonos_import_service.list_solo_bonos(db, periodo_id=periodo_id, servicio_id=servicio_id)
 
 
 @router.get("/capital-humano/ajustes", response_model=list[AjusteCapitalResponse])
@@ -561,4 +589,23 @@ def export_capital_xlsx(
         content=content,
         media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
         headers={"Content-Disposition": 'attachment; filename="capital-humano.xlsx"'},
+    )
+
+
+@router.get("/export-capital-bonos.xlsx")
+def export_capital_bonos_xlsx(
+    periodo_id: int | None = Query(default=None),
+    servicio_id: int | None = Query(default=None),
+    q: str | None = Query(default=None),
+    db: Session = Depends(get_db),
+    user: User = Depends(require_admin_or_rrhh),
+) -> Response:
+    _ = user
+    content = capital_humano_service.export_capital_bonos_xlsx_bytes(
+        db, periodo_id=periodo_id, servicio_id=servicio_id, q=q
+    )
+    return Response(
+        content=content,
+        media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+        headers={"Content-Disposition": 'attachment; filename="capital-humano-bonos.xlsx"'},
     )

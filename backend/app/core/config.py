@@ -52,6 +52,13 @@ class Settings(BaseSettings):
     novedades_prof_sync_url: str = Field(default="", validation_alias="NOVEDADES_PROF_SYNC_URL")
     novedades_prof_sync_token: str = Field(default="", validation_alias="NOVEDADES_PROF_SYNC_TOKEN")
     novedades_prof_sync_timeout: float = Field(default=30.0, validation_alias="NOVEDADES_PROF_SYNC_TIMEOUT")
+    novedades_bonos_resumen_url: str = Field(
+        default="https://api.cpmgsa.com.ar:8001/bonos/resumen",
+        validation_alias="NOVEDADES_BONOS_RESUMEN_URL",
+    )
+    novedades_bonos_resumen_timeout: float = Field(
+        default=60.0, validation_alias="NOVEDADES_BONOS_RESUMEN_TIMEOUT"
+    )
 
     @property
     def cors_origins_list(self) -> list[str]:

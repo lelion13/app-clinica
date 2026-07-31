@@ -67,6 +67,7 @@ export function NovedadesXlsPage() {
   const [error, setError] = useState("");
   const [info, setInfo] = useState("");
   const [rows, setRows] = useState([]);
+  const [bonoColumns, setBonoColumns] = useState([]);
   const [servicios, setServicios] = useState([]);
   const [periodos, setPeriodos] = useState([]);
   const [periodoId, setPeriodoId] = useState("");
@@ -86,6 +87,11 @@ export function NovedadesXlsPage() {
   const [detailItems, setDetailItems] = useState([]);
   const [detailLoading, setDetailLoading] = useState(false);
 
+  const [importing, setImporting] = useState(false);
+  const [soloOpen, setSoloOpen] = useState(false);
+  const [soloRows, setSoloRows] = useState([]);
+  const [soloLoading, setSoloLoading] = useState(false);
+
   const queryString = () => {
     const params = new URLSearchParams();
     if (periodoId) params.set("periodo_id", periodoId);
@@ -95,6 +101,12 @@ export function NovedadesXlsPage() {
     return qs ? `?${qs}` : "";
   };
 
+  const selectedPeriodo = useMemo(
+    () => periodos.find((p) => String(p.id) === String(periodoId)) || null,
+    [periodos, periodoId]
+  );
+  const periodoClosed = selectedPeriodo?.estado === "closed";
+
   const load = async () => {
     setError("");
     try {
@@ -103,11 +115,60 @@ export function NovedadesXlsPage() {
         apiRequestWithRefresh("/novedades/servicios"),
         apiRequestWithRefresh("/novedades/periodos"),
       ]);
-      setRows(grid);
+      setRows(Array.isArray(grid?.rows) ? grid.rows : []);
+      setBonoColumns(Array.isArray(grid?.columns) ? grid.columns : []);
       setServicios(s);
       setPeriodos(p);
     } catch (err) {
       setError(err.message || "Error al cargar Capital Humano");
+    }
+  };
+
+  const importBonos = async () => {
+    if (!periodoId) {
+      setError("Seleccioná un período antes de importar bonos");
+      return;
+    }
+    if (periodoClosed) {
+      setError("El período está cerrado: no se puede reimportar bonos");
+      return;
+    }
+    setImporting(true);
+    setError("");
+    try {
+      const summary = await apiRequestWithRefresh("/novedades/capital-humano/bonos/import", {
+        method: "POST",
+        body: JSON.stringify({ periodo_id: Number(periodoId) }),
+      });
+      setInfo(
+        `Importación OK. Recibidas: ${summary.received} · Matcheadas: ${summary.matched} · Solo bonos: ${summary.solo_bonos} · Columnas: ${summary.columns} · Ignorados: ${summary.ignored}`
+      );
+      await load();
+    } catch (err) {
+      setError(err.message || "Error al importar bonos");
+    } finally {
+      setImporting(false);
+    }
+  };
+
+  const openSoloBonos = async () => {
+    if (!periodoId) {
+      setError("Seleccioná un período para ver solo bonos");
+      return;
+    }
+    setSoloOpen(true);
+    setSoloLoading(true);
+    setError("");
+    try {
+      const params = new URLSearchParams({ periodo_id: periodoId });
+      if (servicioId) params.set("servicio_id", servicioId);
+      const list = await apiRequestWithRefresh(`/novedades/capital-humano/bonos/solo?${params}`);
+      setSoloRows(list);
+    } catch (err) {
+      setError(err.message || "Error al cargar solo bonos");
+      setSoloOpen(false);
+    } finally {
+      setSoloLoading(false);
     }
   };
 
@@ -246,6 +307,9 @@ export function NovedadesXlsPage() {
       let cmp = 0;
       if (sortKey === "legajo" || sortKey === "professional_name") {
         cmp = compareText(a[sortKey], b[sortKey]);
+      } else if (String(sortKey).startsWith("bono:")) {
+        const key = sortKey.slice(5);
+        cmp = compareNumber(a.bonos?.[key], b.bonos?.[key]);
       } else {
         cmp = compareNumber(a[sortKey], b[sortKey]);
       }
@@ -258,8 +322,9 @@ export function NovedadesXlsPage() {
     <section style={uiStyles.pageSection}>
       <h1 style={uiStyles.sectionTitle}>Capital Humano</h1>
       <p style={uiStyles.helpText}>
-        Un registro por profesional: legajo, nombre y monto total (cargas ± ajustes). Los ajustes usan importe con
-        signo y comentario obligatorio. Podés descargar la vista agregada o el detalle por carga (formato anterior).
+        Un registro por profesional: legajo, nombre y monto total (cargas ± ajustes). Importá bonos del período
+        (columnas a la derecha). Con período cerrado no se puede reimportar. Los profesionales solo con bonos van en
+        un modal aparte.
       </p>
       <AlertModal open={Boolean(error)} title="Atención" message={error} onClose={() => setError("")} />
       <AlertModal open={Boolean(info)} title="Listo" message={info} onClose={() => setInfo("")} />
@@ -293,9 +358,34 @@ export function NovedadesXlsPage() {
         <button
           type="button"
           style={uiStyles.buttonPrimary}
+          onClick={importBonos}
+          disabled={importing || !periodoId || periodoClosed}
+          title={
+            !periodoId
+              ? "Seleccioná un período"
+              : periodoClosed
+                ? "Período cerrado: bonos congelados"
+                : "Importar resumen de bonos"
+          }
+        >
+          {importing ? "Importando…" : "Importar bonos"}
+        </button>
+        <button type="button" style={uiStyles.buttonSecondary} onClick={openSoloBonos} disabled={!periodoId}>
+          Solo bonos
+        </button>
+        <button
+          type="button"
+          style={uiStyles.buttonSecondary}
           onClick={() => download("/novedades/export-capital.xlsx", "capital-humano.xlsx")}
         >
           Descargar XLS (agregado)
+        </button>
+        <button
+          type="button"
+          style={uiStyles.buttonSecondary}
+          onClick={() => download("/novedades/export-capital-bonos.xlsx", "capital-humano-bonos.xlsx")}
+        >
+          XLS con bonos
         </button>
         <button
           type="button"
@@ -334,6 +424,17 @@ export function NovedadesXlsPage() {
               <th style={thStyle} onClick={() => toggleSort("monto_total")}>
                 Monto total{sortMark("monto_total")}
               </th>
+              {bonoColumns.map((col) => (
+                <th
+                  key={col.key}
+                  style={{ ...thStyle, maxWidth: 140, whiteSpace: "normal", lineHeight: 1.25 }}
+                  onClick={() => toggleSort(`bono:${col.key}`)}
+                  title={col.label}
+                >
+                  {col.label}
+                  {sortMark(`bono:${col.key}`)}
+                </th>
+              ))}
               <th style={{ ...thStyle, cursor: "default" }}>Acciones</th>
             </tr>
           </thead>
@@ -358,6 +459,11 @@ export function NovedadesXlsPage() {
                   </button>
                 </td>
                 <td style={tdStyle}>{formatMoney(row.monto_total)}</td>
+                {bonoColumns.map((col) => (
+                  <td key={col.key} style={{ ...tdStyle, fontVariantNumeric: "tabular-nums" }}>
+                    {row.bonos?.[col.key] != null ? row.bonos[col.key] : "—"}
+                  </td>
+                ))}
                 <td style={{ ...tdStyle, whiteSpace: "nowrap" }}>
                   <button
                     type="button"
@@ -376,6 +482,79 @@ export function NovedadesXlsPage() {
         </table>
         {!visibleRows.length ? <p style={uiStyles.helpText}>Sin resultados.</p> : null}
       </div>
+
+      {soloOpen ? (
+        <div
+          role="presentation"
+          style={{
+            position: "fixed",
+            inset: 0,
+            zIndex: 1100,
+            background: "rgba(15, 43, 39, 0.45)",
+            display: "flex",
+            alignItems: "flex-start",
+            justifyContent: "center",
+            padding: "max(16px, 4vh) 16px",
+            overflowY: "auto",
+          }}
+          onClick={() => setSoloOpen(false)}
+        >
+          <div
+            role="dialog"
+            aria-modal="true"
+            onClick={(e) => e.stopPropagation()}
+            style={{
+              background: "#fff",
+              borderRadius: uiTheme.radius.md,
+              maxWidth: 860,
+              width: "100%",
+              padding: 22,
+              boxShadow: uiTheme.shadow.md,
+              border: `1px solid ${uiTheme.colors.border}`,
+              marginBottom: 24,
+            }}
+          >
+            <div style={{ display: "flex", justifyContent: "space-between", gap: 12, alignItems: "flex-start" }}>
+              <div>
+                <h2 style={{ marginTop: 0, marginBottom: 8, fontSize: "1.1rem" }}>Solo bonos</h2>
+                <p style={{ ...uiStyles.helpText, marginTop: 0 }}>
+                  Profesionales del catálogo con bonos en el período y sin cargas/ajustes en Capital Humano.
+                </p>
+              </div>
+              <button type="button" style={uiStyles.buttonSecondary} onClick={() => setSoloOpen(false)}>
+                Cerrar
+              </button>
+            </div>
+            {soloLoading ? (
+              <p style={uiStyles.helpText}>Cargando…</p>
+            ) : (
+              <div style={{ overflowX: "auto", maxHeight: "60vh" }}>
+                <table style={{ width: "100%", borderCollapse: "collapse", fontSize: "0.85rem" }}>
+                  <thead>
+                    <tr>
+                      <th style={{ ...thStyle, cursor: "default" }}>CODPROF</th>
+                      <th style={{ ...thStyle, cursor: "default" }}>Legajo</th>
+                      <th style={{ ...thStyle, cursor: "default" }}>Profesional</th>
+                      <th style={{ ...thStyle, cursor: "default" }}>Total cantidad</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {soloRows.map((row) => (
+                      <tr key={row.professional_id}>
+                        <td style={tdStyle}>{row.codprof}</td>
+                        <td style={tdStyle}>{row.legajo || "—"}</td>
+                        <td style={tdStyle}>{row.professional_name}</td>
+                        <td style={{ ...tdStyle, fontVariantNumeric: "tabular-nums" }}>{row.total_cantidad}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+                {!soloRows.length ? <p style={uiStyles.helpText}>No hay profesionales solo-bonos.</p> : null}
+              </div>
+            )}
+          </div>
+        </div>
+      ) : null}
 
       {detailRow ? (
         <div

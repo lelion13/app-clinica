@@ -14,6 +14,7 @@ from app.models.user import User
 from app.schemas.novedades import (
     AjusteCapitalCreateRequest,
     AjusteCapitalResponse,
+    CapitalHumanoGridResponse,
     CapitalHumanoRowResponse,
 )
 from app.services.novedades.export_xls import build_grid_rows
@@ -26,6 +27,7 @@ def build_capital_humano_rows(
     periodo_id: int | None = None,
     servicio_id: int | None = None,
     q: str | None = None,
+    include_bonos: bool = False,
 ) -> list[CapitalHumanoRowResponse]:
     detail = build_grid_rows(db, periodo_id=periodo_id, servicio_id=servicio_id, q=None, concepto_q=None)
     cargas_by_prof: dict[int, Decimal] = {}
@@ -65,6 +67,12 @@ def build_capital_humano_rows(
         .all()
     }
 
+    bonos_by_prof: dict[int, dict[str, int]] = {}
+    if include_bonos:
+        from app.services.novedades.bonos_import import load_bonos_snapshot
+
+        _, bonos_by_prof = load_bonos_snapshot(db, periodo_id=periodo_id)
+
     needle = (q or "").strip().lower()
     rows: list[CapitalHumanoRowResponse] = []
     for pid in prof_ids:
@@ -85,11 +93,27 @@ def build_capital_humano_rows(
                 monto_cargas=monto_cargas,
                 monto_ajustes=monto_ajustes,
                 monto_total=monto_cargas + monto_ajustes,
+                bonos=bonos_by_prof.get(pid, {}),
             )
         )
     rows.sort(key=lambda r: (r.professional_name or "").lower())
     return rows
 
+
+def build_capital_humano_grid(
+    db: Session,
+    *,
+    periodo_id: int | None = None,
+    servicio_id: int | None = None,
+    q: str | None = None,
+) -> CapitalHumanoGridResponse:
+    from app.services.novedades.bonos_import import load_bonos_snapshot
+
+    columns, _ = load_bonos_snapshot(db, periodo_id=periodo_id)
+    rows = build_capital_humano_rows(
+        db, periodo_id=periodo_id, servicio_id=servicio_id, q=q, include_bonos=True
+    )
+    return CapitalHumanoGridResponse(columns=columns, rows=rows)
 
 def list_ajustes(
     db: Session,
@@ -188,6 +212,41 @@ def export_capital_xlsx_bytes(
                 float(row.monto_total),
             ]
         )
+    buffer = BytesIO()
+    wb.save(buffer)
+    return buffer.getvalue()
+
+
+def export_capital_bonos_xlsx_bytes(
+    db: Session,
+    *,
+    periodo_id: int | None = None,
+    servicio_id: int | None = None,
+    q: str | None = None,
+) -> bytes:
+    from io import BytesIO
+
+    from openpyxl import Workbook
+
+    grid = build_capital_humano_grid(db, periodo_id=periodo_id, servicio_id=servicio_id, q=q)
+    wb = Workbook()
+    ws = wb.active
+    ws.title = "Capital Humano Bonos"
+    headers = ["legajo", "profesional", "monto_cargas", "monto_ajustes", "monto_total"] + [
+        col.label for col in grid.columns
+    ]
+    ws.append(headers)
+    for row in grid.rows:
+        values = [
+            row.legajo,
+            row.professional_name,
+            float(row.monto_cargas),
+            float(row.monto_ajustes),
+            float(row.monto_total),
+        ]
+        for col in grid.columns:
+            values.append(row.bonos.get(col.key, 0))
+        ws.append(values)
     buffer = BytesIO()
     wb.save(buffer)
     return buffer.getvalue()

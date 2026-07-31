@@ -42,6 +42,11 @@
   - Campo `legajo` en sync (`LEGAJO`, string + trim + ceros)
   - Pantalla **Capital Humano** (ex Generación XLS): grilla 1 fila/profesional + ajustes (+/−) + 2 XLS
   - Tabla `novedades_ajuste_capital`; ajustes permitidos con período cerrado
+- Cambio `capital-humano-bonos-resumen` (rev `0010_bonos_resumen`):
+  - Importar bonos desde `NOVEDADES_BONOS_RESUMEN_URL` (Bearer = `NOVEDADES_PROF_SYNC_TOKEN`)
+  - Fechas del período → `fecha_desde` / `fecha_hasta`; match por `CODPROF`
+  - Snapshot persistido; re-import solo con período **open**; cerrado = congelado
+  - Columnas dinámicas + modal Solo bonos + 3er XLS con bonos
 
 ## Roles (panel)
 - `admin`: distribución + novedades (todo) + usuarios
