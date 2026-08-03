@@ -1,3 +1,4 @@
+from datetime import date
 from unittest.mock import MagicMock
 
 import pytest
@@ -25,6 +26,16 @@ def test_split_nombre_agenda_fewer_parts():
     assert service._split_nombre_agenda("") == (None, None, None)
 
 
+def test_fecha_hasta_vigente():
+    today = date(2026, 8, 3)
+    assert service._fecha_hasta_vigente("2026-08-03", today=today) is True
+    assert service._fecha_hasta_vigente("2026-12-31", today=today) is True
+    assert service._fecha_hasta_vigente("2026-08-02", today=today) is False
+    assert service._fecha_hasta_vigente("2024-12-31 12:00:00", today=today) is False
+    assert service._fecha_hasta_vigente(None, today=today) is False
+    assert service._fecha_hasta_vigente("no-fecha", today=today) is False
+
+
 def test_map_row_subset():
     item = service._map_row(
         {
@@ -33,6 +44,7 @@ def test_map_row_subset():
             "id_dominio": 1651,
             "nombre_agenda": "ART - TRAUMATOLOGIA - APECECHEA CAIRONE DIEGO",
             "especialidad": "TRAUMATOLOGIA Y ORTOPEDIA ",
+            "dia": "lunes",
             "fecha_desde": "2023-01-01",
             "hora_desde": "8:00:00",
             "fecha_hasta": "2024-12-31",
@@ -48,6 +60,7 @@ def test_map_row_subset():
     assert item.especialidad_agenda == "TRAUMATOLOGIA"
     assert item.medico == "APECECHEA CAIRONE DIEGO"
     assert item.especialidad == "TRAUMATOLOGIA Y ORTOPEDIA"
+    assert item.dia == "lunes"
     assert item.fecha_desde == "2023-01-01"
     assert item.hora_desde == "8:00:00"
     assert item.fecha_hasta == "2024-12-31"
@@ -80,12 +93,32 @@ def test_fetch_happy_path(monkeypatch):
             "id_dato": "1-a",
             "id_dominio": 10,
             "especialidad": "CARDIO",
+            "dia": "martes",
             "fecha_desde": "2024-01-01",
             "hora_desde": "9:00:00",
-            "fecha_hasta": "2024-12-31",
+            "fecha_hasta": "2099-12-31",
             "hora_hasta": "12:00:00",
             "duracion_turno": 15,
-        }
+        },
+        {
+            "id": 2,
+            "id_dato": "2-b",
+            "id_dominio": 11,
+            "especialidad": "OLD",
+            "dia": "lunes",
+            "fecha_desde": "2020-01-01",
+            "hora_desde": "9:00:00",
+            "fecha_hasta": "2020-12-31",
+            "hora_hasta": "12:00:00",
+            "duracion_turno": 15,
+        },
+        {
+            "id": 3,
+            "id_dato": "3-c",
+            "id_dominio": 12,
+            "especialidad": "NO-DATE",
+            "fecha_hasta": None,
+        },
     ]
 
     class FakeClient:
@@ -104,9 +137,11 @@ def test_fetch_happy_path(monkeypatch):
             return mock_response
 
     monkeypatch.setattr(service.httpx, "Client", FakeClient)
+    monkeypatch.setattr(service, "_business_today", lambda: date(2026, 8, 3))
     result = service.fetch_horarios_activos()
     assert len(result.items) == 1
     assert result.items[0].especialidad == "CARDIO"
+    assert result.items[0].dia == "martes"
     assert result.items[0].id_dominio == 10
 
 

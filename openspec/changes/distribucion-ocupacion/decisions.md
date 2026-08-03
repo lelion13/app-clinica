@@ -1,6 +1,6 @@
 # Decisions — distribucion-ocupacion
 
-**Estado:** SURVEY CLOSED (delta nombre_agenda Q7–Q10)  
+**Estado:** SURVEY CLOSED (delta filtro fecha_hasta + dia Q11–Q12)  
 **Change:** `distribucion-ocupacion`  
 **Modo:** una pregunta a la vez (cerrada)
 
@@ -16,6 +16,8 @@
 | Q8 | Filas con ≠ 3 partes | **A** | 1→tipo, 2→especialidad_agenda, resto→medico |
 | Q9 | Columnas de la grilla | **A** | 7 actuales + tipo / especialidad_agenda / medico |
 | Q10 | Orden de columnas | **A** | id_dominio, tipo, especialidad_agenda, medico, especialidad, fechas… |
+| Q11 | Sin fecha_hasta / inválida | **A** | Excluir del resultado filtrado |
+| Q12 | Posición columna `dia` | **B** | Tras `especialidad`, antes de `fecha_desde` |
 
 ---
 
@@ -78,3 +80,15 @@
 **Decisión: A** — `id_dominio`, `tipo`, `especialidad_agenda`, `medico`, `especialidad`, `fecha_desde`, `hora_desde`, `fecha_hasta`, `hora_hasta`, `duracion_turno`.
 
 Separador: ` - ` (espacio-guión-espacio). Parseo en backend.
+
+---
+
+## Q11 — Filas sin `fecha_hasta` o inválida ✅
+
+**Decisión: A** — Excluirlas. Filtro backend: `fecha_hasta >= hoy` en `BUSINESS_TIMEZONE`.
+
+---
+
+## Q12 — Dónde va la columna `dia` ✅
+
+**Decisión: B** — … `especialidad`, `dia`, `fecha_desde` …

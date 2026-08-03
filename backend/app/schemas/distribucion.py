@@ -13,6 +13,7 @@ class HorarioActivoItem(BaseModel):
     especialidad_agenda: str | None = None
     medico: str | None = None
     especialidad: str | None = None
+    dia: str | None = None
     fecha_desde: str | None = None
     hora_desde: str | None = None
     fecha_hasta: str | None = None

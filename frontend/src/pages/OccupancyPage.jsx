@@ -9,6 +9,7 @@ const COLUMNS = [
   { key: "especialidad_agenda", label: "especialidad_agenda" },
   { key: "medico", label: "medico" },
   { key: "especialidad", label: "especialidad" },
+  { key: "dia", label: "dia" },
   { key: "fecha_desde", label: "fecha_desde" },
   { key: "hora_desde", label: "hora_desde" },
   { key: "fecha_hasta", label: "fecha_hasta" },

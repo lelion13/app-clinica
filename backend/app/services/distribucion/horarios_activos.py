@@ -1,3 +1,6 @@
+from datetime import date, datetime
+from zoneinfo import ZoneInfo
+
 import httpx
 from fastapi import HTTPException, status
 
@@ -13,6 +16,30 @@ def _as_str(value) -> str | None:
         return None
     s = str(value).strip()
     return s or None
+
+
+def _business_today() -> date:
+    return datetime.now(ZoneInfo(settings.business_tz)).date()
+
+
+def _parse_fecha(value: str | None) -> date | None:
+    text = _as_str(value)
+    if not text:
+        return None
+    # Soporta "YYYY-MM-DD", "YYYY-MM-DD HH:MM:SS", ISO con T.
+    date_part = text[:10]
+    try:
+        return date.fromisoformat(date_part)
+    except ValueError:
+        return None
+
+
+def _fecha_hasta_vigente(fecha_hasta: str | None, today: date | None = None) -> bool:
+    parsed = _parse_fecha(fecha_hasta)
+    if parsed is None:
+        return False
+    ref = today if today is not None else _business_today()
+    return parsed >= ref
 
 
 def _split_nombre_agenda(nombre: str | None) -> tuple[str | None, str | None, str | None]:
@@ -70,6 +97,7 @@ def _map_row(raw: dict) -> HorarioActivoItem:
         especialidad_agenda=especialidad_agenda,
         medico=medico,
         especialidad=_as_str(raw.get("especialidad")),
+        dia=_as_str(raw.get("dia")),
         fecha_desde=_as_str(raw.get("fecha_desde")),
         hora_desde=_as_str(raw.get("hora_desde")),
         fecha_hasta=_as_str(raw.get("fecha_hasta")),
@@ -116,5 +144,7 @@ def fetch_horarios_activos() -> HorariosActivosResponse:
             detail="Error al consultar API externa de horarios activos",
         ) from exc
 
-    rows = _extract_rows(payload)
-    return HorariosActivosResponse(items=[_map_row(row) for row in rows])
+    today = _business_today()
+    items = [_map_row(row) for row in _extract_rows(payload)]
+    vigentes = [item for item in items if _fecha_hasta_vigente(item.fecha_hasta, today=today)]
+    return HorariosActivosResponse(items=vigentes)
