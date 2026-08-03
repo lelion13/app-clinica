@@ -42,6 +42,7 @@ def test_map_row_subset():
             "id": 62644,
             "id_dato": "62644-2023-10-07",
             "id_dominio": 1651,
+            "id_agenda": 10366,
             "nombre_agenda": "ART - TRAUMATOLOGIA - APECECHEA CAIRONE DIEGO",
             "especialidad": "TRAUMATOLOGIA Y ORTOPEDIA ",
             "dia": "lunes",
@@ -50,11 +51,14 @@ def test_map_row_subset():
             "fecha_hasta": "2024-12-31",
             "hora_hasta": "12:00:00",
             "duracion_turno": 10,
+            "cantidad_turnos": 24.0,
+            "cantidad_sobreturno": 2,
             "consultorio": "CONSULTORIO 1",
         }
     )
     assert item.id == 62644
     assert item.id_dato == "62644-2023-10-07"
+    assert item.id_agenda == 10366
     assert item.id_dominio == 1651
     assert item.tipo == "ART"
     assert item.especialidad_agenda == "TRAUMATOLOGIA"
@@ -66,6 +70,8 @@ def test_map_row_subset():
     assert item.fecha_hasta == "2024-12-31"
     assert item.hora_hasta == "12:00:00"
     assert item.duracion_turno == 10
+    assert item.cantidad_turnos == 24.0
+    assert item.cantidad_sobreturno == 2
 
 
 def test_fetch_requires_config(monkeypatch):

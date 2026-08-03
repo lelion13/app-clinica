@@ -52,20 +52,32 @@ export function parseTimeToMinutes(value) {
   return hours * 60 + minutes + seconds / 60;
 }
 
-/** Null si horas inválidas o duracion_turno ≤ 0 (Q19=A). */
+function asNonNegNumber(value) {
+  const n = Number(value);
+  if (!Number.isFinite(n) || n < 0) return 0;
+  return n;
+}
+
+/**
+ * Null si falta dia o horas inválidas (Q19/Q21).
+ * Turnos/sobreturnos vienen de la API (Q20); se suman aunque sean 0.
+ */
 export function rowMetrics(row) {
+  const dia = String(row?.dia ?? "").trim();
+  if (!dia) return null;
+
   const from = parseTimeToMinutes(row?.hora_desde);
   const to = parseTimeToMinutes(row?.hora_hasta);
-  const duracion = Number(row?.duracion_turno);
   if (from === null || to === null || !(to > from)) return null;
-  if (!Number.isFinite(duracion) || duracion <= 0) return null;
-  const diffMinutes = to - from;
+
   return {
-    horas: diffMinutes / 60,
-    cantidad_turnos: diffMinutes / duracion,
+    horas: (to - from) / 60,
+    cantidad_turnos: asNonNegNumber(row?.cantidad_turnos),
+    cantidad_sobreturno: asNonNegNumber(row?.cantidad_sobreturno),
   };
 }
 
+/** Agrupa por id_dominio + especialidad + medico + dia; suma métricas de todas las filas. */
 export function buildIndicators(filteredItems) {
   const groups = new Map();
   for (const row of filteredItems) {
@@ -74,7 +86,7 @@ export function buildIndicators(filteredItems) {
     const id_dominio = row?.id_dominio ?? "";
     const especialidad = row?.especialidad ?? "";
     const medico = row?.medico ?? "";
-    const dia = row?.dia ?? "";
+    const dia = String(row?.dia ?? "").trim();
     const key = `${id_dominio}\u0001${especialidad}\u0001${medico}\u0001${dia}`;
     const current = groups.get(key) || {
       id_dominio,
@@ -83,9 +95,11 @@ export function buildIndicators(filteredItems) {
       dia,
       horas: 0,
       cantidad_turnos: 0,
+      cantidad_sobreturno: 0,
     };
     current.horas += metrics.horas;
     current.cantidad_turnos += metrics.cantidad_turnos;
+    current.cantidad_sobreturno += metrics.cantidad_sobreturno;
     groups.set(key, current);
   }
   return Array.from(groups.values()).sort((a, b) => {

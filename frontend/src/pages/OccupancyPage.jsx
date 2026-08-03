@@ -195,7 +195,8 @@ function IndicatorsModal({ open, rows, filteredCount, onClose }) {
           Indicadores (filtro actual)
         </h2>
         <p style={{ ...uiStyles.helpText, marginTop: 0, marginBottom: 14 }}>
-          Agrupado por id_dominio + especialidad + medico + dia. Filas en grilla: {filteredCount}. Grupos:{" "}
+          Agrupado por id_dominio + especialidad + medico + dia (sin filas sin dia). Horas = diferencia de
+          horario; turnos/sobreturnos sumados desde la API. Filas en grilla: {filteredCount}. Grupos:{" "}
           {rows.length}.
         </p>
         <div
@@ -206,10 +207,18 @@ function IndicatorsModal({ open, rows, filteredCount, onClose }) {
             marginBottom: 16,
           }}
         >
-          <table style={{ width: "100%", borderCollapse: "collapse", fontSize: "0.88rem", minWidth: 640 }}>
+          <table style={{ width: "100%", borderCollapse: "collapse", fontSize: "0.88rem", minWidth: 720 }}>
             <thead>
               <tr>
-                {["id_dominio", "especialidad", "medico", "dia", "horas", "cantidad_turnos"].map((label) => (
+                {[
+                  "id_dominio",
+                  "especialidad",
+                  "medico",
+                  "dia",
+                  "horas",
+                  "cantidad_turnos",
+                  "cantidad_sobreturno",
+                ].map((label) => (
                   <th key={label} style={thStyle}>
                     {label}
                   </th>
@@ -219,7 +228,7 @@ function IndicatorsModal({ open, rows, filteredCount, onClose }) {
             <tbody>
               {rows.length === 0 ? (
                 <tr>
-                  <td colSpan={6} style={{ ...tdStyle, color: uiTheme.colors.textMuted }}>
+                  <td colSpan={7} style={{ ...tdStyle, color: uiTheme.colors.textMuted }}>
                     No hay filas válidas para calcular indicadores con el filtro actual.
                   </td>
                 </tr>
@@ -232,6 +241,7 @@ function IndicatorsModal({ open, rows, filteredCount, onClose }) {
                     <td style={tdStyle}>{row.dia}</td>
                     <td style={tdStyle}>{formatMetric(row.horas)}</td>
                     <td style={tdStyle}>{formatMetric(row.cantidad_turnos)}</td>
+                    <td style={tdStyle}>{formatMetric(row.cantidad_sobreturno)}</td>
                   </tr>
                 ))
               )}

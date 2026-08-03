@@ -18,6 +18,28 @@ def _as_str(value) -> str | None:
     return s or None
 
 
+def _as_int(value) -> int | None:
+    if value is None or isinstance(value, bool):
+        return None
+    if isinstance(value, int):
+        return value
+    try:
+        return int(value)
+    except (TypeError, ValueError):
+        return None
+
+
+def _as_number(value) -> int | float | None:
+    if value is None or isinstance(value, bool):
+        return None
+    if isinstance(value, (int, float)):
+        return value
+    try:
+        return float(value)
+    except (TypeError, ValueError):
+        return None
+
+
 def _business_today() -> date:
     return datetime.now(ZoneInfo(settings.business_tz)).date()
 
@@ -58,41 +80,13 @@ def _split_nombre_agenda(nombre: str | None) -> tuple[str | None, str | None, st
 
 
 def _map_row(raw: dict) -> HorarioActivoItem:
-    id_raw = raw.get("id")
-    id_val: int | None = None
-    if isinstance(id_raw, int):
-        id_val = id_raw
-    elif id_raw is not None:
-        try:
-            id_val = int(id_raw)
-        except (TypeError, ValueError):
-            id_val = None
-
-    dominio_raw = raw.get("id_dominio")
-    dominio_val: int | None = None
-    if isinstance(dominio_raw, int):
-        dominio_val = dominio_raw
-    elif dominio_raw is not None:
-        try:
-            dominio_val = int(dominio_raw)
-        except (TypeError, ValueError):
-            dominio_val = None
-
-    duracion = raw.get("duracion_turno")
-    if isinstance(duracion, bool):
-        duracion = None
-    elif duracion is not None and not isinstance(duracion, (int, float)):
-        try:
-            duracion = float(duracion)
-        except (TypeError, ValueError):
-            duracion = None
-
     tipo, especialidad_agenda, medico = _split_nombre_agenda(raw.get("nombre_agenda"))
 
     return HorarioActivoItem(
         id_dato=_as_str(raw.get("id_dato")),
-        id=id_val,
-        id_dominio=dominio_val,
+        id=_as_int(raw.get("id")),
+        id_agenda=_as_int(raw.get("id_agenda")),
+        id_dominio=_as_int(raw.get("id_dominio")),
         tipo=tipo,
         especialidad_agenda=especialidad_agenda,
         medico=medico,
@@ -102,7 +96,9 @@ def _map_row(raw: dict) -> HorarioActivoItem:
         hora_desde=_as_str(raw.get("hora_desde")),
         fecha_hasta=_as_str(raw.get("fecha_hasta")),
         hora_hasta=_as_str(raw.get("hora_hasta")),
-        duracion_turno=duracion,
+        duracion_turno=_as_number(raw.get("duracion_turno")),
+        cantidad_turnos=_as_number(raw.get("cantidad_turnos")),
+        cantidad_sobreturno=_as_number(raw.get("cantidad_sobreturno")),
     )
 
 

@@ -67,10 +67,10 @@ La grilla MUST permitir filtrar por **todas** las columnas con multi-select de v
 
 ### Requirement: Indicadores sobre lo filtrado
 
-Debe existir un botón **Indicadores** que abre un modal con resumen de las filas visibles. Agrupación: `id_dominio` + `especialidad` + `medico` + `dia`. Por fila válida: horas = (`hora_hasta` − `hora_desde`) en horas; `cantidad_turnos` = (diferencia en minutos) / `duracion_turno`. Filas con horas inválidas o `duracion_turno` ≤ 0 MUST excluirse del cálculo. Las métricas del grupo MUST ser la suma de las filas del grupo.
+Debe existir un botón **Indicadores** que abre un modal con resumen de las filas visibles. Agrupación: `id_dominio` + `especialidad` + `medico` + `dia`. Filas sin `dia` o con horas inválidas MUST excluirse. Por fila válida: `horas` = (`hora_hasta` − `hora_desde`); `cantidad_turnos` y `cantidad_sobreturno` MUST tomarse de la API y sumarse (incluidas repeticiones del mismo `id_agenda` en el mismo `dia`). El modal MUST mostrar esas tres métricas sumadas por grupo.
 
 #### Scenario: Indicadores tras filtrar
 
 - **Given** el usuario filtró la grilla
 - **When** pulsa Indicadores
-- **Then** el modal muestra grupos solo a partir de las filas filtradas, con columnas id_dominio, especialidad, medico, dia, horas, cantidad_turnos
+- **Then** el modal muestra grupos solo a partir de las filas filtradas, con columnas id_dominio, especialidad, medico, dia, horas, cantidad_turnos, cantidad_sobreturno

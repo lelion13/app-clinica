@@ -1,30 +1,19 @@
 # Decisions — distribucion-ocupacion
 
-**Estado:** SURVEY CLOSED (delta filtros + indicadores Q13–Q19)  
+**Estado:** SURVEY CLOSED (delta indicadores Q20–Q23)  
 **Change:** `distribucion-ocupacion`  
 **Modo:** una pregunta a la vez (cerrada)
 
 | # | Tema | Decisión | Notas |
 |---|------|----------|-------|
-| Q1 | Relación con “Ocupación semanal” | **A** | Ítem nuevo “Ocupación”; “Ocupación semanal” intacta |
-| Q2 | Proxy vs sync DB | **A** | Proxy BFF live; sin persistir en DB v1 |
-| Q3 | Roles con acceso | **A** | admin + operador |
-| Q4 | Carga de datos (live / botón refresh) | **A** | Auto-load al abrir + botón Actualizar |
-| Q5 | Env URL del endpoint externo | **A** | DISTRIBUCION_HORARIOS_ACTIVOS_URL (+ timeout opcional) |
-| Q6 | Path / label exactos en menú | **A** | Label “Ocupación”, path `/ocupacion` |
-| Q7 | Labels split `nombre_agenda` | **B** | `tipo` / `especialidad_agenda` / `medico` |
-| Q8 | Filas con ≠ 3 partes | **A** | 1→tipo, 2→especialidad_agenda, resto→medico |
-| Q9 | Columnas de la grilla | **A** | 7 actuales + tipo / especialidad_agenda / medico |
-| Q10 | Orden de columnas | **A** | id_dominio, tipo, especialidad_agenda, medico, especialidad, fechas… |
-| Q11 | Sin fecha_hasta / inválida | **A** | Excluir del resultado filtrado |
-| Q12 | Posición columna `dia` | **B** | Tras `especialidad`, antes de `fecha_desde` |
+| Q1–Q19 | (ver detalle abajo) | — | Survey previa |
 | Q13 | Cálculo horas | **D** | horas = hora_hasta − hora_desde |
-| Q14 | Cálculo cantidad turnos | **A** | (diff minutos) / duracion_turno |
-| Q15 | Agrupación indicadores | **D** | Por id_dominio + especialidad + medico + dia |
-| Q16 | UI del botón indicadores | **A** | Modal con tabla resumen |
-| Q17 | UI filtros por columna | **C** | Select con valores distintos por columna |
-| Q18 | Select: uno o varios valores | **B** | Multi-select por columna |
-| Q19 | Filas sin horas/duración válidas | **A** | Excluir del cálculo de indicadores |
+| Q15 | Agrupación indicadores | **D** | id_dominio + especialidad + medico + dia |
+| Q19 | Filas sin horas válidas | **A** | Excluir del cálculo (sin `dia` también) |
+| Q20 | Métricas turnos | **D** | API `cantidad_turnos` + `cantidad_sobreturno`; mismo id_agenda por dia |
+| Q21 | Sin `dia` | **A** | Excluir del cálculo |
+| Q22 | Repeticiones | **B** | Sumar cantidades de todas las filas |
+| Q23 | Horas en modal | **B** | horas calculadas + cantidad_turnos + cantidad_sobreturno |
 
 ---
 
@@ -114,7 +103,7 @@ Separador: ` - ` (espacio-guión-espacio). Parseo en backend.
 
 ## Q15 — Cómo agrupa el botón de indicadores ✅
 
-**Decisión: D** — Agrupar por `id_dominio` + `especialidad` + `medico` + `dia`; métricas: horas y cantidad_turnos (sumadas).
+**Decisión: D** — Agrupar por `id_dominio` + `especialidad` + `medico` + `dia`.
 
 ---
 
@@ -139,3 +128,21 @@ Separador: ` - ` (espacio-guión-espacio). Parseo en backend.
 ## Q19 — Filas con `hora_desde`/`hora_hasta` inválidas o `duracion_turno` ≤ 0 ✅
 
 **Decisión: A** — Excluirlas del cálculo de indicadores.
+
+---
+
+## Q20 — Métricas de turnos ✅
+
+**Decisión: D** — Mismo `id_agenda` se consolida en el mismo `dia`. Usar campos API `cantidad_turnos` y `cantidad_sobreturno` (no calcular turnos por duración).
+
+## Q21 — Registros sin `dia` ✅
+
+**Decisión:** Excluir del cálculo filas con `dia` vacío/null.
+
+## Q22 — Repeticiones id_agenda+dia ✅
+
+**Decisión: B** — Sumar `cantidad_turnos` y `cantidad_sobreturno` de todas las filas.
+
+## Q23 — Horas en modal ✅
+
+**Decisión: B** — Modal: `horas` (calculadas) + `cantidad_turnos` + `cantidad_sobreturno` (suma API), agrupado por id_dominio + especialidad + medico + dia.
