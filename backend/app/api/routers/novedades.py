@@ -37,6 +37,7 @@ from app.schemas.novedades import (
     ServicioCreateRequest,
     ServicioResponse,
     ServicioUpdateRequest,
+    TieneProduccionResponse,
 )
 from app.services.novedades import cargas as cargas_service
 from app.services.novedades import bonos_import as bonos_import_service
@@ -45,6 +46,7 @@ from app.services.novedades import export_xls
 from app.services.novedades import masters as masters_service
 from app.services.novedades import prof_sync as prof_sync_service
 from app.services.novedades import purge as purge_service
+from app.services.novedades import tiene_produccion as tiene_produccion_service
 from app.services.novedades.helpers import get_servicio_or_404, list_servicios_for_user
 from app.services.novedades.professional_directory import list_professionals_for_servicio
 
@@ -114,6 +116,7 @@ def _novedad_response(db: Session, item) -> NovedadResponse:
         servicio_nombre=servicio.nombre,
         professional_id=item.professional_id,
         professional_name=professional.full_name if professional else None,
+        professional_codprof=professional.codprof if professional else None,
         tipo=tipo.value,
         tipo_label=NOVEDAD_TIPO_LABELS.get(tipo, tipo.value),
         horas=item.horas,
@@ -144,6 +147,7 @@ def _asignacion_response(db: Session, item) -> AsignacionResponse:
         servicio_nombre=servicio.nombre,
         professional_id=item.professional_id,
         professional_name=professional.full_name if professional else None,
+        professional_codprof=professional.codprof if professional else None,
         modulo_id=item.modulo_id,
         modulo_descripcion=modulo.descripcion if modulo else None,
         modulo_valor=modulo.valor if modulo else None,
@@ -152,6 +156,16 @@ def _asignacion_response(db: Session, item) -> AsignacionResponse:
         updated_at=item.updated_at,
         created_by=item.created_by,
     )
+
+
+@router.get("/bonos/tiene-produccion", response_model=TieneProduccionResponse)
+def bonos_tiene_produccion(
+    fecha: str = Query(...),
+    codprof: str = Query(...),
+    user: User = Depends(require_admin_or_jefe),
+) -> TieneProduccionResponse:
+    _ = user
+    return tiene_produccion_service.check_tiene_produccion(fecha=fecha, codprof=codprof)
 
 
 @router.get("/jefes-candidatos", response_model=list[JefeCandidatoResponse])

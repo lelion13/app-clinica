@@ -146,6 +146,7 @@ class AsignacionResponse(BaseModel):
     servicio_nombre: str | None = None
     professional_id: int
     professional_name: str | None = None
+    professional_codprof: str | None = None
     modulo_id: int
     modulo_descripcion: str | None = None
     modulo_valor: Decimal | None = None
@@ -181,6 +182,7 @@ class NovedadResponse(BaseModel):
     servicio_nombre: str | None = None
     professional_id: int
     professional_name: str | None = None
+    professional_codprof: str | None = None
     tipo: str
     tipo_label: str
     horas: Decimal
@@ -189,6 +191,10 @@ class NovedadResponse(BaseModel):
     created_at: datetime
     updated_at: datetime
     created_by: int | None = None
+
+
+class TieneProduccionResponse(BaseModel):
+    tiene_produccion: bool
 
 
 class GridRowResponse(BaseModel):

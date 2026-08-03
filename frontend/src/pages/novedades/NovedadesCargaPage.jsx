@@ -11,9 +11,27 @@ const TIPO_OPTIONS = [
   { value: "hora_extra_por_ausencia", label: "Hora extra por ausencia" },
 ];
 
+const MSG_SIN_PRODUCCION =
+  "El profesional no tiene producción en esa fecha. No se puede cargar módulo ni novedad para ese día.";
+
 function todayISO() {
   const d = new Date();
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+}
+
+async function assertTieneProduccion(fecha, codprof) {
+  if (!fecha || !codprof) {
+    const err = new Error("Faltan fecha o CODPROF para verificar producción");
+    err.code = "produccion_params";
+    throw err;
+  }
+  const params = new URLSearchParams({ fecha, codprof: String(codprof) });
+  const result = await apiRequestWithRefresh(`/novedades/bonos/tiene-produccion?${params}`);
+  if (!result?.tiene_produccion) {
+    const err = new Error(MSG_SIN_PRODUCCION);
+    err.code = "sin_produccion";
+    throw err;
+  }
 }
 
 export function NovedadesCargaPage() {
@@ -35,6 +53,7 @@ export function NovedadesCargaPage() {
   const [incluirNovedad, setIncluirNovedad] = useState(false);
   const [fechaRealizacion, setFechaRealizacion] = useState(todayISO());
   const [loadingServicio, setLoadingServicio] = useState(false);
+  const [submitting, setSubmitting] = useState(false);
 
   const openPeriodo = useMemo(() => periodos.find((p) => p.estado === "open"), [periodos]);
   const selectedModulo = useMemo(
@@ -85,6 +104,7 @@ export function NovedadesCargaPage() {
       servicio_nombre: item.servicio_nombre,
       professional_id: item.professional_id,
       professional_name: item.professional_name,
+      professional_codprof: item.professional_codprof,
       concepto: item.modulo_descripcion || `Módulo #${item.modulo_id}`,
       horas: null,
       valor: item.modulo_valor,
@@ -102,6 +122,7 @@ export function NovedadesCargaPage() {
       servicio_nombre: item.servicio_nombre,
       professional_id: item.professional_id,
       professional_name: item.professional_name,
+      professional_codprof: item.professional_codprof,
       concepto: item.tipo_label || item.tipo,
       horas: item.horas,
       valor: item.valor_calculado,
@@ -224,7 +245,16 @@ export function NovedadesCargaPage() {
       }
     }
 
+    const selectedProf = profesionales.find((p) => String(p.id) === String(professionalId));
+    const codprof = selectedProf?.codprof;
+    if (!codprof) {
+      setError("El profesional seleccionado no tiene CODPROF; no se puede verificar producción");
+      return;
+    }
+
+    setSubmitting(true);
     try {
+      await assertTieneProduccion(fechaRealizacion, codprof);
       if (hasModulo) {
         await apiRequestWithRefresh("/novedades/asignaciones-modulos", {
           method: "POST",
@@ -254,6 +284,8 @@ export function NovedadesCargaPage() {
       await load();
     } catch (err) {
       setError(err.message || "No se pudo cargar");
+    } finally {
+      setSubmitting(false);
     }
   };
 
@@ -377,7 +409,9 @@ export function NovedadesCargaPage() {
             </span>
           </div>
 
-          <button type="submit" style={uiStyles.buttonPrimary}>Cargar novedad</button>
+          <button type="submit" style={uiStyles.buttonPrimary} disabled={submitting}>
+            {submitting ? "Verificando…" : "Cargar novedad"}
+          </button>
         </form>
       </div>
 
@@ -398,6 +432,11 @@ export function NovedadesCargaPage() {
             await load();
           }}
           onUpdateFecha={async (row, fecha) => {
+            const codprof = row.professional_codprof;
+            if (!codprof) {
+              throw new Error("El profesional no tiene CODPROF; no se puede verificar producción");
+            }
+            await assertTieneProduccion(fecha, codprof);
             const path =
               row.kind === "modulo"
                 ? `/novedades/asignaciones-modulos/${row.id}`

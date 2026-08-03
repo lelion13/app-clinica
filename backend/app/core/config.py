@@ -59,14 +59,12 @@ class Settings(BaseSettings):
     novedades_bonos_resumen_timeout: float = Field(
         default=60.0, validation_alias="NOVEDADES_BONOS_RESUMEN_TIMEOUT"
     )
-    # Proxy HTTP horarios activos (Distribución → Ocupación). Token: NOVEDADES_PROF_SYNC_TOKEN.
-    distribucion_horarios_activos_url: str = Field(
-        default="",
-        validation_alias="DISTRIBUCION_HORARIOS_ACTIVOS_URL",
+    novedades_bonos_tiene_produccion_url: str = Field(
+        default="https://api.cpmgsa.com.ar:8001/bonos/tiene-produccion",
+        validation_alias="NOVEDADES_BONOS_TIENE_PRODUCCION_URL",
     )
-    distribucion_horarios_activos_timeout: float = Field(
-        default=30.0,
-        validation_alias="DISTRIBUCION_HORARIOS_ACTIVOS_TIMEOUT",
+    novedades_bonos_tiene_produccion_timeout: float = Field(
+        default=30.0, validation_alias="NOVEDADES_BONOS_TIENE_PRODUCCION_TIMEOUT"
     )
 
     @property

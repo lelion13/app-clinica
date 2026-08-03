@@ -1,7 +1,6 @@
 from app.models.booking import Booking
 from app.models.consulting_room import ConsultingRoom, RoomOperatingHour
 from app.models.location import Location
-from app.models.ocupacion import OcupacionHorarioActivo
 from app.models.novedades import (
     NovedadesAsignacionModulo,
     NovedadesConfig,
@@ -34,5 +33,4 @@ __all__ = [
     "NovedadesProfesionalServicio",
     "NovedadesAsignacionModulo",
     "NovedadesNovedad",
-    "OcupacionHorarioActivo",
 ]
