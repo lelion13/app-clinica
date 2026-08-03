@@ -47,6 +47,11 @@
   - Fechas del período → `fecha_desde` / `fecha_hasta`; match por `CODPROF`
   - Snapshot persistido; re-import solo con período **open**; cerrado = congelado
   - Columnas dinámicas + modal Solo bonos + 3er XLS con bonos
+- Cambio `distribucion-ocupacion`:
+  - Menú Distribución → **Ocupación** (`/ocupacion`); convive con Ocupación semanal
+  - Proxy BFF `GET /api/v1/distribucion/ocupacion/horarios-activos` (roles admin/operador)
+  - Env: `DISTRIBUCION_HORARIOS_ACTIVOS_URL`, `DISTRIBUCION_HORARIOS_ACTIVOS_TIMEOUT`; Bearer = `NOVEDADES_PROF_SYNC_TOKEN`
+  - Sin migración DB; tras deploy setear URL en `.env.prod` y reiniciar backend
 
 ## Roles (panel)
 - `admin`: distribución + novedades (todo) + usuarios

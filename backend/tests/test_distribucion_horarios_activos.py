@@ -1,0 +1,115 @@
+from unittest.mock import MagicMock
+
+import pytest
+from fastapi import HTTPException
+
+from app.services.distribucion import horarios_activos as service
+
+
+def test_map_row_subset():
+    item = service._map_row(
+        {
+            "id": 62644,
+            "id_dato": "62644-2023-10-07",
+            "id_dominio": 1651,
+            "especialidad": "TRAUMATOLOGIA Y ORTOPEDIA ",
+            "fecha_desde": "2023-01-01",
+            "hora_desde": "8:00:00",
+            "fecha_hasta": "2024-12-31",
+            "hora_hasta": "12:00:00",
+            "duracion_turno": 10,
+            "consultorio": "CONSULTORIO 1",
+        }
+    )
+    assert item.id == 62644
+    assert item.id_dato == "62644-2023-10-07"
+    assert item.id_dominio == 1651
+    assert item.especialidad == "TRAUMATOLOGIA Y ORTOPEDIA"
+    assert item.fecha_desde == "2023-01-01"
+    assert item.hora_desde == "8:00:00"
+    assert item.fecha_hasta == "2024-12-31"
+    assert item.hora_hasta == "12:00:00"
+    assert item.duracion_turno == 10
+
+
+def test_fetch_requires_config(monkeypatch):
+    monkeypatch.setattr(service.settings, "distribucion_horarios_activos_url", "")
+    monkeypatch.setattr(service.settings, "novedades_prof_sync_token", "tok")
+    with pytest.raises(HTTPException) as exc:
+        service.fetch_horarios_activos()
+    assert exc.value.status_code == 422
+
+
+def test_fetch_happy_path(monkeypatch):
+    monkeypatch.setattr(
+        service.settings,
+        "distribucion_horarios_activos_url",
+        "https://example.test/is/horarios-activos",
+    )
+    monkeypatch.setattr(service.settings, "novedades_prof_sync_token", "secret")
+    monkeypatch.setattr(service.settings, "distribucion_horarios_activos_timeout", 5.0)
+
+    mock_response = MagicMock()
+    mock_response.raise_for_status = MagicMock()
+    mock_response.json.return_value = [
+        {
+            "id": 1,
+            "id_dato": "1-a",
+            "id_dominio": 10,
+            "especialidad": "CARDIO",
+            "fecha_desde": "2024-01-01",
+            "hora_desde": "9:00:00",
+            "fecha_hasta": "2024-12-31",
+            "hora_hasta": "12:00:00",
+            "duracion_turno": 15,
+        }
+    ]
+
+    class FakeClient:
+        def __init__(self, *args, **kwargs):
+            pass
+
+        def __enter__(self):
+            return self
+
+        def __exit__(self, *args):
+            return False
+
+        def get(self, url, headers=None):
+            assert "Bearer secret" in (headers or {}).get("Authorization", "")
+            assert "horarios-activos" in url
+            return mock_response
+
+    monkeypatch.setattr(service.httpx, "Client", FakeClient)
+    result = service.fetch_horarios_activos()
+    assert len(result.items) == 1
+    assert result.items[0].especialidad == "CARDIO"
+    assert result.items[0].id_dominio == 10
+
+
+def test_fetch_upstream_error(monkeypatch):
+    monkeypatch.setattr(
+        service.settings,
+        "distribucion_horarios_activos_url",
+        "https://example.test/is/horarios-activos",
+    )
+    monkeypatch.setattr(service.settings, "novedades_prof_sync_token", "secret")
+
+    class BoomClient:
+        def __init__(self, *args, **kwargs):
+            pass
+
+        def __enter__(self):
+            return self
+
+        def __exit__(self, *args):
+            return False
+
+        def get(self, *args, **kwargs):
+            raise RuntimeError("connection refused")
+
+    monkeypatch.setattr(service.httpx, "Client", BoomClient)
+    with pytest.raises(HTTPException) as exc:
+        service.fetch_horarios_activos()
+    assert exc.value.status_code == 502
+    assert "secret" not in str(exc.value.detail)
