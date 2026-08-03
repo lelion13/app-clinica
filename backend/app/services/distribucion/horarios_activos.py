@@ -5,11 +5,29 @@ from app.core.config import settings
 from app.schemas.distribucion import HorarioActivoItem, HorariosActivosResponse
 
 
+NOMBRE_AGENDA_SEP = " - "
+
+
 def _as_str(value) -> str | None:
     if value is None:
         return None
     s = str(value).strip()
     return s or None
+
+
+def _split_nombre_agenda(nombre: str | None) -> tuple[str | None, str | None, str | None]:
+    """Parte nombre_agenda por ' - ': tipo, especialidad_agenda, resto → medico."""
+    text = _as_str(nombre)
+    if not text:
+        return None, None, None
+    parts = [p.strip() for p in text.split(NOMBRE_AGENDA_SEP)]
+    parts = [p for p in parts if p]
+    if not parts:
+        return None, None, None
+    tipo = parts[0] if len(parts) >= 1 else None
+    especialidad_agenda = parts[1] if len(parts) >= 2 else None
+    medico = NOMBRE_AGENDA_SEP.join(parts[2:]) if len(parts) >= 3 else None
+    return tipo, especialidad_agenda, medico
 
 
 def _map_row(raw: dict) -> HorarioActivoItem:
@@ -42,10 +60,15 @@ def _map_row(raw: dict) -> HorarioActivoItem:
         except (TypeError, ValueError):
             duracion = None
 
+    tipo, especialidad_agenda, medico = _split_nombre_agenda(raw.get("nombre_agenda"))
+
     return HorarioActivoItem(
         id_dato=_as_str(raw.get("id_dato")),
         id=id_val,
         id_dominio=dominio_val,
+        tipo=tipo,
+        especialidad_agenda=especialidad_agenda,
+        medico=medico,
         especialidad=_as_str(raw.get("especialidad")),
         fecha_desde=_as_str(raw.get("fecha_desde")),
         hora_desde=_as_str(raw.get("hora_desde")),

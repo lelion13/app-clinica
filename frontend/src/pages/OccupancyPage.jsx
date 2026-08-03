@@ -5,6 +5,9 @@ import { uiStyles, uiTheme } from "../ui/theme";
 
 const COLUMNS = [
   { key: "id_dominio", label: "id_dominio" },
+  { key: "tipo", label: "tipo" },
+  { key: "especialidad_agenda", label: "especialidad_agenda" },
+  { key: "medico", label: "medico" },
   { key: "especialidad", label: "especialidad" },
   { key: "fecha_desde", label: "fecha_desde" },
   { key: "hora_desde", label: "hora_desde" },

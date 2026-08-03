@@ -32,11 +32,21 @@ El backend MUST exponer `GET /api/v1/distribucion/ocupacion/horarios-activos` pr
 
 - **Given** la API externa responde una lista de objetos
 - **When** un operador llama al endpoint
-- **Then** recibe `items` con al menos: `id_dominio`, `especialidad`, `fecha_desde`, `hora_desde`, `fecha_hasta`, `hora_hasta`, `duracion_turno`
+- **Then** recibe `items` con al menos: `id_dominio`, `tipo`, `especialidad_agenda`, `medico`, `especialidad`, `fecha_desde`, `hora_desde`, `fecha_hasta`, `hora_hasta`, `duracion_turno`
+
+### Requirement: Split de `nombre_agenda`
+
+El backend MUST derivar `tipo`, `especialidad_agenda` y `medico` partiendo `nombre_agenda` por el separador ` - `. Parte 1 → `tipo`, parte 2 → `especialidad_agenda`, resto unido → `medico`. Partes faltantes MUST ser null. La grilla MUST NOT mostrar `nombre_agenda` crudo.
+
+#### Scenario: Tres partes
+
+- **Given** `nombre_agenda` = `ART - TRAUMATOLOGIA - APECECHEA CAIRONE DIEGO`
+- **When** se mapea la fila
+- **Then** `tipo`=`ART`, `especialidad_agenda`=`TRAUMATOLOGIA`, `medico`=`APECECHEA CAIRONE DIEGO`
 
 ### Requirement: Grilla Ocupación (v1)
 
-La pantalla `/ocupacion` MUST cargar automáticamente al abrir, MUST ofrecer **Actualizar**, y MUST mostrar una grilla con las columnas v1 anteriores.
+La pantalla `/ocupacion` MUST cargar automáticamente al abrir, MUST ofrecer **Actualizar**, y MUST mostrar una grilla en este orden: `id_dominio`, `tipo`, `especialidad_agenda`, `medico`, `especialidad`, `fecha_desde`, `hora_desde`, `fecha_hasta`, `hora_hasta`, `duracion_turno`.
 
 #### Scenario: Carga al abrir
 

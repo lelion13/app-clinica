@@ -9,6 +9,9 @@ class HorarioActivoItem(BaseModel):
     id_dato: str | None = None
     id: int | None = None
     id_dominio: int | None = None
+    tipo: str | None = None
+    especialidad_agenda: str | None = None
+    medico: str | None = None
     especialidad: str | None = None
     fecha_desde: str | None = None
     hora_desde: str | None = None

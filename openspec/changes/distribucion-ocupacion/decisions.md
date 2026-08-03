@@ -1,6 +1,6 @@
 # Decisions — distribucion-ocupacion
 
-**Estado:** SURVEY CLOSED  
+**Estado:** SURVEY CLOSED (delta nombre_agenda Q7–Q10)  
 **Change:** `distribucion-ocupacion`  
 **Modo:** una pregunta a la vez (cerrada)
 
@@ -12,6 +12,10 @@
 | Q4 | Carga de datos (live / botón refresh) | **A** | Auto-load al abrir + botón Actualizar |
 | Q5 | Env URL del endpoint externo | **A** | DISTRIBUCION_HORARIOS_ACTIVOS_URL (+ timeout opcional) |
 | Q6 | Path / label exactos en menú | **A** | Label “Ocupación”, path `/ocupacion` |
+| Q7 | Labels split `nombre_agenda` | **B** | `tipo` / `especialidad_agenda` / `medico` |
+| Q8 | Filas con ≠ 3 partes | **A** | 1→tipo, 2→especialidad_agenda, resto→medico |
+| Q9 | Columnas de la grilla | **A** | 7 actuales + tipo / especialidad_agenda / medico |
+| Q10 | Orden de columnas | **A** | id_dominio, tipo, especialidad_agenda, medico, especialidad, fechas… |
 
 ---
 
@@ -48,3 +52,29 @@
 ## Q6 — Label y path del menú ✅
 
 **Decisión: A** — Label **Ocupación**, path `/ocupacion`.
+
+---
+
+## Q7 — Labels split `nombre_agenda` ✅
+
+**Decisión: B** — Columnas: `tipo`, `especialidad_agenda`, `medico` (separador ` - `).
+
+---
+
+## Q8 — Si `nombre_agenda` no tiene exactamente 3 partes ✅
+
+**Decisión: A** — Parte 1 → `tipo`, parte 2 → `especialidad_agenda`, resto unido → `medico`; faltantes vacías.
+
+---
+
+## Q9 — Qué columnas muestra la grilla ahora ✅
+
+**Decisión: A** — Mantener las 7 actuales y sumar `tipo`, `especialidad_agenda`, `medico` (sin columna `nombre_agenda` crudo).
+
+---
+
+## Q10 — Orden de las columnas ✅
+
+**Decisión: A** — `id_dominio`, `tipo`, `especialidad_agenda`, `medico`, `especialidad`, `fecha_desde`, `hora_desde`, `fecha_hasta`, `hora_hasta`, `duracion_turno`.
+
+Separador: ` - ` (espacio-guión-espacio). Parseo en backend.

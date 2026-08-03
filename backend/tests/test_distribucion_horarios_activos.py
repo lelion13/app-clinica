@@ -6,12 +6,32 @@ from fastapi import HTTPException
 from app.services.distribucion import horarios_activos as service
 
 
+def test_split_nombre_agenda_three_parts():
+    assert service._split_nombre_agenda("ART - TRAUMATOLOGIA - APECECHEA CAIRONE DIEGO") == (
+        "ART",
+        "TRAUMATOLOGIA",
+        "APECECHEA CAIRONE DIEGO",
+    )
+
+
+def test_split_nombre_agenda_more_than_three():
+    assert service._split_nombre_agenda("A - B - C - D") == ("A", "B", "C - D")
+
+
+def test_split_nombre_agenda_fewer_parts():
+    assert service._split_nombre_agenda("SOLO") == ("SOLO", None, None)
+    assert service._split_nombre_agenda("A - B") == ("A", "B", None)
+    assert service._split_nombre_agenda(None) == (None, None, None)
+    assert service._split_nombre_agenda("") == (None, None, None)
+
+
 def test_map_row_subset():
     item = service._map_row(
         {
             "id": 62644,
             "id_dato": "62644-2023-10-07",
             "id_dominio": 1651,
+            "nombre_agenda": "ART - TRAUMATOLOGIA - APECECHEA CAIRONE DIEGO",
             "especialidad": "TRAUMATOLOGIA Y ORTOPEDIA ",
             "fecha_desde": "2023-01-01",
             "hora_desde": "8:00:00",
@@ -24,6 +44,9 @@ def test_map_row_subset():
     assert item.id == 62644
     assert item.id_dato == "62644-2023-10-07"
     assert item.id_dominio == 1651
+    assert item.tipo == "ART"
+    assert item.especialidad_agenda == "TRAUMATOLOGIA"
+    assert item.medico == "APECECHEA CAIRONE DIEGO"
     assert item.especialidad == "TRAUMATOLOGIA Y ORTOPEDIA"
     assert item.fecha_desde == "2023-01-01"
     assert item.hora_desde == "8:00:00"
