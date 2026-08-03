@@ -54,3 +54,23 @@ La pantalla `/ocupacion` MUST cargar automáticamente al abrir, MUST ofrecer **A
 - **Given** un admin autenticado
 - **When** navega a `/ocupacion`
 - **Then** se solicita el proxy y se renderiza la grilla (o un error visible si falla)
+
+### Requirement: Filtros por columna
+
+La grilla MUST permitir filtrar por **todas** las columnas con multi-select de valores distintos (OR dentro de columna, AND entre columnas). Select vacío = sin filtro en esa columna.
+
+#### Scenario: Filtro por id_dominio
+
+- **Given** filas con varios `id_dominio`
+- **When** el usuario selecciona uno o más valores en el filtro `id_dominio`
+- **Then** la grilla solo muestra filas cuyo `id_dominio` está entre los seleccionados
+
+### Requirement: Indicadores sobre lo filtrado
+
+Debe existir un botón **Indicadores** que abre un modal con resumen de las filas visibles. Agrupación: `id_dominio` + `especialidad` + `medico` + `dia`. Por fila válida: horas = (`hora_hasta` − `hora_desde`) en horas; `cantidad_turnos` = (diferencia en minutos) / `duracion_turno`. Filas con horas inválidas o `duracion_turno` ≤ 0 MUST excluirse del cálculo. Las métricas del grupo MUST ser la suma de las filas del grupo.
+
+#### Scenario: Indicadores tras filtrar
+
+- **Given** el usuario filtró la grilla
+- **When** pulsa Indicadores
+- **Then** el modal muestra grupos solo a partir de las filas filtradas, con columnas id_dominio, especialidad, medico, dia, horas, cantidad_turnos

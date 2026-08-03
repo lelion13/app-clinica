@@ -13,6 +13,8 @@
 - [x] 2.1 Ítem menú Ocupación `/ocupacion`
 - [x] 2.2 Ruta en `main.jsx`
 - [x] 2.3 `OccupancyPage` grilla + auto-load + Actualizar
+- [x] 2.4 Multi-select filtros por columna + Limpiar filtros
+- [x] 2.5 Botón Indicadores (modal) agrupado id_dominio+especialidad+medico+dia
 
 ## Phase 3 — Ops / docs
 

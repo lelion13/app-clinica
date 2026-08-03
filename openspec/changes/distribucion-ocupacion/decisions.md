@@ -1,6 +1,6 @@
 # Decisions — distribucion-ocupacion
 
-**Estado:** SURVEY CLOSED (delta filtro fecha_hasta + dia Q11–Q12)  
+**Estado:** SURVEY CLOSED (delta filtros + indicadores Q13–Q19)  
 **Change:** `distribucion-ocupacion`  
 **Modo:** una pregunta a la vez (cerrada)
 
@@ -18,6 +18,13 @@
 | Q10 | Orden de columnas | **A** | id_dominio, tipo, especialidad_agenda, medico, especialidad, fechas… |
 | Q11 | Sin fecha_hasta / inválida | **A** | Excluir del resultado filtrado |
 | Q12 | Posición columna `dia` | **B** | Tras `especialidad`, antes de `fecha_desde` |
+| Q13 | Cálculo horas | **D** | horas = hora_hasta − hora_desde |
+| Q14 | Cálculo cantidad turnos | **A** | (diff minutos) / duracion_turno |
+| Q15 | Agrupación indicadores | **D** | Por id_dominio + especialidad + medico + dia |
+| Q16 | UI del botón indicadores | **A** | Modal con tabla resumen |
+| Q17 | UI filtros por columna | **C** | Select con valores distintos por columna |
+| Q18 | Select: uno o varios valores | **B** | Multi-select por columna |
+| Q19 | Filas sin horas/duración válidas | **A** | Excluir del cálculo de indicadores |
 
 ---
 
@@ -92,3 +99,43 @@ Separador: ` - ` (espacio-guión-espacio). Parseo en backend.
 ## Q12 — Dónde va la columna `dia` ✅
 
 **Decisión: B** — … `especialidad`, `dia`, `fecha_desde` …
+
+---
+
+## Q13 — Cálculo de horas ✅
+
+**Decisión: D** — Horas = diferencia `hora_hasta − hora_desde`.
+
+## Q14 — Cantidad de turnos ✅
+
+**Decisión: A** — `cantidad_turnos = (diferencia en minutos) / duracion_turno` (minutos).
+
+---
+
+## Q15 — Cómo agrupa el botón de indicadores ✅
+
+**Decisión: D** — Agrupar por `id_dominio` + `especialidad` + `medico` + `dia`; métricas: horas y cantidad_turnos (sumadas).
+
+---
+
+## Q16 — Dónde se muestran los indicadores ✅
+
+**Decisión: A** — Modal al pulsar el botón (tabla resumen + cerrar).
+
+---
+
+## Q17 — Cómo filtrar por columnas ✅
+
+**Decisión: C** — Select con valores distintos por columna (AND entre columnas).
+
+---
+
+## Q18 — Cada select permite ✅
+
+**Decisión: B** — Multi-select por columna (OR dentro de la columna; AND entre columnas).
+
+---
+
+## Q19 — Filas con `hora_desde`/`hora_hasta` inválidas o `duracion_turno` ≤ 0 ✅
+
+**Decisión: A** — Excluirlas del cálculo de indicadores.
