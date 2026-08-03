@@ -1,6 +1,5 @@
-from datetime import date, datetime
+from datetime import date
 from types import SimpleNamespace
-from unittest.mock import MagicMock
 
 import pytest
 from fastapi import HTTPException
@@ -87,7 +86,6 @@ class FakeDB:
         self._rows = []
 
     def execute(self, stmt):
-        # delete or select — both ok for this fake
         self.deleted = True
         return SimpleNamespace(scalars=lambda: SimpleNamespace(all=lambda: self._rows))
 
@@ -101,45 +99,47 @@ class FakeDB:
         self.rolled_back = True
 
 
-def test_sync_wipe_reload(monkeypatch):
+def test_sync_keeps_duplicate_id_dato(monkeypatch):
+    """Regresión: id_dato repetido NO debe colapsar filas."""
     monkeypatch.setattr(
         service,
         "_fetch_remote_rows",
         lambda: [
             {
                 "id": 1,
-                "id_dato": "1-a",
+                "id_dato": "same",
                 "id_dominio": 10,
-                "id_agenda": 100,
                 "nombre_agenda": "X - Y - Z",
                 "especialidad": "CARDIO",
                 "dia": "martes",
-                "fecha_desde": "2024-01-01",
-                "hora_desde": "9:00:00",
                 "fecha_hasta": "2099-12-31",
+                "hora_desde": "9:00:00",
                 "hora_hasta": "12:00:00",
-                "duracion_turno": 15,
                 "cantidad_turnos": 12,
                 "cantidad_sobreturno": 1,
             },
             {
-                "id": 2,
-                "id_dato": None,
-                "especialidad": "SKIP",
+                "id": 1,
+                "id_dato": "same",
+                "id_dominio": 10,
+                "nombre_agenda": "X - Y - Z",
+                "especialidad": "CARDIO",
+                "dia": "martes",
+                "fecha_hasta": "2099-12-31",
+                "hora_desde": "9:00:00",
+                "hora_hasta": "12:00:00",
+                "cantidad_turnos": 12,
+                "cantidad_sobreturno": 1,
             },
         ],
     )
     db = FakeDB()
     result = service.sync_horarios_activos(db)
-    assert result.synced == 1
-    assert result.skipped == 1
-    assert db.deleted is True
-    assert len(db.added) == 1
-    assert db.added[0].id_dato == "1-a"
-    assert db.added[0].tipo == "X"
-    assert db.added[0].payload["id"] == 1
-    assert db.added[0].payload["nombre_agenda"] == "X - Y - Z"
-    assert db.added[0].payload["especialidad"] == "CARDIO"
+    assert result.synced == 2
+    assert result.skipped == 0
+    assert len(db.added) == 2
+    assert db.added[0].payload["id_dato"] == "same"
+    assert db.added[1].payload["id_dato"] == "same"
     assert db.committed is True
 
 
@@ -159,7 +159,7 @@ def test_sync_does_not_touch_db_when_fetch_fails(monkeypatch):
 def test_list_filters_fecha_hasta(monkeypatch):
     monkeypatch.setattr(service, "_business_today", lambda: date(2026, 8, 3))
     row_ok = SimpleNamespace(
-        id_dato="1",
+        id=1,
         payload={
             "id": 1,
             "id_dato": "1",
@@ -179,14 +179,16 @@ def test_list_filters_fecha_hasta(monkeypatch):
         especialidad_agenda="B",
         medico="C",
         fecha_hasta="2099-01-01",
+        id_dato="1",
     )
     row_old = SimpleNamespace(
-        id_dato="2",
+        id=2,
         payload={"id_dato": "2", "fecha_hasta": "2020-01-01", "especialidad": "OLD"},
         tipo=None,
         especialidad_agenda=None,
         medico=None,
         fecha_hasta="2020-01-01",
+        id_dato="2",
     )
     db = FakeDB()
     db._rows = [row_ok, row_old]

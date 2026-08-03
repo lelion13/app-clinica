@@ -122,23 +122,21 @@ def _fetch_remote_rows() -> list[dict]:
     return _extract_rows(payload)
 
 
-def _raw_to_model(raw: dict, synced_at: datetime) -> OcupacionHorarioActivo | None:
-    """Persiste el objeto del endpoint tal cual en `payload` (copia profunda)."""
-    id_dato = _as_str(raw.get("id_dato"))
-    if not id_dato:
-        return None
-    # Copia exacta de claves/valores del endpoint (sin renombrar ni tipar).
+def _raw_to_model(raw: dict, synced_at: datetime) -> OcupacionHorarioActivo:
+    """Una fila del endpoint → una fila DB. `payload` = JSON exacto."""
     payload = copy.deepcopy(raw)
     tipo, especialidad_agenda, medico = _split_nombre_agenda(payload.get("nombre_agenda"))
     fecha_hasta = payload.get("fecha_hasta")
     fecha_hasta_str = None if fecha_hasta is None else str(fecha_hasta)
+    id_dato = payload.get("id_dato")
+    id_dato_str = None if id_dato is None else str(id_dato)[:120]
     return OcupacionHorarioActivo(
-        id_dato=id_dato[:120],
         payload=payload,
         tipo=tipo,
         especialidad_agenda=especialidad_agenda,
         medico=medico,
         fecha_hasta=fecha_hasta_str,
+        id_dato=id_dato_str,
         synced_at=synced_at,
     )
 
@@ -154,7 +152,6 @@ def _model_to_item(row: OcupacionHorarioActivo) -> HorarioActivoItem:
         tipo=row.tipo,
         especialidad_agenda=row.especialidad_agenda,
         medico=row.medico,
-        # especialidad tal cual en payload (sin strip extra al persistir; strip solo en lectura UI)
         especialidad=_as_str(raw.get("especialidad")),
         dia=_as_str(raw.get("dia")),
         fecha_desde=_as_str(raw.get("fecha_desde")),
@@ -176,22 +173,15 @@ def list_horarios_activos(db: Session) -> HorariosActivosResponse:
 
 
 def sync_horarios_activos(db: Session) -> HorariosActivosSyncResponse:
-    """GET externo OK → wipe + reload en una transacción (Q24=A)."""
+    """GET externo OK → wipe + insertar TODAS las filas (sin colapsar por id_dato)."""
     remote_rows = _fetch_remote_rows()
     synced_at = datetime.now(timezone.utc)
-    by_id_dato: dict[str, OcupacionHorarioActivo] = {}
-    skipped = 0
-    for raw in remote_rows:
-        model = _raw_to_model(raw, synced_at=synced_at)
-        if model is None:
-            skipped += 1
-            continue
-        by_id_dato[model.id_dato] = model
+    models = [_raw_to_model(raw, synced_at=synced_at) for raw in remote_rows]
 
     try:
         db.execute(delete(OcupacionHorarioActivo))
-        if by_id_dato:
-            db.add_all(list(by_id_dato.values()))
+        if models:
+            db.add_all(models)
         db.commit()
     except Exception as exc:
         db.rollback()
@@ -200,11 +190,9 @@ def sync_horarios_activos(db: Session) -> HorariosActivosSyncResponse:
             detail="Error al persistir horarios activos",
         ) from exc
 
-    return HorariosActivosSyncResponse(synced=len(by_id_dato), skipped=skipped)
+    return HorariosActivosSyncResponse(synced=len(models), skipped=0)
 
 
 def _map_row(raw: dict) -> HorarioActivoItem:
     model = _raw_to_model(raw, synced_at=datetime.now(timezone.utc))
-    if model is None:
-        return HorarioActivoItem()
     return _model_to_item(model)

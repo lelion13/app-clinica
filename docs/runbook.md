@@ -49,12 +49,11 @@
   - Columnas dinámicas + modal Solo bonos + 3er XLS con bonos
 - Cambio `distribucion-ocupacion`:
   - Menú Distribución → **Ocupación** (`/ocupacion`); convive con Ocupación semanal
-  - Tabla `ocupacion_horario_activo` (rev `0012_ocupacion_payload`): columna `payload` JSONB = JSON exacto del endpoint
-  - También guarda derivados `tipo`/`especialidad_agenda`/`medico` + `fecha_hasta` para filtro
-  - `GET /api/v1/distribucion/ocupacion/horarios-activos` lee DB (`fecha_hasta >= hoy`); roles admin/operador
-  - `POST .../sync` = wipe+reload transaccional desde API externa (botón **Actualizar** en UI)
-  - Env: `DISTRIBUCION_HORARIOS_ACTIVOS_URL`, `DISTRIBUCION_HORARIOS_ACTIVOS_TIMEOUT`; Bearer = `NOVEDADES_PROF_SYNC_TOKEN`
-  - Tras deploy: `alembic upgrade head`, setear URL/token, reiniciar; primera carga vacía hasta el primer Actualizar
+  - Tabla `ocupacion_horario_activo` (rev `0013_ocupacion_serial`): PK serial local; `payload` JSONB = cada fila del endpoint tal cual
+  - Importante: `id_dato` del API **no es único** → se guarda 1 fila DB por cada fila del JSON (no colapsar)
+  - Derivados `tipo`/`especialidad_agenda`/`medico` + `fecha_hasta` para filtro/UI
+  - `GET .../horarios-activos` lee DB (`fecha_hasta >= hoy`); `POST .../sync` wipe+reload (botón Actualizar)
+  - Tras deploy: `alembic upgrade head`, redeploy, **Actualizar** en Ocupación (esperar synced ≈ miles de filas)
 
 ## Roles (panel)
 - `admin`: distribución + novedades (todo) + usuarios
