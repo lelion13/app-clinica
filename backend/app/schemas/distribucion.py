@@ -2,9 +2,9 @@ from pydantic import BaseModel, ConfigDict, Field
 
 
 class HorarioActivoItem(BaseModel):
-    """Subset de columnas para la grilla Ocupación (v1)."""
+    """Fila de grilla / indicadores Ocupación."""
 
-    model_config = ConfigDict(extra="ignore")
+    model_config = ConfigDict(extra="ignore", from_attributes=True)
 
     id_dato: str | None = None
     id: int | None = None
@@ -26,3 +26,8 @@ class HorarioActivoItem(BaseModel):
 
 class HorariosActivosResponse(BaseModel):
     items: list[HorarioActivoItem] = Field(default_factory=list)
+
+
+class HorariosActivosSyncResponse(BaseModel):
+    synced: int
+    skipped: int = 0

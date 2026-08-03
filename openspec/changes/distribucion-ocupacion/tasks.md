@@ -7,6 +7,8 @@
 - [x] 1.3 Service httpx proxy (422/502)
 - [x] 1.4 Router `GET /ocupacion/horarios-activos` + include en `main.py`
 - [x] 1.5 Tests unitarios del servicio
+- [x] 1.6 Tabla `ocupacion_horario_activo` + alembic `0011`
+- [x] 1.7 Sync wipe+reload (`POST .../sync`); GET lista desde DB con filtro vigencia
 
 ## Phase 2 — Frontend
 
@@ -15,6 +17,7 @@
 - [x] 2.3 `OccupancyPage` grilla + auto-load + Actualizar
 - [x] 2.4 Multi-select filtros por columna + Limpiar filtros
 - [x] 2.5 Botón Indicadores (modal) agrupado id_dominio+especialidad+medico+dia
+- [x] 2.6 Actualizar = sync + recarga; carga inicial solo DB
 
 ## Phase 3 — Ops / docs
 

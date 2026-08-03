@@ -1,6 +1,6 @@
 # Decisions — distribucion-ocupacion
 
-**Estado:** SURVEY CLOSED (delta indicadores Q20–Q23)  
+**Estado:** SURVEY CLOSED (delta persistencia Q24–Q28)  
 **Change:** `distribucion-ocupacion`  
 **Modo:** una pregunta a la vez (cerrada)
 
@@ -14,6 +14,11 @@
 | Q21 | Sin `dia` | **A** | Excluir del cálculo |
 | Q22 | Repeticiones | **B** | Sumar cantidades de todas las filas |
 | Q23 | Horas en modal | **B** | horas calculadas + cantidad_turnos + cantidad_sobreturno |
+| Q24 | Sync persistencia | **A** | Wipe + reload transaccional; endpoint mandante |
+| Q25 | Cuándo se sincroniza | **C** | Grilla lee DB; Actualizar = sync + recargar |
+| Q26 | Qué columnas persistir | **A** | Todos los campos del JSON en columnas tipadas |
+| Q27 | Filtro fecha_hasta al listar | **A** | Listar UI con fecha_hasta >= hoy; sync guarda todo |
+| Q28 | Columnas derivadas del split | **A** | Persistir tipo / especialidad_agenda / medico en sync |
 
 ---
 
@@ -146,3 +151,33 @@ Separador: ` - ` (espacio-guión-espacio). Parseo en backend.
 ## Q23 — Horas en modal ✅
 
 **Decisión: B** — Modal: `horas` (calculadas) + `cantidad_turnos` + `cantidad_sobreturno` (suma API), agrupado por id_dominio + especialidad + medico + dia.
+
+---
+
+## Q24 — Sync persistencia ✅
+
+**Decisión: A** — Wipe + reload en una transacción tras GET OK. Si falla el GET, no se modifica la tabla.
+
+---
+
+## Q25 — Cuándo se sincroniza contra el endpoint ✅
+
+**Decisión: C** — La grilla lee siempre de DB. “Actualizar” dispara sync (wipe+reload) y luego recarga la grilla. Carga inicial: solo DB (sin sync automático).
+
+---
+
+## Q26 — Qué persistir del endpoint ✅
+
+**Decisión: A** — Todos los campos del JSON en columnas tipadas. PK natural candidata: `id_dato`.
+
+---
+
+## Q27 — Filtro `fecha_hasta >= hoy` al leer la grilla ✅
+
+**Decisión: A** — Sync persiste todo; el listado UI sigue filtrando `fecha_hasta >= hoy`.
+
+---
+
+## Q28 — Columnas `tipo` / `especialidad_agenda` / `medico` ✅
+
+**Decisión: A** — Calcular en sync y persistir. PK de tabla: `id_dato`.

@@ -49,9 +49,11 @@
   - Columnas dinámicas + modal Solo bonos + 3er XLS con bonos
 - Cambio `distribucion-ocupacion`:
   - Menú Distribución → **Ocupación** (`/ocupacion`); convive con Ocupación semanal
-  - Proxy BFF `GET /api/v1/distribucion/ocupacion/horarios-activos` (roles admin/operador)
+  - Tabla `ocupacion_horario_activo` (rev `0011_ocupacion_horario`): snapshot completo del endpoint
+  - `GET /api/v1/distribucion/ocupacion/horarios-activos` lee DB (`fecha_hasta >= hoy`); roles admin/operador
+  - `POST .../sync` = wipe+reload transaccional desde API externa (botón **Actualizar** en UI)
   - Env: `DISTRIBUCION_HORARIOS_ACTIVOS_URL`, `DISTRIBUCION_HORARIOS_ACTIVOS_TIMEOUT`; Bearer = `NOVEDADES_PROF_SYNC_TOKEN`
-  - Sin migración DB; tras deploy setear URL en `.env.prod` y reiniciar backend
+  - Tras deploy: `alembic upgrade head`, setear URL/token, reiniciar; primera carga de grilla vacía hasta el primer Actualizar
 
 ## Roles (panel)
 - `admin`: distribución + novedades (todo) + usuarios

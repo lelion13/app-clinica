@@ -9,8 +9,20 @@ from sqlalchemy import engine_from_config, pool
 sys.path.append(str(Path(__file__).resolve().parents[1]))
 
 from app.core.config import settings
-from app.models import Booking, ConsultingRoom, Location, Professional, RoomOperatingHour, RoomWeeklyAssignment, User
+from app.models import (
+    Booking,
+    ConsultingRoom,
+    Location,
+    OcupacionHorarioActivo,
+    Professional,
+    RoomOperatingHour,
+    RoomWeeklyAssignment,
+    User,
+)
 from app.models.base import Base
+
+_ = OcupacionHorarioActivo
+
 
 config = context.config
 config.set_main_option("sqlalchemy.url", settings.database_url)

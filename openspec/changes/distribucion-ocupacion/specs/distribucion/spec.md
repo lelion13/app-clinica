@@ -12,28 +12,27 @@ El sistema MUST mostrar un ítem **Ocupación** bajo Distribución de consultori
 - **When** abre el menú Distribución de consultorios
 - **Then** ve **Ocupación semanal** y **Ocupación** como entradas distintas
 
-### Requirement: Proxy JWT de horarios activos
+### Requirement: Persistencia y sync de horarios activos
 
-El backend MUST exponer `GET /api/v1/distribucion/ocupacion/horarios-activos` protegido con JWT y `require_operator_or_admin`. MUST consultar la URL de `DISTRIBUCION_HORARIOS_ACTIVOS_URL` con Bearer `NOVEDADES_PROF_SYNC_TOKEN`. El token MUST NOT devolverse al cliente.
+El backend MUST persistir el snapshot completo del endpoint externo en `ocupacion_horario_activo` (PK `id_dato`, incluyendo columnas derivadas `tipo`/`especialidad_agenda`/`medico`). `POST /api/v1/distribucion/ocupacion/horarios-activos/sync` MUST, tras GET externo OK, borrar y recargar la tabla en una sola transacción. Si el GET falla, MUST NOT modificar la tabla. `GET /api/v1/distribucion/ocupacion/horarios-activos` MUST leer de DB y filtrar `fecha_hasta >= hoy`. Ambos endpoints MUST exigir JWT + `admin`/`operador`. El token MUST NOT devolverse al cliente.
 
-#### Scenario: Config ausente
+#### Scenario: Sync OK
 
-- **Given** falta URL o token
-- **When** un operador llama al endpoint
-- **Then** la API responde 422 con mensaje genérico de configuración
+- **Given** URL/token configurados y la API externa responde OK
+- **When** un operador hace POST sync
+- **Then** la tabla queda con exactamente las filas del payload (por `id_dato`) y la respuesta incluye `synced`
 
-#### Scenario: Upstream falla
+#### Scenario: Sync con upstream fallido
 
-- **Given** URL y token configurados y la API externa falla
-- **When** un operador llama al endpoint
-- **Then** la API responde 502 sin incluir el token en el detalle
+- **Given** datos previos en DB y la API externa falla
+- **When** un operador hace POST sync
+- **Then** responde 502 y los datos previos permanecen
 
-#### Scenario: Respuesta OK
+#### Scenario: Listado vigente
 
-- **Given** la API externa responde una lista de objetos
-- **When** un operador llama al endpoint
-- **Then** recibe `items` con al menos: `id_dominio`, `tipo`, `especialidad_agenda`, `medico`, `especialidad`, `dia`, `fecha_desde`, `hora_desde`, `fecha_hasta`, `hora_hasta`, `duracion_turno`
-- **And** solo incluye filas con `fecha_hasta` parseable y `fecha_hasta >= hoy` (`BUSINESS_TIMEZONE`); sin fecha o inválida se excluyen
+- **Given** filas persistidas con `fecha_hasta` pasada y futura
+- **When** un operador hace GET list
+- **Then** solo recibe filas con `fecha_hasta >= hoy`
 
 ### Requirement: Split de `nombre_agenda`
 

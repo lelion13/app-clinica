@@ -4,25 +4,24 @@
 
 | Decisión | Rationale |
 |----------|-----------|
-| Proxy BFF live (sin DB) | Token server-side; v1 solo lectura; joins después |
-| Reusar `NOVEDADES_PROF_SYNC_TOKEN` | Pedido explícito; misma API host |
-| Env URL/timeout propios | Configurable sin redeploy de código |
-| Prefijo `/api/v1/distribucion` | Separar de Novedades y maestros |
-| Subset Pydantic | No filtrar payload completo al cliente más de lo necesario |
+| Snapshot DB + wipe/reload transaccional | Endpoint mandante; sin fantasmas ni datos a medias si falla el GET |
+| GET lista DB; POST sync en Actualizar | Carga rápida; sync explícito |
+| Reusar `NOVEDADES_PROF_SYNC_TOKEN` | Pedido explícito |
+| PK `id_dato` | Clave natural del payload |
+| Persistir todos los campos + split nombre | Q26/Q28 |
 
 ## Flow
 
 ```
-Browser (JWT cookie) → GET /api/v1/distribucion/ocupacion/horarios-activos
-  → httpx GET DISTRIBUCION_HORARIOS_ACTIVOS_URL + Bearer token
-  → map subset → { items: [...] }
+Carga:  Browser → GET .../horarios-activos → SELECT DB → filter fecha_hasta>=hoy
+Actualizar: Browser → POST .../sync → httpx GET externo → DELETE ALL + INSERT (txn) → GET lista
 ```
 
 ## API
 
-- `GET /api/v1/distribucion/ocupacion/horarios-activos`
-- Auth: cookie JWT + admin|operador
-- 422 config / 502 upstream / 200 `{ items: HorarioActivoItem[] }`
+- `GET /api/v1/distribucion/ocupacion/horarios-activos` → DB vigente
+- `POST /api/v1/distribucion/ocupacion/horarios-activos/sync` → wipe+reload
+- Auth: JWT + admin|operador
 
 ## Files
 

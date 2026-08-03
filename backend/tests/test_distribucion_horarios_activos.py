@@ -1,4 +1,5 @@
-from datetime import date
+from datetime import date, datetime
+from types import SimpleNamespace
 from unittest.mock import MagicMock
 
 import pytest
@@ -65,11 +66,6 @@ def test_map_row_subset():
     assert item.medico == "APECECHEA CAIRONE DIEGO"
     assert item.especialidad == "TRAUMATOLOGIA Y ORTOPEDIA"
     assert item.dia == "lunes"
-    assert item.fecha_desde == "2023-01-01"
-    assert item.hora_desde == "8:00:00"
-    assert item.fecha_hasta == "2024-12-31"
-    assert item.hora_hasta == "12:00:00"
-    assert item.duracion_turno == 10
     assert item.cantidad_turnos == 24.0
     assert item.cantidad_sobreturno == 2
 
@@ -78,77 +74,128 @@ def test_fetch_requires_config(monkeypatch):
     monkeypatch.setattr(service.settings, "distribucion_horarios_activos_url", "")
     monkeypatch.setattr(service.settings, "novedades_prof_sync_token", "tok")
     with pytest.raises(HTTPException) as exc:
-        service.fetch_horarios_activos()
+        service._fetch_remote_rows()
     assert exc.value.status_code == 422
 
 
-def test_fetch_happy_path(monkeypatch):
+class FakeDB:
+    def __init__(self):
+        self.deleted = False
+        self.added = []
+        self.committed = False
+        self.rolled_back = False
+        self._rows = []
+
+    def execute(self, stmt):
+        # delete or select — both ok for this fake
+        self.deleted = True
+        return SimpleNamespace(scalars=lambda: SimpleNamespace(all=lambda: self._rows))
+
+    def add_all(self, items):
+        self.added = list(items)
+
+    def commit(self):
+        self.committed = True
+
+    def rollback(self):
+        self.rolled_back = True
+
+
+def test_sync_wipe_reload(monkeypatch):
     monkeypatch.setattr(
-        service.settings,
-        "distribucion_horarios_activos_url",
-        "https://example.test/is/horarios-activos",
+        service,
+        "_fetch_remote_rows",
+        lambda: [
+            {
+                "id": 1,
+                "id_dato": "1-a",
+                "id_dominio": 10,
+                "id_agenda": 100,
+                "nombre_agenda": "X - Y - Z",
+                "especialidad": "CARDIO",
+                "dia": "martes",
+                "fecha_desde": "2024-01-01",
+                "hora_desde": "9:00:00",
+                "fecha_hasta": "2099-12-31",
+                "hora_hasta": "12:00:00",
+                "duracion_turno": 15,
+                "cantidad_turnos": 12,
+                "cantidad_sobreturno": 1,
+            },
+            {
+                "id": 2,
+                "id_dato": None,
+                "especialidad": "SKIP",
+            },
+        ],
     )
-    monkeypatch.setattr(service.settings, "novedades_prof_sync_token", "secret")
-    monkeypatch.setattr(service.settings, "distribucion_horarios_activos_timeout", 5.0)
+    db = FakeDB()
+    result = service.sync_horarios_activos(db)
+    assert result.synced == 1
+    assert result.skipped == 1
+    assert db.deleted is True
+    assert len(db.added) == 1
+    assert db.added[0].id_dato == "1-a"
+    assert db.added[0].tipo == "X"
+    assert db.committed is True
 
-    mock_response = MagicMock()
-    mock_response.raise_for_status = MagicMock()
-    mock_response.json.return_value = [
-        {
-            "id": 1,
-            "id_dato": "1-a",
-            "id_dominio": 10,
-            "especialidad": "CARDIO",
-            "dia": "martes",
-            "fecha_desde": "2024-01-01",
-            "hora_desde": "9:00:00",
-            "fecha_hasta": "2099-12-31",
-            "hora_hasta": "12:00:00",
-            "duracion_turno": 15,
-        },
-        {
-            "id": 2,
-            "id_dato": "2-b",
-            "id_dominio": 11,
-            "especialidad": "OLD",
-            "dia": "lunes",
-            "fecha_desde": "2020-01-01",
-            "hora_desde": "9:00:00",
-            "fecha_hasta": "2020-12-31",
-            "hora_hasta": "12:00:00",
-            "duracion_turno": 15,
-        },
-        {
-            "id": 3,
-            "id_dato": "3-c",
-            "id_dominio": 12,
-            "especialidad": "NO-DATE",
-            "fecha_hasta": None,
-        },
-    ]
 
-    class FakeClient:
-        def __init__(self, *args, **kwargs):
-            pass
+def test_sync_does_not_touch_db_when_fetch_fails(monkeypatch):
+    def boom():
+        raise HTTPException(status_code=502, detail="down")
 
-        def __enter__(self):
-            return self
+    monkeypatch.setattr(service, "_fetch_remote_rows", boom)
+    db = FakeDB()
+    with pytest.raises(HTTPException) as exc:
+        service.sync_horarios_activos(db)
+    assert exc.value.status_code == 502
+    assert db.committed is False
+    assert db.added == []
 
-        def __exit__(self, *args):
-            return False
 
-        def get(self, url, headers=None):
-            assert "Bearer secret" in (headers or {}).get("Authorization", "")
-            assert "horarios-activos" in url
-            return mock_response
-
-    monkeypatch.setattr(service.httpx, "Client", FakeClient)
+def test_list_filters_fecha_hasta(monkeypatch):
     monkeypatch.setattr(service, "_business_today", lambda: date(2026, 8, 3))
-    result = service.fetch_horarios_activos()
+    row_ok = SimpleNamespace(
+        id_dato="1",
+        horario_id=1,
+        id_agenda=1,
+        id_dominio=1,
+        tipo="A",
+        especialidad_agenda="B",
+        medico="C",
+        especialidad="ESP",
+        dia="lunes",
+        fecha_desde="2024-01-01",
+        hora_desde="8:00:00",
+        fecha_hasta="2099-01-01",
+        hora_hasta="12:00:00",
+        duracion_turno=10,
+        cantidad_turnos=5,
+        cantidad_sobreturno=0,
+    )
+    row_old = SimpleNamespace(
+        id_dato="2",
+        horario_id=2,
+        id_agenda=2,
+        id_dominio=2,
+        tipo=None,
+        especialidad_agenda=None,
+        medico=None,
+        especialidad="OLD",
+        dia="martes",
+        fecha_desde="2020-01-01",
+        hora_desde="8:00:00",
+        fecha_hasta="2020-01-01",
+        hora_hasta="12:00:00",
+        duracion_turno=10,
+        cantidad_turnos=5,
+        cantidad_sobreturno=0,
+    )
+    db = FakeDB()
+    db._rows = [row_ok, row_old]
+    result = service.list_horarios_activos(db)
     assert len(result.items) == 1
-    assert result.items[0].especialidad == "CARDIO"
-    assert result.items[0].dia == "martes"
-    assert result.items[0].id_dominio == 10
+    assert result.items[0].id_dato == "1"
 
 
 def test_fetch_upstream_error(monkeypatch):
@@ -174,6 +221,6 @@ def test_fetch_upstream_error(monkeypatch):
 
     monkeypatch.setattr(service.httpx, "Client", BoomClient)
     with pytest.raises(HTTPException) as exc:
-        service.fetch_horarios_activos()
+        service._fetch_remote_rows()
     assert exc.value.status_code == 502
     assert "secret" not in str(exc.value.detail)

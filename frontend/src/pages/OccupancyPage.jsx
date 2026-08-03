@@ -261,17 +261,19 @@ function IndicatorsModal({ open, rows, filteredCount, onClose }) {
 export function OccupancyPage() {
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(true);
+  const [syncing, setSyncing] = useState(false);
   const [items, setItems] = useState([]);
   const [filters, setFilters] = useState(emptyFilters);
   const [indicatorsOpen, setIndicatorsOpen] = useState(false);
+  const [syncInfo, setSyncInfo] = useState("");
 
-  const load = async () => {
+  const loadFromDb = async ({ resetFilters = false } = {}) => {
     setError("");
     setLoading(true);
     try {
       const data = await apiRequestWithRefresh("/distribucion/ocupacion/horarios-activos");
       setItems(Array.isArray(data?.items) ? data.items : []);
-      setFilters(emptyFilters());
+      if (resetFilters) setFilters(emptyFilters());
     } catch (err) {
       setItems([]);
       setError(err.message || "No se pudieron cargar los horarios activos");
@@ -280,8 +282,27 @@ export function OccupancyPage() {
     }
   };
 
+  const syncAndReload = async () => {
+    setError("");
+    setSyncInfo("");
+    setSyncing(true);
+    try {
+      const result = await apiRequestWithRefresh("/distribucion/ocupacion/horarios-activos/sync", {
+        method: "POST",
+      });
+      const synced = Number(result?.synced) || 0;
+      const skipped = Number(result?.skipped) || 0;
+      setSyncInfo(`Sincronizado: ${synced} filas${skipped ? ` (${skipped} omitidas)` : ""}.`);
+      await loadFromDb({ resetFilters: true });
+    } catch (err) {
+      setError(err.message || "No se pudo sincronizar contra la API externa");
+    } finally {
+      setSyncing(false);
+    }
+  };
+
   useEffect(() => {
-    load();
+    loadFromDb();
   }, []);
 
   const filterOptions = useMemo(() => {
@@ -318,7 +339,7 @@ export function OccupancyPage() {
           <button
             type="button"
             onClick={() => setFilters(emptyFilters())}
-            disabled={loading || activeFilterCount === 0}
+            disabled={loading || syncing || activeFilterCount === 0}
             style={uiStyles.buttonSecondary}
           >
             Limpiar filtros
@@ -326,20 +347,27 @@ export function OccupancyPage() {
           <button
             type="button"
             onClick={() => setIndicatorsOpen(true)}
-            disabled={loading || filteredItems.length === 0}
+            disabled={loading || syncing || filteredItems.length === 0}
             style={uiStyles.buttonPrimary}
           >
             Indicadores
           </button>
-          <button type="button" onClick={load} disabled={loading} style={uiStyles.buttonSecondary}>
-            {loading ? "Cargando..." : "Actualizar"}
+          <button
+            type="button"
+            onClick={syncAndReload}
+            disabled={loading || syncing}
+            style={uiStyles.buttonSecondary}
+          >
+            {syncing ? "Sincronizando..." : "Actualizar"}
           </button>
         </div>
       </div>
       <p style={uiStyles.helpText}>
-        Horarios activos vigentes. Filtrá por columna (multi-select) y usá Indicadores sobre el resultado.
-        {loading ? "" : ` Mostrando ${filteredItems.length} de ${items.length}.`}
+        Datos locales (DB). Actualizar sincroniza desde la API externa (reemplazo total) y recarga.
+        Filtrá por columna e Indicadores sobre el resultado.
+        {loading || syncing ? "" : ` Mostrando ${filteredItems.length} de ${items.length}.`}
       </p>
+      {syncInfo ? <p style={{ color: uiTheme.colors.primaryStrong, marginTop: 0 }}>{syncInfo}</p> : null}
       {error ? <p style={{ color: uiTheme.colors.danger }}>{error}</p> : null}
       {!error && !loading && items.length === 0 ? (
         <p style={uiStyles.helpText}>No hay horarios activos para mostrar.</p>
