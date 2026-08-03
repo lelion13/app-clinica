@@ -168,7 +168,7 @@ Separador: ` - ` (espacio-guión-espacio). Parseo en backend.
 
 ## Q26 — Qué persistir del endpoint ✅
 
-**Decisión: A** — Todos los campos del JSON en columnas tipadas. PK natural candidata: `id_dato`.
+**Decisión: A** (ajustada en apply): el mandante se guarda en `payload` JSONB **tal cual viene** del endpoint (sin renombrar ni tipar). PK `id_dato`. Columnas extra solo para UI: `tipo`/`especialidad_agenda`/`medico` (split) y `fecha_hasta` (filtro).
 
 ---
 

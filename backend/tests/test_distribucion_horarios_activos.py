@@ -137,6 +137,9 @@ def test_sync_wipe_reload(monkeypatch):
     assert len(db.added) == 1
     assert db.added[0].id_dato == "1-a"
     assert db.added[0].tipo == "X"
+    assert db.added[0].payload["id"] == 1
+    assert db.added[0].payload["nombre_agenda"] == "X - Y - Z"
+    assert db.added[0].payload["especialidad"] == "CARDIO"
     assert db.committed is True
 
 
@@ -157,39 +160,33 @@ def test_list_filters_fecha_hasta(monkeypatch):
     monkeypatch.setattr(service, "_business_today", lambda: date(2026, 8, 3))
     row_ok = SimpleNamespace(
         id_dato="1",
-        horario_id=1,
-        id_agenda=1,
-        id_dominio=1,
+        payload={
+            "id": 1,
+            "id_dato": "1",
+            "id_agenda": 1,
+            "id_dominio": 1,
+            "especialidad": "ESP",
+            "dia": "lunes",
+            "fecha_desde": "2024-01-01",
+            "hora_desde": "8:00:00",
+            "fecha_hasta": "2099-01-01",
+            "hora_hasta": "12:00:00",
+            "duracion_turno": 10,
+            "cantidad_turnos": 5,
+            "cantidad_sobreturno": 0,
+        },
         tipo="A",
         especialidad_agenda="B",
         medico="C",
-        especialidad="ESP",
-        dia="lunes",
-        fecha_desde="2024-01-01",
-        hora_desde="8:00:00",
         fecha_hasta="2099-01-01",
-        hora_hasta="12:00:00",
-        duracion_turno=10,
-        cantidad_turnos=5,
-        cantidad_sobreturno=0,
     )
     row_old = SimpleNamespace(
         id_dato="2",
-        horario_id=2,
-        id_agenda=2,
-        id_dominio=2,
+        payload={"id_dato": "2", "fecha_hasta": "2020-01-01", "especialidad": "OLD"},
         tipo=None,
         especialidad_agenda=None,
         medico=None,
-        especialidad="OLD",
-        dia="martes",
-        fecha_desde="2020-01-01",
-        hora_desde="8:00:00",
         fecha_hasta="2020-01-01",
-        hora_hasta="12:00:00",
-        duracion_turno=10,
-        cantidad_turnos=5,
-        cantidad_sobreturno=0,
     )
     db = FakeDB()
     db._rows = [row_ok, row_old]

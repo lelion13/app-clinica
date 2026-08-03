@@ -1,4 +1,5 @@
-from datetime import date, datetime
+import copy
+from datetime import date, datetime, timezone
 from zoneinfo import ZoneInfo
 
 import httpx
@@ -122,68 +123,47 @@ def _fetch_remote_rows() -> list[dict]:
 
 
 def _raw_to_model(raw: dict, synced_at: datetime) -> OcupacionHorarioActivo | None:
+    """Persiste el objeto del endpoint tal cual en `payload` (copia profunda)."""
     id_dato = _as_str(raw.get("id_dato"))
     if not id_dato:
         return None
-    tipo, especialidad_agenda, medico = _split_nombre_agenda(raw.get("nombre_agenda"))
+    # Copia exacta de claves/valores del endpoint (sin renombrar ni tipar).
+    payload = copy.deepcopy(raw)
+    tipo, especialidad_agenda, medico = _split_nombre_agenda(payload.get("nombre_agenda"))
+    fecha_hasta = payload.get("fecha_hasta")
+    fecha_hasta_str = None if fecha_hasta is None else str(fecha_hasta)
     return OcupacionHorarioActivo(
-        id_dato=id_dato[:80],
-        horario_id=_as_int(raw.get("id")),
-        id_agenda=_as_int(raw.get("id_agenda")),
-        id_dominio=_as_int(raw.get("id_dominio")),
-        area_jerarquica_id=_as_int(raw.get("area_jerarquica_id")),
-        nombre_agenda=_as_str(raw.get("nombre_agenda")),
+        id_dato=id_dato[:120],
+        payload=payload,
         tipo=tipo,
         especialidad_agenda=especialidad_agenda,
         medico=medico,
-        especialidad=_as_str(raw.get("especialidad")),
-        tipo_agenda=_as_str(raw.get("tipo_agenda")),
-        consultorio=_as_str(raw.get("consultorio")),
-        dia=_as_str(raw.get("dia")),
-        dia_de_agenda=_as_str(raw.get("dia_de_agenda")),
-        fecha_desde=_as_str(raw.get("fecha_desde")),
-        hora_desde=_as_str(raw.get("hora_desde")),
-        fecha_hasta=_as_str(raw.get("fecha_hasta")),
-        hora_hasta=_as_str(raw.get("hora_hasta")),
-        periodo_desde=_as_str(raw.get("periodo_desde")),
-        periodo_hasta=_as_str(raw.get("periodo_hasta")),
-        duracion_turno=_as_number(raw.get("duracion_turno")),
-        cantidad_turnos=_as_number(raw.get("cantidad_turnos")),
-        cantidad_sobreturno=_as_number(raw.get("cantidad_sobreturno")),
-        horas_funcionamiento=_as_number(raw.get("horas_funcionamiento")),
-        capacidad_turnos_15_min=_as_number(raw.get("capacidad_turnos_15_min")),
-        tiempo_consultorio=_as_number(raw.get("tiempo_consultorio")),
-        estado_agenda=_as_str(raw.get("estado_agenda")),
-        estado_horario=_as_str(raw.get("estado_horario")),
-        atiende_feriado=_as_str(raw.get("atiende_feriado")),
-        dias_limite_visualizacion_pantalla=_as_int(raw.get("dias_limite_visualizacion_pantalla")),
-        dias_solicitud_turnos=_as_int(raw.get("dias_solicitud_turnos")),
-        medico_responsable=_as_str(raw.get("medico_responsable")),
-        medico_responsable_equipo=_as_str(raw.get("medico_responsable_equipo")),
-        fecha_ultima_modificacion_agenda=_as_str(raw.get("fecha_ultima_modificacion_agenda")),
-        fecha_creacion_horario=_as_str(raw.get("fecha_creacion_horario")),
+        fecha_hasta=fecha_hasta_str,
         synced_at=synced_at,
     )
 
 
 def _model_to_item(row: OcupacionHorarioActivo) -> HorarioActivoItem:
+    """UI lee valores del payload original; derivados desde columnas tipadas."""
+    raw = row.payload if isinstance(row.payload, dict) else {}
     return HorarioActivoItem(
-        id_dato=row.id_dato,
-        id=row.horario_id,
-        id_agenda=row.id_agenda,
-        id_dominio=row.id_dominio,
+        id_dato=_as_str(raw.get("id_dato")) or row.id_dato,
+        id=_as_int(raw.get("id")),
+        id_agenda=_as_int(raw.get("id_agenda")),
+        id_dominio=_as_int(raw.get("id_dominio")),
         tipo=row.tipo,
         especialidad_agenda=row.especialidad_agenda,
         medico=row.medico,
-        especialidad=row.especialidad,
-        dia=row.dia,
-        fecha_desde=row.fecha_desde,
-        hora_desde=row.hora_desde,
-        fecha_hasta=row.fecha_hasta,
-        hora_hasta=row.hora_hasta,
-        duracion_turno=row.duracion_turno,
-        cantidad_turnos=row.cantidad_turnos,
-        cantidad_sobreturno=row.cantidad_sobreturno,
+        # especialidad tal cual en payload (sin strip extra al persistir; strip solo en lectura UI)
+        especialidad=_as_str(raw.get("especialidad")),
+        dia=_as_str(raw.get("dia")),
+        fecha_desde=_as_str(raw.get("fecha_desde")),
+        hora_desde=_as_str(raw.get("hora_desde")),
+        fecha_hasta=_as_str(raw.get("fecha_hasta")) or row.fecha_hasta,
+        hora_hasta=_as_str(raw.get("hora_hasta")),
+        duracion_turno=_as_number(raw.get("duracion_turno")),
+        cantidad_turnos=_as_number(raw.get("cantidad_turnos")),
+        cantidad_sobreturno=_as_number(raw.get("cantidad_sobreturno")),
     )
 
 
@@ -198,7 +178,7 @@ def list_horarios_activos(db: Session) -> HorariosActivosResponse:
 def sync_horarios_activos(db: Session) -> HorariosActivosSyncResponse:
     """GET externo OK → wipe + reload en una transacción (Q24=A)."""
     remote_rows = _fetch_remote_rows()
-    synced_at = datetime.utcnow()
+    synced_at = datetime.now(timezone.utc)
     by_id_dato: dict[str, OcupacionHorarioActivo] = {}
     skipped = 0
     for raw in remote_rows:
@@ -223,9 +203,8 @@ def sync_horarios_activos(db: Session) -> HorariosActivosSyncResponse:
     return HorariosActivosSyncResponse(synced=len(by_id_dato), skipped=skipped)
 
 
-# Compat tests / helpers
 def _map_row(raw: dict) -> HorarioActivoItem:
-    model = _raw_to_model(raw, synced_at=datetime.utcnow())
+    model = _raw_to_model(raw, synced_at=datetime.now(timezone.utc))
     if model is None:
         return HorarioActivoItem()
     return _model_to_item(model)
