@@ -5,6 +5,7 @@ from fastapi.responses import Response
 from app.api.routers.auth import router as auth_router
 from app.api.routers.bookings import router as bookings_router
 from app.api.routers.consulting_rooms import router as consulting_rooms_router
+from app.api.routers.distribucion import router as distribucion_router
 from app.api.routers.locations import router as locations_router
 from app.api.routers.novedades import router as novedades_router
 from app.api.routers.professionals import router as professionals_router
@@ -50,4 +51,5 @@ app.include_router(professionals_router, prefix="/api/v1/professionals", tags=["
 app.include_router(bookings_router, prefix="/api/v1/bookings", tags=["bookings"])
 app.include_router(stats_router, prefix="/api/v1/stats", tags=["stats"])
 app.include_router(weekly_assignments_router, prefix="/api/v1/weekly-assignments", tags=["weekly-assignments"])
+app.include_router(distribucion_router, prefix="/api/v1/distribucion", tags=["distribucion"])
 app.include_router(novedades_router, prefix="/api/v1/novedades", tags=["novedades"])

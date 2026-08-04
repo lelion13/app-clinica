@@ -47,6 +47,13 @@
   - Fechas del período → `fecha_desde` / `fecha_hasta`; match por `CODPROF`
   - Snapshot persistido; re-import solo con período **open**; cerrado = congelado
   - Columnas dinámicas + modal Solo bonos + 3er XLS con bonos
+- Cambio `distribucion-ocupacion`:
+  - Menú Distribución → **Ocupación** (`/ocupacion`); convive con Ocupación semanal
+  - Tabla `ocupacion_horario_activo` (rev `0013_ocupacion_serial`): PK serial local; `payload` JSONB = cada fila del endpoint tal cual
+  - Importante: `id_dato` del API **no es único** → se guarda 1 fila DB por cada fila del JSON (no colapsar)
+  - Derivados `tipo`/`especialidad_agenda`/`medico` + `fecha_hasta` para filtro/UI
+  - `GET .../horarios-activos` lee DB (`fecha_hasta >= hoy`); `POST .../sync` wipe+reload (botón Actualizar)
+  - Tras deploy: `alembic upgrade head`, redeploy, **Actualizar** en Ocupación (esperar synced ≈ miles de filas)
 - Cambio `novedades-tiene-produccion`:
   - Proxy `GET /novedades/bonos/tiene-produccion` → `NOVEDADES_BONOS_TIENE_PRODUCCION_URL` (mismo Bearer)
   - UI Carga (admin/jefe): al Cargar o editar fecha; si `false` o error → bloquea (solo UI; create API no revalida)
