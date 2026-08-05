@@ -5,6 +5,7 @@ import { BrowserRouter, Navigate, Route, Routes } from "react-router-dom";
 import { AuthProvider } from "./auth/AuthContext";
 import { AppLayout } from "./layouts/AppLayout";
 import { AgendaPage } from "./pages/AgendaPage";
+import { AgendaOcupacionPage } from "./pages/AgendaOcupacionPage";
 import { ConsultingRoomsPage } from "./pages/ConsultingRoomsPage";
 import { EstadisticasPage } from "./pages/EstadisticasPage";
 import { LocationsPage } from "./pages/LocationsPage";
@@ -38,6 +39,7 @@ function AppRouter() {
         <Route index element={<HomePage />} />
         <Route path="ocupacion-semanal" element={<WeeklyOccupancyPage />} />
         <Route path="ocupacion" element={<OccupancyPage />} />
+        <Route path="agenda-ocupacion" element={<AgendaOcupacionPage />} />
         <Route path="agenda" element={<AgendaPage />} />
         <Route path="ubicaciones" element={<LocationsPage />} />
         <Route path="profesionales" element={<ProfessionalsPage />} />

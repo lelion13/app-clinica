@@ -31,3 +31,47 @@ class HorariosActivosResponse(BaseModel):
 class HorariosActivosSyncResponse(BaseModel):
     synced: int
     skipped: int = 0
+
+
+class AgendaOcupacionEventExtended(BaseModel):
+    row_id: int
+    id_dato: str | None = None
+    id_dominio: int | None = None
+    location_name: str | None = None
+    tipo: str | None = None
+    especialidad_agenda: str | None = None
+    medico: str | None = None
+    especialidad: str | None = None
+    dia: str | None = None
+    fecha_desde: str | None = None
+    hora_desde: str | None = None
+    fecha_hasta: str | None = None
+    hora_hasta: str | None = None
+    duracion_turno: int | float | None = None
+    cantidad_turnos: int | float | None = None
+    cantidad_sobreturno: int | float | None = None
+
+
+class AgendaOcupacionEvent(BaseModel):
+    id: str
+    title: str = ""
+    start: str
+    end: str
+    extended: AgendaOcupacionEventExtended
+
+
+class AgendaOcupacionEventsResponse(BaseModel):
+    events: list[AgendaOcupacionEvent] = Field(default_factory=list)
+
+
+class AgendaFilterOption(BaseModel):
+    value: str
+    label: str
+
+
+class AgendaFilterOptionsResponse(BaseModel):
+    id_dominio: list[AgendaFilterOption] = Field(default_factory=list)
+    tipo: list[AgendaFilterOption] = Field(default_factory=list)
+    especialidad: list[AgendaFilterOption] = Field(default_factory=list)
+    medico: list[AgendaFilterOption] = Field(default_factory=list)
+    dia: list[AgendaFilterOption] = Field(default_factory=list)
