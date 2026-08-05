@@ -113,22 +113,35 @@ def _ranges_overlap(a_start: date, a_end: date, b_start: date, b_end_exclusive: 
     return a_start < b_end_exclusive and a_end >= b_start
 
 
-def _location_labels(db: Session) -> dict[int, str]:
+def _location_labels(db: Session) -> dict[tuple[int, str], str]:
+    """Clave (id_dominio, tipo normalizado) → nombre de ubicación."""
     rows = db.execute(select(Location).where(Location.deleted_at.is_(None))).scalars().all()
-    out: dict[int, str] = {}
+    out: dict[tuple[int, str], str] = {}
     for loc in rows:
         if loc.id_dominio is None:
             continue
         name = _as_str(loc.name)
-        if name:
-            out[int(loc.id_dominio)] = name
+        tipo_key = _norm(loc.tipo)
+        if name and tipo_key:
+            out[(int(loc.id_dominio), tipo_key)] = name
     return out
 
 
-def _dominio_label(id_dominio: int | None, labels: dict[int, str]) -> str | None:
+def _dominio_label(
+    id_dominio: int | None,
+    tipo: str | None,
+    labels: dict[tuple[int, str], str],
+) -> str | None:
     if id_dominio is None:
         return None
-    return labels.get(int(id_dominio)) or str(id_dominio)
+    key = (int(id_dominio), _norm(tipo))
+    if key in labels:
+        return labels[key]
+    # Fallback: primer nombre con ese id_dominio, o el número.
+    for (dom, _t), name in labels.items():
+        if dom == int(id_dominio):
+            return name
+    return str(id_dominio)
 
 
 def _payload_fields(row: OcupacionHorarioActivo) -> dict:
@@ -220,7 +233,7 @@ def list_filter_options(db: Session) -> AgendaFilterOptionsResponse:
         fields = _payload_fields(row)
         if fields["id_dominio"] is not None:
             key = str(fields["id_dominio"])
-            dominios[key] = _dominio_label(fields["id_dominio"], labels) or key
+            dominios[key] = _dominio_label(fields["id_dominio"], fields["tipo"], labels) or key
         if fields["tipo"]:
             tipos.add(fields["tipo"])
         if fields["especialidad"]:
@@ -272,17 +285,17 @@ def list_agenda_events(
     f_med = medico or []
     f_dia = dia or []
 
-    # Filtro ubicación → restringe id_dominio al de esa location (si tiene).
-    location_dominio: int | None = None
+    # Filtro ubicación → id_dominio + tipo de esa location.
+    location_tipo_required: str | None = None
     if location_id is not None:
         loc = db.execute(
             select(Location).where(Location.id == location_id, Location.deleted_at.is_(None))
         ).scalar_one_or_none()
         if not loc:
             raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Ubicacion no encontrada")
-        location_dominio = loc.id_dominio
-        if location_dominio is not None and location_dominio > 0:
-            f_dom = [str(location_dominio)]
+        if loc.id_dominio is not None and loc.id_dominio > 0:
+            f_dom = [str(loc.id_dominio)]
+        location_tipo_required = _as_str(loc.tipo)
 
     labels = _location_labels(db)
     agenda_rooms = room_agenda_map_service.agenda_to_room_map(db)
@@ -313,6 +326,8 @@ def list_agenda_events(
 
         if not _match_id_dominio(fields["id_dominio"], f_dom):
             continue
+        if location_tipo_required and _norm(fields["tipo"]) != _norm(location_tipo_required):
+            continue
         if not _match_multi(fields["tipo"], f_tipo):
             continue
         if not _match_especialidad(fields["especialidad"], fields["especialidad_agenda"], f_esp):
@@ -330,7 +345,7 @@ def list_agenda_events(
 
         resource_id = str(mapped_room_id) if mapped_room_id is not None else "unassigned"
         room_code = room_code_by_id.get(mapped_room_id) if mapped_room_id is not None else None
-        loc_name = _dominio_label(fields["id_dominio"], labels)
+        loc_name = _dominio_label(fields["id_dominio"], fields["tipo"], labels)
         extended = AgendaOcupacionEventExtended(
             row_id=row.id,
             id_dato=fields["id_dato"],

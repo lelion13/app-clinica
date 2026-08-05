@@ -10,5 +10,6 @@ class Location(AuditMixin, Base):
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True)
     name: Mapped[str] = mapped_column(String(120), nullable=False, unique=True)
-    # Código del endpoint de ocupación (id_dominio). Unique entre activas (índice parcial en migración).
+    # Par ocupación: id_dominio + tipo (unique entre activas; ver migración 0016).
     id_dominio: Mapped[int] = mapped_column(Integer, nullable=False)
+    tipo: Mapped[str] = mapped_column(String(200), nullable=False)

@@ -9,9 +9,11 @@ export function LocationsPage() {
   const [locations, setLocations] = useState([]);
   const [locationName, setLocationName] = useState("");
   const [idDominio, setIdDominio] = useState("");
+  const [tipo, setTipo] = useState("");
   const [editingId, setEditingId] = useState(null);
   const [editName, setEditName] = useState("");
   const [editIdDominio, setEditIdDominio] = useState("");
+  const [editTipo, setEditTipo] = useState("");
   const [saving, setSaving] = useState(false);
 
   const load = async () => {
@@ -33,10 +35,12 @@ export function LocationsPage() {
         body: JSON.stringify({
           name: locationName,
           id_dominio: Number(idDominio),
+          tipo: tipo.trim(),
         }),
       });
       setLocationName("");
       setIdDominio("");
+      setTipo("");
       await load();
     } catch (err) {
       setError(err.message || "No se pudo crear la ubicacion");
@@ -49,6 +53,7 @@ export function LocationsPage() {
     setEditingId(item.id);
     setEditName(item.name || "");
     setEditIdDominio(String(item.id_dominio ?? ""));
+    setEditTipo(item.tipo || "");
     setError("");
   };
 
@@ -56,6 +61,7 @@ export function LocationsPage() {
     setEditingId(null);
     setEditName("");
     setEditIdDominio("");
+    setEditTipo("");
   };
 
   const saveEdit = async (event) => {
@@ -69,6 +75,7 @@ export function LocationsPage() {
         body: JSON.stringify({
           name: editName,
           id_dominio: Number(editIdDominio),
+          tipo: editTipo.trim(),
         }),
       });
       cancelEdit();
@@ -95,8 +102,9 @@ export function LocationsPage() {
     <section style={uiStyles.pageSection}>
       <h1 style={uiStyles.sectionTitle}>Ubicaciones</h1>
       <p style={uiStyles.helpText}>
-        Sedes o puntos físicos donde hay consultorios. El <strong>id_dominio</strong> vincula la sede con los
-        datos de Ocupación (código del endpoint externo).
+        Sedes o puntos físicos donde hay consultorios. El par <strong>id_dominio</strong> +{" "}
+        <strong>tipo</strong> vincula la sede con Ocupación (mismo código y tipo del endpoint externo). El
+        tipo es obligatorio y debe coincidir con el valor de ocupación (ej. SEDE TORRE).
       </p>
       {error ? <p style={{ color: uiTheme.colors.danger }}>{error}</p> : null}
       <form onSubmit={submitLocation} style={{ display: "flex", gap: 8, flexWrap: "wrap", marginBottom: 16 }}>
@@ -116,6 +124,13 @@ export function LocationsPage() {
           placeholder="id_dominio"
           required
           style={{ ...uiStyles.formControl, width: 140 }}
+        />
+        <input
+          value={tipo}
+          onChange={(event) => setTipo(event.target.value)}
+          placeholder="tipo (ej. SEDE TORRE)"
+          required
+          style={{ ...uiStyles.formControl, minWidth: 180 }}
         />
         <button type="submit" disabled={saving} style={uiStyles.buttonPrimary}>
           Agregar
@@ -142,6 +157,13 @@ export function LocationsPage() {
                   required
                   style={{ ...uiStyles.formControl, width: 140 }}
                 />
+                <input
+                  value={editTipo}
+                  onChange={(event) => setEditTipo(event.target.value)}
+                  placeholder="tipo"
+                  required
+                  style={{ ...uiStyles.formControl, minWidth: 160 }}
+                />
                 <button type="submit" disabled={saving} style={uiStyles.buttonPrimary}>
                   Guardar
                 </button>
@@ -155,7 +177,10 @@ export function LocationsPage() {
                   #{item.id} — {item.name}{" "}
                   <span style={{ color: uiTheme.colors.textMuted }}>
                     (id_dominio: {item.id_dominio}
-                    {item.id_dominio < 0 ? " · pendiente" : ""})
+                    {item.id_dominio < 0 ? " · pendiente" : ""}
+                    {" · tipo: "}
+                    {item.tipo || "—"}
+                    {item.tipo?.startsWith?.("PENDIENTE-") ? " · pendiente" : ""})
                   </span>
                 </span>
                 <button type="button" onClick={() => startEdit(item)} style={uiStyles.buttonSecondary}>

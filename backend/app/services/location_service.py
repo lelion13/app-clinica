@@ -20,25 +20,33 @@ def _assert_unique_name(db: Session, name: str, *, exclude_id: int | None = None
         raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="La ubicacion ya existe")
 
 
-def _assert_unique_id_dominio(db: Session, id_dominio: int, *, exclude_id: int | None = None) -> None:
-    query = select(Location).where(Location.id_dominio == id_dominio, Location.deleted_at.is_(None))
+def _assert_unique_dominio_tipo(
+    db: Session, id_dominio: int, tipo: str, *, exclude_id: int | None = None
+) -> None:
+    query = select(Location).where(
+        Location.id_dominio == id_dominio,
+        Location.tipo == tipo,
+        Location.deleted_at.is_(None),
+    )
     if exclude_id is not None:
         query = query.where(Location.id != exclude_id)
     if db.execute(query).scalar_one_or_none():
         raise HTTPException(
             status_code=status.HTTP_409_CONFLICT,
-            detail="Ya existe una ubicacion con ese id_dominio",
+            detail="Ya existe una ubicacion con ese id_dominio y tipo",
         )
 
 
 def create_location(db: Session, payload: LocationCreateRequest, actor_id: int) -> Location:
     name = payload.name.strip()
+    tipo = payload.tipo.strip()
     _assert_unique_name(db, name)
-    _assert_unique_id_dominio(db, payload.id_dominio)
+    _assert_unique_dominio_tipo(db, payload.id_dominio, tipo)
     now = datetime.utcnow()
     item = Location(
         name=name,
         id_dominio=payload.id_dominio,
+        tipo=tipo,
         created_at=now,
         updated_at=now,
         created_by=actor_id,
@@ -56,10 +64,12 @@ def update_location(db: Session, location_id: int, payload: LocationUpdateReques
     if not item:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Ubicacion no encontrada")
     name = payload.name.strip()
+    tipo = payload.tipo.strip()
     _assert_unique_name(db, name, exclude_id=location_id)
-    _assert_unique_id_dominio(db, payload.id_dominio, exclude_id=location_id)
+    _assert_unique_dominio_tipo(db, payload.id_dominio, tipo, exclude_id=location_id)
     item.name = name
     item.id_dominio = payload.id_dominio
+    item.tipo = tipo
     item.updated_at = datetime.utcnow()
     item.updated_by = actor_id
     db.commit()

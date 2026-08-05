@@ -68,17 +68,32 @@ def _fecha_hasta_vigente(fecha_hasta: str | None, today: date | None = None) -> 
 
 
 def _split_nombre_agenda(nombre: str | None) -> tuple[str | None, str | None, str | None]:
-    """Parte nombre_agenda por ' - ': tipo, especialidad_agenda, resto → medico."""
+    """Parte nombre_agenda → tipo, especialidad_agenda, medico.
+
+    Formatos soportados:
+    - Con espacios: `ART - TRAUMATOLOGIA - APECECHEA`
+    - Compacto: `CMG-ECOGRAFIA-DR. BARRERA ORO GABRIEL`
+    """
     text = _as_str(nombre)
     if not text:
         return None, None, None
-    parts = [p.strip() for p in text.split(NOMBRE_AGENDA_SEP)]
-    parts = [p for p in parts if p]
-    if not parts:
-        return None, None, None
+
+    spaced = [p.strip() for p in text.split(NOMBRE_AGENDA_SEP) if p.strip()]
+    if len(spaced) >= 2:
+        parts = spaced
+        join_sep = NOMBRE_AGENDA_SEP
+    else:
+        compact = [p.strip() for p in text.split("-") if p.strip()]
+        if len(compact) >= 2:
+            parts = compact
+            join_sep = "-"
+        else:
+            parts = spaced or [text]
+            join_sep = NOMBRE_AGENDA_SEP
+
     tipo = parts[0] if len(parts) >= 1 else None
     especialidad_agenda = parts[1] if len(parts) >= 2 else None
-    medico = NOMBRE_AGENDA_SEP.join(parts[2:]) if len(parts) >= 3 else None
+    medico = join_sep.join(parts[2:]) if len(parts) >= 3 else None
     return tipo, especialidad_agenda, medico
 
 

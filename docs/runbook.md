@@ -57,7 +57,7 @@
   - Tras deploy: set env en `.env.prod`, `alembic upgrade head`, redeploy backend+frontend, **Actualizar** en Ocupación (esperar synced ≈ miles de filas)
   - **Agenda ocupación** (`/agenda-ocupacion`): grilla día × consultorios (+ **Sin consultorio**); `GET .../ocupacion/agenda/events`; sync solo desde Ocupación
   - Mapeo `id_agenda` → consultorio (rev `0015_room_id_agenda`): en ficha **Consultorios**; typeahead `GET .../ocupacion/agenda-lookup?q=`
-  - `locations.id_dominio` (rev `0014_locations_id_dominio`): vínculo 1:1 con ocupación; existentes migran con placeholder negativo (−id) hasta editarlos en UI
+  - `locations.id_dominio` (rev `0014`) + `locations.tipo` (rev `0016_locations_tipo`): vínculo con ocupación por par `(id_dominio, tipo)` único entre activas; `tipo` obligatorio al crear/editar; existentes migran con `PENDIENTE-{id}` hasta corregir en UI; Agenda ocupación filtra ubicación por dominio+tipo
 - Cambio `novedades-tiene-produccion`:
   - Proxy `GET /novedades/bonos/tiene-produccion` → `NOVEDADES_BONOS_TIENE_PRODUCCION_URL` (mismo Bearer)
   - UI Carga (admin/jefe): al Cargar o editar fecha; si `false` o error → bloquea (solo UI; create API no revalida)

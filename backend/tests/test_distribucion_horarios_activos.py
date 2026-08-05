@@ -26,6 +26,15 @@ def test_split_nombre_agenda_fewer_parts():
     assert service._split_nombre_agenda("") == (None, None, None)
 
 
+def test_split_nombre_agenda_compact_hyphen():
+    """Sin espacios alrededor del guión (caso CMG-ECOGRAFIA-DR. ...)."""
+    assert service._split_nombre_agenda("CMG-ECOGRAFIA-DR. BARRERA ORO GABRIEL") == (
+        "CMG",
+        "ECOGRAFIA",
+        "DR. BARRERA ORO GABRIEL",
+    )
+
+
 def test_fecha_hasta_vigente():
     today = date(2026, 8, 3)
     assert service._fecha_hasta_vigente("2026-08-03", today=today) is True
