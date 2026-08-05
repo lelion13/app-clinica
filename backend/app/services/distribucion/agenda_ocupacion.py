@@ -10,6 +10,7 @@ from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from app.core.config import settings
+from app.models.consulting_room import ConsultingRoom
 from app.models.location import Location
 from app.models.ocupacion import OcupacionHorarioActivo
 from app.schemas.distribucion import (
@@ -18,7 +19,9 @@ from app.schemas.distribucion import (
     AgendaOcupacionEvent,
     AgendaOcupacionEventExtended,
     AgendaOcupacionEventsResponse,
+    AgendaResourceColumn,
 )
+from app.services import room_agenda_map as room_agenda_map_service
 
 
 DIA_TO_WEEKDAY = {
@@ -135,8 +138,14 @@ def _payload_fields(row: OcupacionHorarioActivo) -> dict:
         id_dominio_int = int(id_dominio) if id_dominio is not None and id_dominio != "" else None
     except (TypeError, ValueError):
         id_dominio_int = None
+    id_agenda = raw.get("id_agenda")
+    try:
+        id_agenda_int = int(id_agenda) if id_agenda is not None and id_agenda != "" else None
+    except (TypeError, ValueError):
+        id_agenda_int = None
     return {
         "id_dato": _as_str(raw.get("id_dato")) or row.id_dato,
+        "id_agenda": id_agenda_int,
         "id_dominio": id_dominio_int,
         "tipo": row.tipo or _as_str(raw.get("tipo")),
         "especialidad_agenda": row.especialidad_agenda,
@@ -151,6 +160,26 @@ def _payload_fields(row: OcupacionHorarioActivo) -> dict:
         "cantidad_turnos": raw.get("cantidad_turnos"),
         "cantidad_sobreturno": raw.get("cantidad_sobreturno"),
     }
+
+
+def _rooms_for_location(db: Session, location_id: int | None) -> list[ConsultingRoom]:
+    q = select(ConsultingRoom).where(ConsultingRoom.deleted_at.is_(None)).order_by(ConsultingRoom.code)
+    if location_id is not None:
+        q = q.where(ConsultingRoom.location_id == location_id)
+    return list(db.execute(q).scalars().all())
+
+
+def _build_resources(rooms: list[ConsultingRoom]) -> list[AgendaResourceColumn]:
+    cols = [
+        AgendaResourceColumn(id=str(room.id), title=room.code, room_id=room.id) for room in rooms
+    ]
+    cols.append(AgendaResourceColumn(id="unassigned", title="Sin consultorio", room_id=None))
+    return cols
+
+
+def _room_code_map(db: Session) -> dict[int, str]:
+    rows = db.execute(select(ConsultingRoom).where(ConsultingRoom.deleted_at.is_(None))).scalars().all()
+    return {r.id: r.code for r in rows}
 
 
 def _match_multi(value: str | None, selected: list[str]) -> bool:
@@ -222,6 +251,7 @@ def list_agenda_events(
     *,
     start: str,
     end: str,
+    location_id: int | None = None,
     id_dominio: list[str] | None = None,
     tipo: list[str] | None = None,
     especialidad: list[str] | None = None,
@@ -236,13 +266,31 @@ def list_agenda_events(
             detail="end debe ser posterior a start",
         )
 
-    f_dom = id_dominio or []
+    f_dom = list(id_dominio or [])
     f_tipo = tipo or []
     f_esp = especialidad or []
     f_med = medico or []
     f_dia = dia or []
 
+    # Filtro ubicación → restringe id_dominio al de esa location (si tiene).
+    location_dominio: int | None = None
+    if location_id is not None:
+        loc = db.execute(
+            select(Location).where(Location.id == location_id, Location.deleted_at.is_(None))
+        ).scalar_one_or_none()
+        if not loc:
+            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Ubicacion no encontrada")
+        location_dominio = loc.id_dominio
+        if location_dominio is not None and location_dominio > 0:
+            f_dom = [str(location_dominio)]
+
     labels = _location_labels(db)
+    agenda_rooms = room_agenda_map_service.agenda_to_room_map(db)
+    rooms = _rooms_for_location(db, location_id)
+    room_by_id = {r.id: r for r in rooms}
+    room_code_by_id = _room_code_map(db)
+    resources = _build_resources(rooms)
+
     rows = db.execute(select(OcupacionHorarioActivo)).scalars().all()
     events: list[AgendaOcupacionEvent] = []
 
@@ -274,12 +322,23 @@ def list_agenda_events(
         if not _match_multi(fields["dia"], f_dia):
             continue
 
+        id_agenda = fields["id_agenda"]
+        mapped_room_id = agenda_rooms.get(id_agenda) if id_agenda is not None else None
+        # Si filtramos por location, solo eventos de rooms de esa location o unassigned
+        if location_id is not None and mapped_room_id is not None and mapped_room_id not in room_by_id:
+            continue
+
+        resource_id = str(mapped_room_id) if mapped_room_id is not None else "unassigned"
+        room_code = room_code_by_id.get(mapped_room_id) if mapped_room_id is not None else None
         loc_name = _dominio_label(fields["id_dominio"], labels)
         extended = AgendaOcupacionEventExtended(
             row_id=row.id,
             id_dato=fields["id_dato"],
+            id_agenda=id_agenda,
             id_dominio=fields["id_dominio"],
             location_name=loc_name,
+            room_id=mapped_room_id,
+            room_code=room_code,
             tipo=fields["tipo"],
             especialidad_agenda=fields["especialidad_agenda"],
             medico=fields["medico"],
@@ -302,10 +361,7 @@ def list_agenda_events(
 
         day = win_start
         while day < win_end:
-            if (
-                day.weekday() == weekday
-                and f_desde <= day <= f_hasta
-            ):
+            if day.weekday() == weekday and f_desde <= day <= f_hasta:
                 start_dt = datetime.combine(day, h_desde)
                 end_dt = datetime.combine(day, h_hasta)
                 events.append(
@@ -314,10 +370,11 @@ def list_agenda_events(
                         title=fields["medico"] or "",
                         start=start_dt.isoformat(timespec="seconds"),
                         end=end_dt.isoformat(timespec="seconds"),
+                        resource_id=resource_id,
                         extended=extended,
                     )
                 )
             day += timedelta(days=1)
 
-    events.sort(key=lambda e: (e.start, e.title or "", e.id))
-    return AgendaOcupacionEventsResponse(events=events)
+    events.sort(key=lambda e: (e.start, e.resource_id, e.title or "", e.id))
+    return AgendaOcupacionEventsResponse(events=events, resources=resources)

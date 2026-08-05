@@ -36,8 +36,11 @@ class HorariosActivosSyncResponse(BaseModel):
 class AgendaOcupacionEventExtended(BaseModel):
     row_id: int
     id_dato: str | None = None
+    id_agenda: int | None = None
     id_dominio: int | None = None
     location_name: str | None = None
+    room_id: int | None = None
+    room_code: str | None = None
     tipo: str | None = None
     especialidad_agenda: str | None = None
     medico: str | None = None
@@ -57,11 +60,19 @@ class AgendaOcupacionEvent(BaseModel):
     title: str = ""
     start: str
     end: str
+    resource_id: str = "unassigned"
     extended: AgendaOcupacionEventExtended
+
+
+class AgendaResourceColumn(BaseModel):
+    id: str
+    title: str
+    room_id: int | None = None
 
 
 class AgendaOcupacionEventsResponse(BaseModel):
     events: list[AgendaOcupacionEvent] = Field(default_factory=list)
+    resources: list[AgendaResourceColumn] = Field(default_factory=list)
 
 
 class AgendaFilterOption(BaseModel):

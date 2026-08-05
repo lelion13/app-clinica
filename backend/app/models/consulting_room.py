@@ -1,6 +1,6 @@
-from datetime import time
+from datetime import datetime, time
 
-from sqlalchemy import ForeignKey, Integer, String, Time
+from sqlalchemy import DateTime, ForeignKey, Integer, String, Time
 from sqlalchemy.orm import Mapped, mapped_column
 
 from app.models.base import Base
@@ -23,3 +23,16 @@ class RoomOperatingHour(AuditMixin, Base):
     weekday: Mapped[int] = mapped_column(Integer, nullable=False)
     start_time: Mapped[time] = mapped_column(Time, nullable=False)
     end_time: Mapped[time] = mapped_column(Time, nullable=False)
+
+
+class ConsultingRoomIdAgenda(Base):
+    """Mapeo N:1 — varios id_agenda del sync pueden apuntar al mismo consultorio."""
+
+    __tablename__ = "consulting_room_id_agenda"
+
+    id_agenda: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=False)
+    room_id: Mapped[int] = mapped_column(ForeignKey("consulting_rooms.id"), nullable=False, index=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
+    updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
+    created_by: Mapped[int | None] = mapped_column(ForeignKey("users.id"), nullable=True)
+    updated_by: Mapped[int | None] = mapped_column(ForeignKey("users.id"), nullable=True)

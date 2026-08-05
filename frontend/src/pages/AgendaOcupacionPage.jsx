@@ -1,23 +1,12 @@
-import { useCallback, useEffect, useRef, useState } from "react";
-import FullCalendar from "@fullcalendar/react";
-import dayGridPlugin from "@fullcalendar/daygrid";
-import timeGridPlugin from "@fullcalendar/timegrid";
-import esLocale from "@fullcalendar/core/locales/es";
+import { useCallback, useEffect, useMemo, useState } from "react";
 
 import { apiRequestWithRefresh } from "../services/api";
+import { safeLoad } from "../lib/apiHelpers";
 import { uiStyles, uiTheme } from "../ui/theme";
 
-const FILTER_KEYS = [
-  { key: "id_dominio", label: "Ubicación" },
-  { key: "tipo", label: "Tipo" },
-  { key: "especialidad", label: "Especialidad" },
-  { key: "medico", label: "Médico" },
-  { key: "dia", label: "Día" },
-];
-
-function emptyFilters() {
-  return Object.fromEntries(FILTER_KEYS.map((f) => [f.key, []]));
-}
+const HOUR_START = 6;
+const HOUR_END = 22;
+const PX_PER_HOUR = 48;
 
 function isoDate(d) {
   const y = d.getFullYear();
@@ -26,95 +15,31 @@ function isoDate(d) {
   return `${y}-${m}-${day}`;
 }
 
-function MultiFilter({ label, options, selected, onChange }) {
-  const rootRef = useRef(null);
-  const [open, setOpen] = useState(false);
-  const count = selected.length;
-  const summary = count === 0 ? "Todos" : `${count} sel.`;
+function addDays(iso, n) {
+  const d = new Date(`${iso}T12:00:00`);
+  d.setDate(d.getDate() + n);
+  return isoDate(d);
+}
 
-  useEffect(() => {
-    if (!open) return undefined;
-    const onPointerDown = (event) => {
-      if (!rootRef.current?.contains(event.target)) setOpen(false);
-    };
-    document.addEventListener("pointerdown", onPointerDown);
-    return () => document.removeEventListener("pointerdown", onPointerDown);
-  }, [open]);
+function parseLocalDateTime(value) {
+  // "2026-08-03T09:00:00"
+  const [datePart, timePart = "00:00:00"] = String(value).split("T");
+  const [y, m, day] = datePart.split("-").map(Number);
+  const [hh, mm, ss] = timePart.split(":").map(Number);
+  return new Date(y, m - 1, day, hh || 0, mm || 0, ss || 0);
+}
 
-  const toggle = (token) => {
-    if (selected.includes(token)) onChange(selected.filter((v) => v !== token));
-    else onChange([...selected, token]);
-  };
-
-  return (
-    <div ref={rootRef} style={{ position: "relative", minWidth: 140 }}>
-      <div style={{ fontSize: 11, color: uiTheme.colors.textMuted, marginBottom: 4 }}>{label}</div>
-      <button
-        type="button"
-        onClick={() => setOpen((v) => !v)}
-        style={{
-          ...uiStyles.buttonSecondary,
-          width: "100%",
-          padding: "6px 10px",
-          fontSize: 12,
-          fontWeight: count ? 600 : 500,
-          textAlign: "left",
-        }}
-      >
-        {summary}
-      </button>
-      {open ? (
-        <div
-          style={{
-            position: "absolute",
-            top: "calc(100% + 4px)",
-            left: 0,
-            zIndex: 40,
-            minWidth: 200,
-            maxHeight: 240,
-            overflowY: "auto",
-            background: uiTheme.colors.surface,
-            border: `1px solid ${uiTheme.colors.border}`,
-            borderRadius: uiTheme.radius.sm,
-            boxShadow: "0 8px 24px rgba(0,0,0,0.12)",
-            padding: 8,
-          }}
-        >
-          {(options || []).length === 0 ? (
-            <div style={{ fontSize: 12, color: uiTheme.colors.textMuted }}>Sin opciones</div>
-          ) : (
-            options.map((opt) => (
-              <label
-                key={opt.value}
-                style={{
-                  display: "flex",
-                  gap: 8,
-                  alignItems: "flex-start",
-                  fontSize: 12,
-                  padding: "4px 2px",
-                  cursor: "pointer",
-                }}
-              >
-                <input
-                  type="checkbox"
-                  checked={selected.includes(opt.value)}
-                  onChange={() => toggle(opt.value)}
-                />
-                <span>{opt.label}</span>
-              </label>
-            ))
-          )}
-        </div>
-      ) : null}
-    </div>
-  );
+function minutesFromDayStart(dt) {
+  return dt.getHours() * 60 + dt.getMinutes() + dt.getSeconds() / 60;
 }
 
 function Popover({ anchor, detail, onClose }) {
   if (!anchor || !detail) return null;
   const rows = [
+    ["Consultorio", detail.room_code || (detail.room_id ? `#${detail.room_id}` : "Sin consultorio")],
     ["Ubicación", detail.location_name],
     ["id_dominio", detail.id_dominio],
+    ["id_agenda", detail.id_agenda],
     ["tipo", detail.tipo],
     ["especialidad_agenda", detail.especialidad_agenda],
     ["medico", detail.medico],
@@ -171,151 +96,262 @@ function Popover({ anchor, detail, onClose }) {
 export function AgendaOcupacionPage() {
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
+  const [locations, setLocations] = useState([]);
+  const [locationId, setLocationId] = useState("");
+  const [day, setDay] = useState(() => isoDate(new Date()));
   const [events, setEvents] = useState([]);
-  const [filterOptions, setFilterOptions] = useState({
-    id_dominio: [],
-    tipo: [],
-    especialidad: [],
-    medico: [],
-    dia: [],
-  });
-  const [filters, setFilters] = useState(emptyFilters);
-  const [range, setRange] = useState({ start: null, end: null });
+  const [resources, setResources] = useState([]);
   const [popover, setPopover] = useState({ anchor: null, detail: null });
 
   useEffect(() => {
-    let cancelled = false;
-    (async () => {
-      try {
-        const data = await apiRequestWithRefresh("/distribucion/ocupacion/agenda/filter-options");
-        if (!cancelled) setFilterOptions(data || {});
-      } catch (err) {
-        if (!cancelled) setError(err.message || "No se pudieron cargar filtros");
-      }
-    })();
-    return () => {
-      cancelled = true;
-    };
+    safeLoad("/locations", setLocations, setError);
   }, []);
 
-  const loadEvents = useCallback(async (nextRange, nextFilters) => {
-    if (!nextRange?.start || !nextRange?.end) return;
+  const loadEvents = useCallback(async () => {
+    if (!day) return;
     setError("");
     setLoading(true);
     try {
-      const params = new URLSearchParams();
-      params.set("start", nextRange.start);
-      params.set("end", nextRange.end);
-      for (const { key } of FILTER_KEYS) {
-        for (const value of nextFilters[key] || []) {
-          params.append(key, value);
-        }
-      }
-      const data = await apiRequestWithRefresh(
-        `/distribucion/ocupacion/agenda/events?${params.toString()}`
-      );
-      const mapped = (data?.events || []).map((ev) => ({
-        id: ev.id,
-        title: ev.title || "(sin médico)",
-        start: ev.start,
-        end: ev.end,
-        backgroundColor: uiTheme.colors.primary,
-        borderColor: uiTheme.colors.primary,
-        extendedProps: ev.extended || {},
-      }));
-      setEvents(mapped);
+      const next = addDays(day, 1);
+      const params = new URLSearchParams({ start: day, end: next });
+      if (locationId) params.set("location_id", locationId);
+      const data = await apiRequestWithRefresh(`/distribucion/ocupacion/agenda/events?${params}`);
+      setEvents(Array.isArray(data?.events) ? data.events : []);
+      setResources(Array.isArray(data?.resources) ? data.resources : []);
     } catch (err) {
       setEvents([]);
+      setResources([]);
       setError(err.message || "No se pudieron cargar eventos");
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [day, locationId]);
 
   useEffect(() => {
-    if (!range.start || !range.end) return;
-    loadEvents(range, filters);
-  }, [range, filters, loadEvents]);
+    loadEvents();
+  }, [loadEvents]);
 
-  const onDatesSet = (arg) => {
-    const start = isoDate(arg.start);
-    const end = isoDate(arg.end);
-    setRange((prev) => (prev.start === start && prev.end === end ? prev : { start, end }));
-  };
+  const hours = useMemo(() => {
+    const list = [];
+    for (let h = HOUR_START; h < HOUR_END; h += 1) list.push(h);
+    return list;
+  }, []);
 
-  const activeFilterCount = FILTER_KEYS.reduce((acc, f) => acc + (filters[f.key]?.length ? 1 : 0), 0);
+  const gridHeight = (HOUR_END - HOUR_START) * PX_PER_HOUR;
+
+  const eventsByResource = useMemo(() => {
+    const map = {};
+    for (const res of resources) map[res.id] = [];
+    for (const ev of events) {
+      const key = ev.resource_id || "unassigned";
+      if (!map[key]) map[key] = [];
+      map[key].push(ev);
+    }
+    return map;
+  }, [events, resources]);
+
+  const dayLabel = useMemo(() => {
+    try {
+      return new Date(`${day}T12:00:00`).toLocaleDateString("es-AR", {
+        weekday: "long",
+        day: "numeric",
+        month: "long",
+        year: "numeric",
+      });
+    } catch {
+      return day;
+    }
+  }, [day]);
 
   return (
     <section>
-      <div style={{ display: "flex", justifyContent: "space-between", gap: 12, flexWrap: "wrap", marginBottom: 8 }}>
-        <div>
-          <h2 style={{ margin: 0 }}>Agenda ocupación</h2>
-          <p style={{ margin: "6px 0 0", color: uiTheme.colors.textMuted, fontSize: 13 }}>
-            Vista read-only del sync de Ocupación. Filtrá y navegá el calendario. Sync solo desde Ocupación.
-            {loading ? " Cargando…" : ""}
-          </p>
-        </div>
-        <button
-          type="button"
-          style={uiStyles.buttonSecondary}
-          onClick={() => setFilters(emptyFilters())}
-          disabled={!activeFilterCount}
-        >
-          Limpiar filtros
+      <div style={{ marginBottom: 12 }}>
+        <h2 style={{ margin: 0 }}>Agenda ocupación</h2>
+        <p style={{ margin: "6px 0 0", color: uiTheme.colors.textMuted, fontSize: 13 }}>
+          Grilla por consultorio (estilo planilla). Sync solo desde Ocupación. Mapeá agendas en Consultorios.
+          {loading ? " Cargando…" : ""}
+        </p>
+      </div>
+
+      {error ? <div style={{ ...uiStyles.alertError, marginBottom: 12 }}>{error}</div> : null}
+
+      <div style={{ display: "flex", flexWrap: "wrap", gap: 10, marginBottom: 14, alignItems: "flex-end" }}>
+        <label style={{ display: "flex", flexDirection: "column", gap: 4, fontSize: 12 }}>
+          Ubicación
+          <select
+            value={locationId}
+            onChange={(e) => setLocationId(e.target.value)}
+            style={uiStyles.formControl}
+          >
+            <option value="">Todas</option>
+            {locations.map((loc) => (
+              <option key={loc.id} value={loc.id}>
+                {loc.name}
+              </option>
+            ))}
+          </select>
+        </label>
+        <label style={{ display: "flex", flexDirection: "column", gap: 4, fontSize: 12 }}>
+          Día
+          <input type="date" value={day} onChange={(e) => setDay(e.target.value)} style={uiStyles.formControl} />
+        </label>
+        <button type="button" style={uiStyles.buttonSecondary} onClick={() => setDay(addDays(day, -1))}>
+          ←
         </button>
+        <button type="button" style={uiStyles.buttonSecondary} onClick={() => setDay(isoDate(new Date()))}>
+          Hoy
+        </button>
+        <button type="button" style={uiStyles.buttonSecondary} onClick={() => setDay(addDays(day, 1))}>
+          →
+        </button>
+        <span style={{ fontSize: 13, color: uiTheme.colors.textMuted, textTransform: "capitalize" }}>{dayLabel}</span>
       </div>
 
-      {error ? (
-        <div style={{ ...uiStyles.alertError, marginBottom: 12 }}>{error}</div>
+      <div style={{ overflowX: "auto", border: `1px solid ${uiTheme.colors.border}`, borderRadius: uiTheme.radius.md }}>
+        <div
+          style={{
+            display: "grid",
+            gridTemplateColumns: `56px repeat(${Math.max(resources.length, 1)}, minmax(120px, 1fr))`,
+            minWidth: 56 + Math.max(resources.length, 1) * 120,
+          }}
+        >
+          <div
+            style={{
+              position: "sticky",
+              left: 0,
+              zIndex: 2,
+              background: uiTheme.colors.surfaceMuted,
+              borderBottom: `1px solid ${uiTheme.colors.borderStrong}`,
+              borderRight: `1px solid ${uiTheme.colors.border}`,
+              padding: 8,
+              fontSize: 11,
+              fontWeight: 600,
+            }}
+          >
+            HORA
+          </div>
+          {resources.map((res) => (
+            <div
+              key={res.id}
+              style={{
+                background: uiTheme.colors.surfaceMuted,
+                borderBottom: `1px solid ${uiTheme.colors.borderStrong}`,
+                borderRight: `1px solid ${uiTheme.colors.border}`,
+                padding: 8,
+                fontSize: 12,
+                fontWeight: 700,
+                textAlign: "center",
+              }}
+            >
+              {res.title}
+            </div>
+          ))}
+
+          <div
+            style={{
+              position: "sticky",
+              left: 0,
+              zIndex: 1,
+              background: uiTheme.colors.surface,
+              borderRight: `1px solid ${uiTheme.colors.border}`,
+              height: gridHeight,
+            }}
+          >
+            {hours.map((h) => (
+              <div
+                key={h}
+                style={{
+                  height: PX_PER_HOUR,
+                  borderBottom: `1px solid ${uiTheme.colors.border}`,
+                  fontSize: 11,
+                  color: uiTheme.colors.textMuted,
+                  padding: "2px 6px",
+                }}
+              >
+                {String(h).padStart(2, "0")}:00
+              </div>
+            ))}
+          </div>
+
+          {resources.map((res) => (
+            <div
+              key={res.id}
+              style={{
+                position: "relative",
+                height: gridHeight,
+                borderRight: `1px solid ${uiTheme.colors.border}`,
+                background:
+                  res.id === "unassigned"
+                    ? "repeating-linear-gradient(135deg, transparent, transparent 6px, rgba(0,0,0,0.03) 6px, rgba(0,0,0,0.03) 12px)"
+                    : uiTheme.colors.surface,
+              }}
+            >
+              {hours.map((h) => (
+                <div
+                  key={h}
+                  style={{
+                    position: "absolute",
+                    left: 0,
+                    right: 0,
+                    top: (h - HOUR_START) * PX_PER_HOUR,
+                    height: PX_PER_HOUR,
+                    borderBottom: `1px solid ${uiTheme.colors.border}`,
+                    pointerEvents: "none",
+                  }}
+                />
+              ))}
+              {(eventsByResource[res.id] || []).map((ev) => {
+                const startDt = parseLocalDateTime(ev.start);
+                const endDt = parseLocalDateTime(ev.end);
+                const topMin = minutesFromDayStart(startDt) - HOUR_START * 60;
+                const endMin = minutesFromDayStart(endDt) - HOUR_START * 60;
+                const top = Math.max(0, (topMin / 60) * PX_PER_HOUR);
+                const height = Math.max(18, ((endMin - topMin) / 60) * PX_PER_HOUR);
+                return (
+                  <button
+                    key={ev.id}
+                    type="button"
+                    title={ev.title}
+                    onClick={(e) => {
+                      const rect = e.currentTarget.getBoundingClientRect();
+                      setPopover({
+                        anchor: { x: rect.left, y: rect.bottom + 4 },
+                        detail: ev.extended || {},
+                      });
+                    }}
+                    style={{
+                      position: "absolute",
+                      left: 3,
+                      right: 3,
+                      top,
+                      height,
+                      overflow: "hidden",
+                      border: "none",
+                      borderRadius: 4,
+                      background: uiTheme.colors.primary,
+                      color: "#fff",
+                      fontSize: 11,
+                      fontWeight: 600,
+                      textAlign: "left",
+                      padding: "4px 6px",
+                      cursor: "pointer",
+                      lineHeight: 1.25,
+                    }}
+                  >
+                    {ev.title || "(sin médico)"}
+                  </button>
+                );
+              })}
+            </div>
+          ))}
+        </div>
+      </div>
+
+      {!resources.length && !loading ? (
+        <p style={{ marginTop: 12, color: uiTheme.colors.textMuted, fontSize: 13 }}>
+          No hay columnas. Creá consultorios en la ubicación o dejá “Todas”.
+        </p>
       ) : null}
-
-      <div
-        style={{
-          display: "flex",
-          flexWrap: "wrap",
-          gap: 12,
-          marginBottom: 16,
-          padding: 12,
-          background: uiTheme.colors.surfaceMuted,
-          borderRadius: uiTheme.radius.md,
-        }}
-      >
-        {FILTER_KEYS.map((f) => (
-          <MultiFilter
-            key={f.key}
-            label={f.label}
-            options={filterOptions[f.key] || []}
-            selected={filters[f.key] || []}
-            onChange={(next) => setFilters((prev) => ({ ...prev, [f.key]: next }))}
-          />
-        ))}
-      </div>
-
-      <FullCalendar
-        plugins={[timeGridPlugin, dayGridPlugin]}
-        initialView="timeGridWeek"
-        headerToolbar={{
-          left: "prev,next today",
-          center: "title",
-          right: "timeGridDay,timeGridWeek,dayGridMonth",
-        }}
-        datesSet={onDatesSet}
-        events={events}
-        eventClick={(info) => {
-          const rect = info.el.getBoundingClientRect();
-          setPopover({
-            anchor: { x: rect.left, y: rect.bottom + 6 },
-            detail: info.event.extendedProps || {},
-          });
-        }}
-        height={650}
-        locale={esLocale}
-        allDaySlot={false}
-        slotMinTime="06:00:00"
-        slotMaxTime="22:00:00"
-        editable={false}
-        selectable={false}
-      />
 
       <Popover
         anchor={popover.anchor}
