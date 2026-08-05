@@ -8,6 +8,11 @@ export function LocationsPage() {
   const [error, setError] = useState("");
   const [locations, setLocations] = useState([]);
   const [locationName, setLocationName] = useState("");
+  const [idDominio, setIdDominio] = useState("");
+  const [editingId, setEditingId] = useState(null);
+  const [editName, setEditName] = useState("");
+  const [editIdDominio, setEditIdDominio] = useState("");
+  const [saving, setSaving] = useState(false);
 
   const load = async () => {
     setError("");
@@ -20,23 +25,79 @@ export function LocationsPage() {
 
   const submitLocation = async (event) => {
     event.preventDefault();
-    await apiRequestWithRefresh("/locations", {
-      method: "POST",
-      body: JSON.stringify({ name: locationName }),
-    });
-    setLocationName("");
-    await load();
+    setError("");
+    setSaving(true);
+    try {
+      await apiRequestWithRefresh("/locations", {
+        method: "POST",
+        body: JSON.stringify({
+          name: locationName,
+          id_dominio: Number(idDominio),
+        }),
+      });
+      setLocationName("");
+      setIdDominio("");
+      await load();
+    } catch (err) {
+      setError(err.message || "No se pudo crear la ubicacion");
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const startEdit = (item) => {
+    setEditingId(item.id);
+    setEditName(item.name || "");
+    setEditIdDominio(String(item.id_dominio ?? ""));
+    setError("");
+  };
+
+  const cancelEdit = () => {
+    setEditingId(null);
+    setEditName("");
+    setEditIdDominio("");
+  };
+
+  const saveEdit = async (event) => {
+    event.preventDefault();
+    if (!editingId) return;
+    setError("");
+    setSaving(true);
+    try {
+      await apiRequestWithRefresh(`/locations/${editingId}`, {
+        method: "PUT",
+        body: JSON.stringify({
+          name: editName,
+          id_dominio: Number(editIdDominio),
+        }),
+      });
+      cancelEdit();
+      await load();
+    } catch (err) {
+      setError(err.message || "No se pudo actualizar la ubicacion");
+    } finally {
+      setSaving(false);
+    }
   };
 
   const removeItem = async (id) => {
-    await apiRequestWithRefresh(`/locations/${id}`, { method: "DELETE" });
-    await load();
+    setError("");
+    try {
+      await apiRequestWithRefresh(`/locations/${id}`, { method: "DELETE" });
+      if (editingId === id) cancelEdit();
+      await load();
+    } catch (err) {
+      setError(err.message || "No se pudo eliminar la ubicacion");
+    }
   };
 
   return (
     <section style={uiStyles.pageSection}>
       <h1 style={uiStyles.sectionTitle}>Ubicaciones</h1>
-      <p style={uiStyles.helpText}>Sedes o puntos físicos donde hay consultorios.</p>
+      <p style={uiStyles.helpText}>
+        Sedes o puntos físicos donde hay consultorios. El <strong>id_dominio</strong> vincula la sede con los
+        datos de Ocupación (código del endpoint externo).
+      </p>
       {error ? <p style={{ color: uiTheme.colors.danger }}>{error}</p> : null}
       <form onSubmit={submitLocation} style={{ display: "flex", gap: 8, flexWrap: "wrap", marginBottom: 16 }}>
         <input
@@ -46,15 +107,65 @@ export function LocationsPage() {
           required
           style={{ ...uiStyles.formControl, minWidth: 220 }}
         />
-        <button type="submit" style={uiStyles.buttonPrimary}>Agregar</button>
+        <input
+          type="number"
+          min={1}
+          step={1}
+          value={idDominio}
+          onChange={(event) => setIdDominio(event.target.value)}
+          placeholder="id_dominio"
+          required
+          style={{ ...uiStyles.formControl, width: 140 }}
+        />
+        <button type="submit" disabled={saving} style={uiStyles.buttonPrimary}>
+          Agregar
+        </button>
       </form>
       <ul style={uiStyles.listCard}>
         {locations.map((item) => (
-          <li key={item.id} style={{ padding: "8px 10px", borderBottom: `1px solid ${uiTheme.colors.border}` }}>
-            #{item.id} - {item.name}{" "}
-            <button type="button" onClick={() => removeItem(item.id)} style={{ ...uiStyles.buttonDanger, marginLeft: 8 }}>
-              eliminar
-            </button>
+          <li key={item.id} style={{ padding: "10px 10px", borderBottom: `1px solid ${uiTheme.colors.border}` }}>
+            {editingId === item.id ? (
+              <form onSubmit={saveEdit} style={{ display: "flex", gap: 8, flexWrap: "wrap", alignItems: "center" }}>
+                <span style={{ color: uiTheme.colors.textMuted }}>#{item.id}</span>
+                <input
+                  value={editName}
+                  onChange={(event) => setEditName(event.target.value)}
+                  required
+                  style={{ ...uiStyles.formControl, minWidth: 180 }}
+                />
+                <input
+                  type="number"
+                  min={1}
+                  step={1}
+                  value={editIdDominio}
+                  onChange={(event) => setEditIdDominio(event.target.value)}
+                  required
+                  style={{ ...uiStyles.formControl, width: 140 }}
+                />
+                <button type="submit" disabled={saving} style={uiStyles.buttonPrimary}>
+                  Guardar
+                </button>
+                <button type="button" onClick={cancelEdit} style={uiStyles.buttonSecondary}>
+                  Cancelar
+                </button>
+              </form>
+            ) : (
+              <div style={{ display: "flex", gap: 8, flexWrap: "wrap", alignItems: "center" }}>
+                <span>
+                  #{item.id} — {item.name}{" "}
+                  <span style={{ color: uiTheme.colors.textMuted }}>
+                    (id_dominio: {item.id_dominio}
+                    {item.id_dominio < 0 ? " · pendiente" : ""})
+                  </span>
+                </span>
+                <button type="button" onClick={() => startEdit(item)} style={uiStyles.buttonSecondary}>
+                  editar
+                </button>
+                <button type="button" onClick={() => removeItem(item.id)} style={uiStyles.buttonDanger}>
+                  eliminar
+                </button>
+              </div>
+            )}
           </li>
         ))}
       </ul>

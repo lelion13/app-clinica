@@ -24,3 +24,9 @@
 - [x] 3.1 `.env.example` + `.env.prod.example`
 - [x] 3.2 Runbook
 - [x] 3.3 Spec / design / proposal (SDD)
+
+## Phase 4 — Ubicación ↔ id_dominio
+
+- [x] 4.1 Alembic `0014_locations_id_dominio` (placeholder −id, unique parcial activas)
+- [x] 4.2 Model/schemas/service/router con `id_dominio` obligatorio (>0)
+- [x] 4.3 UI Ubicaciones: alta con id_dominio + editar nombre/id_dominio

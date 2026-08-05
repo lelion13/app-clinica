@@ -11,7 +11,13 @@ router = APIRouter()
 
 
 def _to_response(item) -> LocationResponse:
-    return LocationResponse(id=item.id, name=item.name, created_at=item.created_at, updated_at=item.updated_at)
+    return LocationResponse(
+        id=item.id,
+        name=item.name,
+        id_dominio=item.id_dominio,
+        created_at=item.created_at,
+        updated_at=item.updated_at,
+    )
 
 
 @router.get("", response_model=list[LocationResponse])

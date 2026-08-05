@@ -12,15 +12,33 @@ def list_locations(db: Session) -> list[Location]:
     return list(db.execute(select(Location).where(Location.deleted_at.is_(None)).order_by(Location.id)).scalars().all())
 
 
-def create_location(db: Session, payload: LocationCreateRequest, actor_id: int) -> Location:
-    existing = db.execute(
-        select(Location).where(Location.name == payload.name.strip(), Location.deleted_at.is_(None))
-    ).scalar_one_or_none()
-    if existing:
+def _assert_unique_name(db: Session, name: str, *, exclude_id: int | None = None) -> None:
+    query = select(Location).where(Location.name == name, Location.deleted_at.is_(None))
+    if exclude_id is not None:
+        query = query.where(Location.id != exclude_id)
+    if db.execute(query).scalar_one_or_none():
         raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="La ubicacion ya existe")
+
+
+def _assert_unique_id_dominio(db: Session, id_dominio: int, *, exclude_id: int | None = None) -> None:
+    query = select(Location).where(Location.id_dominio == id_dominio, Location.deleted_at.is_(None))
+    if exclude_id is not None:
+        query = query.where(Location.id != exclude_id)
+    if db.execute(query).scalar_one_or_none():
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail="Ya existe una ubicacion con ese id_dominio",
+        )
+
+
+def create_location(db: Session, payload: LocationCreateRequest, actor_id: int) -> Location:
+    name = payload.name.strip()
+    _assert_unique_name(db, name)
+    _assert_unique_id_dominio(db, payload.id_dominio)
     now = datetime.utcnow()
     item = Location(
-        name=payload.name.strip(),
+        name=name,
+        id_dominio=payload.id_dominio,
         created_at=now,
         updated_at=now,
         created_by=actor_id,
@@ -37,7 +55,11 @@ def update_location(db: Session, location_id: int, payload: LocationUpdateReques
     item = db.execute(select(Location).where(Location.id == location_id, Location.deleted_at.is_(None))).scalar_one_or_none()
     if not item:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Ubicacion no encontrada")
-    item.name = payload.name.strip()
+    name = payload.name.strip()
+    _assert_unique_name(db, name, exclude_id=location_id)
+    _assert_unique_id_dominio(db, payload.id_dominio, exclude_id=location_id)
+    item.name = name
+    item.id_dominio = payload.id_dominio
     item.updated_at = datetime.utcnow()
     item.updated_by = actor_id
     db.commit()

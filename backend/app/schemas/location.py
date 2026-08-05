@@ -5,14 +5,17 @@ from pydantic import BaseModel, Field
 
 class LocationCreateRequest(BaseModel):
     name: str = Field(min_length=2, max_length=120)
+    id_dominio: int = Field(gt=0)
 
 
 class LocationUpdateRequest(BaseModel):
     name: str = Field(min_length=2, max_length=120)
+    id_dominio: int = Field(gt=0)
 
 
 class LocationResponse(BaseModel):
     id: int
     name: str
+    id_dominio: int
     created_at: datetime
     updated_at: datetime
