@@ -66,6 +66,15 @@ class Settings(BaseSettings):
     novedades_bonos_tiene_produccion_timeout: float = Field(
         default=30.0, validation_alias="NOVEDADES_BONOS_TIENE_PRODUCCION_TIMEOUT"
     )
+    # Proxy HTTP horarios activos (Distribución → Ocupación). Token: NOVEDADES_PROF_SYNC_TOKEN.
+    distribucion_horarios_activos_url: str = Field(
+        default="",
+        validation_alias="DISTRIBUCION_HORARIOS_ACTIVOS_URL",
+    )
+    distribucion_horarios_activos_timeout: float = Field(
+        default=120.0,
+        validation_alias="DISTRIBUCION_HORARIOS_ACTIVOS_TIMEOUT",
+    )
 
     @property
     def cors_origins_list(self) -> list[str]:

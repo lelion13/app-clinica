@@ -1,7 +1,8 @@
 # Decisions — distribucion-ocupacion
 
-**Estado:** SURVEY CLOSED (delta persistencia Q24–Q28)  
+**Estado:** SURVEY CLOSED (delta ubicación ↔ id_dominio Q29–Q31)  
 **Change:** `distribucion-ocupacion`  
+**Branch:** `feature/ocupacion`  
 **Modo:** una pregunta a la vez (cerrada)
 
 | # | Tema | Decisión | Notas |
@@ -19,6 +20,9 @@
 | Q26 | Qué columnas persistir | **A** | Todos los campos del JSON en columnas tipadas |
 | Q27 | Filtro fecha_hasta al listar | **A** | Listar UI con fecha_hasta >= hoy; sync guarda todo |
 | Q28 | Columnas derivadas del split | **A** | Persistir tipo / especialidad_agenda / medico en sync |
+| Q29 | Ubicación ↔ id_dominio | **A** | Campo obligatorio id_dominio; unique 1:1 |
+| Q30 | Ubicaciones existentes sin id_dominio | **A** | Placeholder temporal en migración; editar luego en UI |
+| Q31 | Editar ubicación (nombre + id_dominio) | **A** | Editable nombre + id_dominio |
 
 ---
 
@@ -180,4 +184,22 @@ Separador: ` - ` (espacio-guión-espacio). Parseo en backend.
 
 ## Q28 — Columnas `tipo` / `especialidad_agenda` / `medico` ✅
 
-**Decisión: A** — Calcular en sync y persistir. PK de tabla: `id_dato`.
+**Decisión: A** — Calcular en sync y persistir.
+
+---
+
+## Q29 — Cómo asociar Ubicación con `id_dominio` ✅
+
+**Decisión: A** — `id_dominio` obligatorio en alta/edición; unique (1 ubicación por código).
+
+---
+
+## Q30 — Ubicaciones ya existentes sin `id_dominio` ✅
+
+**Decisión: A** — Migración con `id_dominio` placeholder (negativo único por fila); luego editar en UI a los códigos reales.
+
+---
+
+## Q31 — Edición en la pantalla Ubicaciones ✅
+
+**Decisión: A** — Editar nombre e `id_dominio`. Altas: ambos obligatorios; `id_dominio` > 0 y unique entre activas.

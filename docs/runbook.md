@@ -53,7 +53,9 @@
   - Importante: `id_dato` del API **no es único** → se guarda 1 fila DB por cada fila del JSON (no colapsar)
   - Derivados `tipo`/`especialidad_agenda`/`medico` + `fecha_hasta` para filtro/UI
   - `GET .../horarios-activos` lee DB (`fecha_hasta >= hoy`); `POST .../sync` wipe+reload (botón Actualizar)
-  - Tras deploy: `alembic upgrade head`, redeploy, **Actualizar** en Ocupación (esperar synced ≈ miles de filas)
+  - Env: `DISTRIBUCION_HORARIOS_ACTIVOS_URL` (+ timeout; default 120s); Bearer = `NOVEDADES_PROF_SYNC_TOKEN`
+  - Tras deploy: set env en `.env.prod`, `alembic upgrade head`, redeploy backend+frontend, **Actualizar** en Ocupación (esperar synced ≈ miles de filas)
+  - `locations.id_dominio` (rev `0014_locations_id_dominio`): vínculo 1:1 con ocupación; existentes migran con placeholder negativo (−id) hasta editarlos en UI
 - Cambio `novedades-tiene-produccion`:
   - Proxy `GET /novedades/bonos/tiene-produccion` → `NOVEDADES_BONOS_TIENE_PRODUCCION_URL` (mismo Bearer)
   - UI Carga (admin/jefe): al Cargar o editar fecha; si `false` o error → bloquea (solo UI; create API no revalida)
