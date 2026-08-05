@@ -42,3 +42,28 @@ class RoomOperatingHourResponse(BaseModel):
     end_time: time
     created_at: datetime
     updated_at: datetime
+
+
+class RoomIdAgendaItem(BaseModel):
+    id_agenda: int
+    label: str
+
+
+class RoomIdAgendaListResponse(BaseModel):
+    items: list[RoomIdAgendaItem] = Field(default_factory=list)
+
+
+class RoomIdAgendaCreateRequest(BaseModel):
+    id_agenda: int
+    confirm_move: bool = False
+
+
+class AgendaLookupItem(BaseModel):
+    id_agenda: int
+    label: str
+    medico: str | None = None
+    nombre_agenda: str | None = None
+
+
+class AgendaLookupResponse(BaseModel):
+    items: list[AgendaLookupItem] = Field(default_factory=list)

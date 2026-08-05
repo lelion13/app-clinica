@@ -8,10 +8,14 @@ from app.schemas.consulting_room import (
     ConsultingRoomCreateRequest,
     ConsultingRoomResponse,
     ConsultingRoomUpdateRequest,
+    RoomIdAgendaCreateRequest,
+    RoomIdAgendaItem,
+    RoomIdAgendaListResponse,
     RoomOperatingHourCreateRequest,
     RoomOperatingHourResponse,
     RoomOperatingHourUpdateRequest,
 )
+from app.services import room_agenda_map as room_agenda_map_service
 from app.services.consulting_room_service import (
     create_room,
     create_room_hour,
@@ -76,6 +80,43 @@ def rooms_update(
 @router.delete("/{room_id}", status_code=status.HTTP_204_NO_CONTENT)
 def rooms_delete(room_id: int, db: Session = Depends(get_db), user: User = Depends(require_operator_or_admin)) -> None:
     delete_room(db, room_id, actor_id=user.id)
+
+
+@router.get("/{room_id}/id-agendas", response_model=RoomIdAgendaListResponse)
+def room_id_agendas_list(
+    room_id: int,
+    db: Session = Depends(get_db),
+    user: User = Depends(require_operator_or_admin),
+) -> RoomIdAgendaListResponse:
+    _ = user
+    return room_agenda_map_service.list_room_id_agendas(db, room_id)
+
+
+@router.post("/{room_id}/id-agendas", response_model=RoomIdAgendaItem, status_code=status.HTTP_201_CREATED)
+def room_id_agendas_add(
+    room_id: int,
+    payload: RoomIdAgendaCreateRequest,
+    db: Session = Depends(get_db),
+    user: User = Depends(require_operator_or_admin),
+) -> RoomIdAgendaItem:
+    return room_agenda_map_service.add_room_id_agenda(
+        db,
+        room_id,
+        payload.id_agenda,
+        actor_id=user.id,
+        confirm_move=payload.confirm_move,
+    )
+
+
+@router.delete("/{room_id}/id-agendas/{id_agenda}", status_code=status.HTTP_204_NO_CONTENT)
+def room_id_agendas_remove(
+    room_id: int,
+    id_agenda: int,
+    db: Session = Depends(get_db),
+    user: User = Depends(require_operator_or_admin),
+) -> None:
+    _ = user
+    room_agenda_map_service.remove_room_id_agenda(db, room_id, id_agenda)
 
 
 @router.get("/{room_id}/hours", response_model=list[RoomOperatingHourResponse])

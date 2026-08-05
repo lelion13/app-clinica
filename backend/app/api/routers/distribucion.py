@@ -4,12 +4,14 @@ from sqlalchemy.orm import Session
 from app.api.deps import require_operator_or_admin
 from app.db.session import get_db
 from app.models.user import User
+from app.schemas.consulting_room import AgendaLookupResponse
 from app.schemas.distribucion import (
     AgendaFilterOptionsResponse,
     AgendaOcupacionEventsResponse,
     HorariosActivosResponse,
     HorariosActivosSyncResponse,
 )
+from app.services import room_agenda_map as room_agenda_map_service
 from app.services.distribucion import agenda_ocupacion as agenda_ocupacion_service
 from app.services.distribucion import horarios_activos as horarios_activos_service
 
@@ -43,10 +45,21 @@ def ocupacion_agenda_filter_options(
     return agenda_ocupacion_service.list_filter_options(db)
 
 
+@router.get("/ocupacion/agenda-lookup", response_model=AgendaLookupResponse)
+def ocupacion_agenda_lookup(
+    q: str = Query(default="", min_length=0),
+    db: Session = Depends(get_db),
+    user: User = Depends(require_operator_or_admin),
+) -> AgendaLookupResponse:
+    _ = user
+    return room_agenda_map_service.lookup_agendas_by_medico(db, q)
+
+
 @router.get("/ocupacion/agenda/events", response_model=AgendaOcupacionEventsResponse)
 def ocupacion_agenda_events(
     start: str = Query(...),
     end: str = Query(...),
+    location_id: int | None = Query(default=None),
     id_dominio: list[str] | None = Query(default=None),
     tipo: list[str] | None = Query(default=None),
     especialidad: list[str] | None = Query(default=None),
@@ -60,6 +73,7 @@ def ocupacion_agenda_events(
         db,
         start=start,
         end=end,
+        location_id=location_id,
         id_dominio=id_dominio,
         tipo=tipo,
         especialidad=especialidad,
