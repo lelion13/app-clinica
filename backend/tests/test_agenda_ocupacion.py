@@ -83,10 +83,13 @@ def test_weekday_from_dia():
 def test_materialize_monday_in_window(monkeypatch):
     # 2026-08-03 is Monday
     row = _row()
-    db = FakeDB([row], locations=[SimpleNamespace(id_dominio=1651, name="Sede Centro", deleted_at=None)])
+    db = FakeDB(
+        [row],
+        locations=[SimpleNamespace(id_dominio=1651, name="Sede Centro", tipo="ART", deleted_at=None)],
+    )
 
     # Bypass sqlalchemy select string checks: force location + ocupacion via patched helpers
-    monkeypatch.setattr(service, "_location_labels", lambda _db: {1651: "Sede Centro"})
+    monkeypatch.setattr(service, "_location_labels", lambda _db: {(1651, "art"): "Sede Centro"})
 
     class DB2:
         def execute(self, _statement):
@@ -192,3 +195,31 @@ def test_invalid_window():
     with pytest.raises(HTTPException) as exc:
         service.list_agenda_events(FakeDB([]), start="2026-08-10", end="2026-08-03")
     assert exc.value.status_code == 422
+
+
+def test_location_filter_matches_dominio_and_tipo(monkeypatch):
+    _stub_map(monkeypatch)
+    match = _row(row_id=1, tipo="SEDE TORRE", id_dominio=1651)
+    other = _row(row_id=2, tipo="SEDE CAÑUELAS", id_dominio=1651)
+    loc = SimpleNamespace(id=3, id_dominio=1651, tipo="SEDE TORRE", deleted_at=None)
+
+    class DB2:
+        def execute(self, statement):
+            sql = str(statement)
+            if "locations" in sql.lower() or "Location" in sql:
+                result = FakeResult([loc])
+                result.scalar_one_or_none = lambda: loc
+                return result
+            return FakeResult([match, other])
+
+    monkeypatch.setattr(service, "_rooms_for_location", lambda _db, _loc: [])
+    result = service.list_agenda_events(DB2(), start="2026-08-03", end="2026-08-10", location_id=3)
+    assert len(result.events) == 1
+    assert result.events[0].extended.tipo == "SEDE TORRE"
+
+
+def test_dominio_label_prefers_tipo_pair():
+    labels = {(1651, "sede torre"): "Torre", (1651, "sede cañuelas"): "Cañuelas"}
+    assert service._dominio_label(1651, "SEDE TORRE", labels) == "Torre"
+    assert service._dominio_label(1651, "SEDE CAÑUELAS", labels) == "Cañuelas"
+    assert service._dominio_label(999, "X", labels) == "999"

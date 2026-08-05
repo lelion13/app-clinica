@@ -15,6 +15,7 @@ def _to_response(item) -> LocationResponse:
         id=item.id,
         name=item.name,
         id_dominio=item.id_dominio,
+        tipo=item.tipo,
         created_at=item.created_at,
         updated_at=item.updated_at,
     )
