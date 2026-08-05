@@ -3,6 +3,7 @@
 export const DISTRIBUTION_ITEMS = [
   { label: "Ocupación semanal", path: "/ocupacion-semanal", roles: ["admin", "operador"] },
   { label: "Ocupación", path: "/ocupacion", roles: ["admin", "operador"] },
+  { label: "Agenda ocupación", path: "/agenda-ocupacion", roles: ["admin", "operador"] },
   { label: "Agenda", path: "/agenda", roles: ["admin", "operador"] },
   { label: "Ubicaciones", path: "/ubicaciones", roles: ["admin", "operador"] },
   { label: "Profesionales", path: "/profesionales", roles: ["admin", "operador"] },

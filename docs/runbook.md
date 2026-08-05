@@ -55,6 +55,7 @@
   - `GET .../horarios-activos` lee DB (`fecha_hasta >= hoy`); `POST .../sync` wipe+reload (botón Actualizar)
   - Env: `DISTRIBUCION_HORARIOS_ACTIVOS_URL` (+ timeout; default 120s); Bearer = `NOVEDADES_PROF_SYNC_TOKEN`
   - Tras deploy: set env en `.env.prod`, `alembic upgrade head`, redeploy backend+frontend, **Actualizar** en Ocupación (esperar synced ≈ miles de filas)
+  - **Agenda ocupación** (`/agenda-ocupacion`): calendario read-only del snapshot; `GET .../ocupacion/agenda/events`; sync solo desde Ocupación
   - `locations.id_dominio` (rev `0014_locations_id_dominio`): vínculo 1:1 con ocupación; existentes migran con placeholder negativo (−id) hasta editarlos en UI
 - Cambio `novedades-tiene-produccion`:
   - Proxy `GET /novedades/bonos/tiene-produccion` → `NOVEDADES_BONOS_TIENE_PRODUCCION_URL` (mismo Bearer)

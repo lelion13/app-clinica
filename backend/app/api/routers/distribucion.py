@@ -1,10 +1,16 @@
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter, Depends, Query
 from sqlalchemy.orm import Session
 
 from app.api.deps import require_operator_or_admin
 from app.db.session import get_db
 from app.models.user import User
-from app.schemas.distribucion import HorariosActivosResponse, HorariosActivosSyncResponse
+from app.schemas.distribucion import (
+    AgendaFilterOptionsResponse,
+    AgendaOcupacionEventsResponse,
+    HorariosActivosResponse,
+    HorariosActivosSyncResponse,
+)
+from app.services.distribucion import agenda_ocupacion as agenda_ocupacion_service
 from app.services.distribucion import horarios_activos as horarios_activos_service
 
 router = APIRouter()
@@ -26,3 +32,37 @@ def ocupacion_horarios_activos_sync(
 ) -> HorariosActivosSyncResponse:
     _ = user
     return horarios_activos_service.sync_horarios_activos(db)
+
+
+@router.get("/ocupacion/agenda/filter-options", response_model=AgendaFilterOptionsResponse)
+def ocupacion_agenda_filter_options(
+    db: Session = Depends(get_db),
+    user: User = Depends(require_operator_or_admin),
+) -> AgendaFilterOptionsResponse:
+    _ = user
+    return agenda_ocupacion_service.list_filter_options(db)
+
+
+@router.get("/ocupacion/agenda/events", response_model=AgendaOcupacionEventsResponse)
+def ocupacion_agenda_events(
+    start: str = Query(...),
+    end: str = Query(...),
+    id_dominio: list[str] | None = Query(default=None),
+    tipo: list[str] | None = Query(default=None),
+    especialidad: list[str] | None = Query(default=None),
+    medico: list[str] | None = Query(default=None),
+    dia: list[str] | None = Query(default=None),
+    db: Session = Depends(get_db),
+    user: User = Depends(require_operator_or_admin),
+) -> AgendaOcupacionEventsResponse:
+    _ = user
+    return agenda_ocupacion_service.list_agenda_events(
+        db,
+        start=start,
+        end=end,
+        id_dominio=id_dominio,
+        tipo=tipo,
+        especialidad=especialidad,
+        medico=medico,
+        dia=dia,
+    )
