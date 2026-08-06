@@ -10,10 +10,12 @@ from app.schemas.distribucion import (
     AgendaOcupacionEventsResponse,
     HorariosActivosResponse,
     HorariosActivosSyncResponse,
+    IndicadoresOcupacionResponse,
 )
 from app.services import room_agenda_map as room_agenda_map_service
 from app.services.distribucion import agenda_ocupacion as agenda_ocupacion_service
 from app.services.distribucion import horarios_activos as horarios_activos_service
+from app.services.distribucion import indicadores_ocupacion as indicadores_ocupacion_service
 
 router = APIRouter()
 
@@ -53,6 +55,27 @@ def ocupacion_agenda_lookup(
 ) -> AgendaLookupResponse:
     _ = user
     return room_agenda_map_service.lookup_agendas_by_medico(db, q)
+
+
+@router.get("/ocupacion/indicadores", response_model=IndicadoresOcupacionResponse)
+def ocupacion_indicadores(
+    date: str = Query(..., description="Día YYYY-MM-DD"),
+    location_id: int | None = Query(default=None),
+    room_id: int | None = Query(default=None),
+    especialidad: str | None = Query(default=None),
+    medico: str | None = Query(default=None),
+    db: Session = Depends(get_db),
+    user: User = Depends(require_operator_or_admin),
+) -> IndicadoresOcupacionResponse:
+    _ = user
+    return indicadores_ocupacion_service.compute_indicadores(
+        db,
+        date_str=date,
+        location_id=location_id,
+        room_id=room_id,
+        especialidad=especialidad,
+        medico=medico,
+    )
 
 
 @router.get("/ocupacion/agenda/events", response_model=AgendaOcupacionEventsResponse)

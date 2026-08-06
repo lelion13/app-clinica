@@ -8,6 +8,7 @@ import { AgendaPage } from "./pages/AgendaPage";
 import { AgendaOcupacionPage } from "./pages/AgendaOcupacionPage";
 import { ConsultingRoomsPage } from "./pages/ConsultingRoomsPage";
 import { EstadisticasPage } from "./pages/EstadisticasPage";
+import { IndicadoresOcupacionPage } from "./pages/IndicadoresOcupacionPage";
 import { LocationsPage } from "./pages/LocationsPage";
 import { LoginPage } from "./pages/LoginPage";
 import { ProfessionalsPage } from "./pages/ProfessionalsPage";
@@ -40,6 +41,7 @@ function AppRouter() {
         <Route path="ocupacion-semanal" element={<WeeklyOccupancyPage />} />
         <Route path="ocupacion" element={<OccupancyPage />} />
         <Route path="agenda-ocupacion" element={<AgendaOcupacionPage />} />
+        <Route path="indicadores-ocupacion" element={<IndicadoresOcupacionPage />} />
         <Route path="agenda" element={<AgendaPage />} />
         <Route path="ubicaciones" element={<LocationsPage />} />
         <Route path="profesionales" element={<ProfessionalsPage />} />

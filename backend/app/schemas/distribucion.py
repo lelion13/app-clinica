@@ -86,3 +86,20 @@ class AgendaFilterOptionsResponse(BaseModel):
     especialidad: list[AgendaFilterOption] = Field(default_factory=list)
     medico: list[AgendaFilterOption] = Field(default_factory=list)
     dia: list[AgendaFilterOption] = Field(default_factory=list)
+
+
+class IndicadoresRoomRef(BaseModel):
+    id: int
+    code: str
+
+
+class IndicadoresOcupacionResponse(BaseModel):
+    date: str
+    occupied_hours: float
+    enabled_hours: float
+    free_hours: float
+    occupancy_percent: float | None = None
+    rooms_included: int = 0
+    rooms_in_pie: int = 0
+    rooms_without_hours: list[IndicadoresRoomRef] = Field(default_factory=list)
+    rooms_without_agenda: int = 0
