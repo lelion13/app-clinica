@@ -35,60 +35,35 @@ function minutesFromDayStart(dt) {
   return dt.getHours() * 60 + dt.getMinutes() + dt.getSeconds() / 60;
 }
 
-function toggleValue(list, value) {
-  return list.includes(value) ? list.filter((v) => v !== value) : [...list, value];
-}
+const filterFieldStyle = {
+  display: "flex",
+  flexDirection: "column",
+  gap: 2,
+  fontSize: 11,
+  flex: "0 1 auto",
+  minWidth: 0,
+};
 
-function MultiFilter({ label, options, selected, onChange }) {
+const filterSelectStyle = {
+  ...uiStyles.formControl,
+  minWidth: 120,
+  maxWidth: 200,
+  fontSize: 13,
+  padding: "6px 8px",
+};
+
+function FilterSelect({ label, value, onChange, options, allLabel = "Todos" }) {
   return (
-    <label style={{ display: "flex", flexDirection: "column", gap: 4, fontSize: 12, minWidth: 140 }}>
+    <label style={filterFieldStyle}>
       {label}
-      <div
-        style={{
-          ...uiStyles.formControl,
-          height: "auto",
-          maxHeight: 110,
-          overflowY: "auto",
-          padding: 6,
-          display: "flex",
-          flexDirection: "column",
-          gap: 4,
-          minWidth: 160,
-        }}
-      >
-        {!options.length ? (
-          <span style={{ color: uiTheme.colors.textMuted, fontSize: 11 }}>Sin opciones</span>
-        ) : (
-          options.map((opt) => {
-            const value = opt.value;
-            const checked = selected.includes(value);
-            return (
-              <label
-                key={value}
-                style={{
-                  display: "flex",
-                  gap: 6,
-                  alignItems: "flex-start",
-                  fontSize: 11,
-                  cursor: "pointer",
-                  lineHeight: 1.3,
-                }}
-              >
-                <input
-                  type="checkbox"
-                  checked={checked}
-                  onChange={() => onChange(toggleValue(selected, value))}
-                  style={{ marginTop: 1 }}
-                />
-                <span>{opt.label || value}</span>
-              </label>
-            );
-          })
-        )}
-      </div>
-      {selected.length ? (
-        <span style={{ fontSize: 10, color: uiTheme.colors.textMuted }}>{selected.length} seleccionado(s)</span>
-      ) : null}
+      <select value={value} onChange={(e) => onChange(e.target.value)} style={filterSelectStyle}>
+        <option value="">{allLabel}</option>
+        {options.map((opt) => (
+          <option key={opt.value} value={opt.value}>
+            {opt.label || opt.value}
+          </option>
+        ))}
+      </select>
     </label>
   );
 }
@@ -186,9 +161,9 @@ export function AgendaOcupacionPage() {
   const [resources, setResources] = useState([]);
   const [modalDetail, setModalDetail] = useState(null);
   const [filterOptions, setFilterOptions] = useState({ tipo: [], especialidad: [], medico: [] });
-  const [tipos, setTipos] = useState([]);
-  const [especialidades, setEspecialidades] = useState([]);
-  const [medicos, setMedicos] = useState([]);
+  const [tipo, setTipo] = useState("");
+  const [especialidad, setEspecialidad] = useState("");
+  const [medico, setMedico] = useState("");
 
   useEffect(() => {
     safeLoad("/locations", setLocations, setError);
@@ -214,9 +189,9 @@ export function AgendaOcupacionPage() {
       const next = addDays(day, 1);
       const params = new URLSearchParams({ start: day, end: next });
       if (locationId) params.set("location_id", locationId);
-      for (const value of tipos) params.append("tipo", value);
-      for (const value of especialidades) params.append("especialidad", value);
-      for (const value of medicos) params.append("medico", value);
+      if (tipo) params.append("tipo", tipo);
+      if (especialidad) params.append("especialidad", especialidad);
+      if (medico) params.append("medico", medico);
       const data = await apiRequestWithRefresh(`/distribucion/ocupacion/agenda/events?${params}`);
       setEvents(Array.isArray(data?.events) ? data.events : []);
       setResources(Array.isArray(data?.resources) ? data.resources : []);
@@ -227,7 +202,7 @@ export function AgendaOcupacionPage() {
     } finally {
       setLoading(false);
     }
-  }, [day, locationId, tipos, especialidades, medicos]);
+  }, [day, locationId, tipo, especialidad, medico]);
 
   useEffect(() => {
     loadEvents();
@@ -284,89 +259,100 @@ export function AgendaOcupacionPage() {
     fontWeight: 700,
   };
 
+  const navBtn = { ...uiStyles.buttonSecondary, padding: "6px 10px", fontSize: 13 };
+
   return (
     <section
       style={{
         width: "100vw",
         marginLeft: "calc(50% - 50vw)",
-        height: "calc(100dvh - 128px)",
+        height: "calc(100dvh - 112px)",
         display: "flex",
         flexDirection: "column",
         boxSizing: "border-box",
-        padding: "0 12px 8px",
-        gap: 10,
+        padding: "0 12px 6px",
+        gap: 6,
       }}
     >
-      <div style={{ flexShrink: 0 }}>
-        <h2 style={{ margin: 0, fontSize: "1.25rem" }}>Agenda ocupación</h2>
-        <p style={{ margin: "4px 0 0", color: uiTheme.colors.textMuted, fontSize: 13 }}>
-          Grilla por consultorio. Sync solo desde Ocupación. Mapeá agendas en Consultorios.
-          {loading ? " Cargando…" : ""}
-        </p>
+      <div
+        style={{
+          flexShrink: 0,
+          display: "flex",
+          alignItems: "baseline",
+          gap: 10,
+          flexWrap: "nowrap",
+          minHeight: 0,
+        }}
+      >
+        <h2 style={{ margin: 0, fontSize: "1.1rem", whiteSpace: "nowrap" }}>Agenda ocupación</h2>
+        <span style={{ color: uiTheme.colors.textMuted, fontSize: 12, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+          Sync desde Ocupación
+          {loading ? " · Cargando…" : ""}
+        </span>
       </div>
 
-      {error ? <div style={{ ...uiStyles.alertError, flexShrink: 0 }}>{error}</div> : null}
+      {error ? <div style={{ ...uiStyles.alertError, flexShrink: 0, padding: "6px 10px", fontSize: 13 }}>{error}</div> : null}
 
       <div
         style={{
           display: "flex",
-          flexWrap: "wrap",
-          gap: 10,
+          flexWrap: "nowrap",
+          gap: 8,
           alignItems: "flex-end",
           flexShrink: 0,
+          overflowX: "auto",
+          paddingBottom: 2,
         }}
       >
-        <label style={{ display: "flex", flexDirection: "column", gap: 4, fontSize: 12 }}>
-          Ubicación
-          <select
-            value={locationId}
-            onChange={(e) => setLocationId(e.target.value)}
-            style={uiStyles.formControl}
-          >
-            <option value="">Todas</option>
-            {locations.map((loc) => (
-              <option key={loc.id} value={loc.id}>
-                {loc.name}
-                {loc.tipo ? ` · ${loc.tipo}` : ""}
-              </option>
-            ))}
-          </select>
-        </label>
-        <label style={{ display: "flex", flexDirection: "column", gap: 4, fontSize: 12 }}>
-          Día
-          <input type="date" value={day} onChange={(e) => setDay(e.target.value)} style={uiStyles.formControl} />
-        </label>
-        <button type="button" style={uiStyles.buttonSecondary} onClick={() => setDay(addDays(day, -1))}>
-          ←
-        </button>
-        <button type="button" style={uiStyles.buttonSecondary} onClick={() => setDay(isoDate(new Date()))}>
-          Hoy
-        </button>
-        <button type="button" style={uiStyles.buttonSecondary} onClick={() => setDay(addDays(day, 1))}>
-          →
-        </button>
-        <span style={{ fontSize: 13, color: uiTheme.colors.textMuted, textTransform: "capitalize" }}>{dayLabel}</span>
-        <MultiFilter label="Tipo" options={filterOptions.tipo} selected={tipos} onChange={setTipos} />
-        <MultiFilter
-          label="Especialidad"
-          options={filterOptions.especialidad}
-          selected={especialidades}
-          onChange={setEspecialidades}
+        <FilterSelect
+          label="Ubicación"
+          value={locationId}
+          onChange={setLocationId}
+          allLabel="Todas"
+          options={locations.map((loc) => ({
+            value: String(loc.id),
+            label: `${loc.name}${loc.tipo ? ` · ${loc.tipo}` : ""}`,
+          }))}
         />
-        <MultiFilter label="Médico" options={filterOptions.medico} selected={medicos} onChange={setMedicos} />
-        {tipos.length || especialidades.length || medicos.length ? (
-          <button
-            type="button"
-            style={uiStyles.buttonSecondary}
-            onClick={() => {
-              setTipos([]);
-              setEspecialidades([]);
-              setMedicos([]);
-            }}
-          >
-            Limpiar filtros
+        <label style={filterFieldStyle}>
+          Día
+          <input
+            type="date"
+            value={day}
+            onChange={(e) => setDay(e.target.value)}
+            style={{ ...filterSelectStyle, maxWidth: 150 }}
+          />
+        </label>
+        <div style={{ display: "flex", gap: 4, alignItems: "center", paddingBottom: 1 }}>
+          <button type="button" style={navBtn} onClick={() => setDay(addDays(day, -1))} aria-label="Día anterior">
+            ←
           </button>
-        ) : null}
+          <button type="button" style={navBtn} onClick={() => setDay(isoDate(new Date()))}>
+            Hoy
+          </button>
+          <button type="button" style={navBtn} onClick={() => setDay(addDays(day, 1))} aria-label="Día siguiente">
+            →
+          </button>
+        </div>
+        <span
+          style={{
+            fontSize: 12,
+            color: uiTheme.colors.textMuted,
+            textTransform: "capitalize",
+            whiteSpace: "nowrap",
+            paddingBottom: 8,
+          }}
+        >
+          {dayLabel}
+        </span>
+        <FilterSelect label="Tipo" value={tipo} onChange={setTipo} options={filterOptions.tipo} />
+        <FilterSelect
+          label="Especialidad"
+          value={especialidad}
+          onChange={setEspecialidad}
+          options={filterOptions.especialidad}
+        />
+        <FilterSelect label="Médico" value={medico} onChange={setMedico} options={filterOptions.medico} />
       </div>
 
       <div
