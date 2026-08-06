@@ -56,8 +56,12 @@
   - Env: `DISTRIBUCION_HORARIOS_ACTIVOS_URL` (+ timeout; default 120s); Bearer = `NOVEDADES_PROF_SYNC_TOKEN`
   - Tras deploy: set env en `.env.prod`, `alembic upgrade head`, redeploy backend+frontend, **Actualizar** en Ocupación (esperar synced ≈ miles de filas)
   - **Agenda ocupación** (`/agenda-ocupacion`): grilla día × consultorios (+ **Sin consultorio**); viewport full-bleed + scroll interno; filtros en una fila (selects: ubicación/tipo/especialidad/médico + día); detalle en modal (Esc/overlay); sync solo desde Ocupación
+  - **Indicadores ocupación** (`/indicadores-ocupacion`): torta global del día; % = horas sync (agendas mapeadas) ÷ `room_operating_hours`; `GET .../ocupacion/indicadores`; filtros ubicación/consultorio/especialidad/médico; sin horario → aviso fuera de torta; convive con Estadística (bookings)
   - Mapeo `id_agenda` → consultorio (rev `0015_room_id_agenda`): en ficha **Consultorios**; typeahead `GET .../ocupacion/agenda-lookup?q=`
   - `locations.id_dominio` (rev `0014`) + `locations.tipo` (rev `0016_locations_tipo`): vínculo con ocupación por par `(id_dominio, tipo)` único entre activas; `tipo` obligatorio al crear/editar; existentes migran con `PENDIENTE-{id}` hasta corregir en UI; Agenda ocupación filtra ubicación por dominio+tipo
+  - Split `nombre_agenda`: `" - "` o fallback `-` (valores compactos); tras cambiar parser → **Actualizar** en Ocupación
+  - OpenSpec Distribución (archivados 2026-08-06): `distribucion-ocupacion`, `agenda-ocupacion-sync`, `mapeo-agenda-consultorio`, `locations-tipo`, `agenda-ocupacion-ui` → spec estable `openspec/specs/distribucion/spec.md`
+  - Si Actions Backend GHCR falla con `failed to fetch oauth token: denied`: revisar Package settings del package `app-clinica-backend` → Manage Actions access (Write); re-run workflow (Frontend puede haber pasado igual)
 - Cambio `novedades-tiene-produccion`:
   - Proxy `GET /novedades/bonos/tiene-produccion` → `NOVEDADES_BONOS_TIENE_PRODUCCION_URL` (mismo Bearer)
   - UI Carga (admin/jefe): al Cargar o editar fecha; si `false` o error → bloquea (solo UI; create API no revalida)
