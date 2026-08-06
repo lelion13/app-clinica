@@ -223,3 +223,32 @@ def test_dominio_label_prefers_tipo_pair():
     assert service._dominio_label(1651, "SEDE TORRE", labels) == "Torre"
     assert service._dominio_label(1651, "SEDE CAÑUELAS", labels) == "Cañuelas"
     assert service._dominio_label(999, "X", labels) == "999"
+
+
+def test_tipo_filter_reduces_unassigned(monkeypatch):
+    _stub_map(monkeypatch)
+    a = _row(row_id=1, tipo="SEDE TORRE", medico="A")
+    b = _row(row_id=2, tipo="SEDE CAÑUELAS", medico="B")
+
+    class DB2:
+        def execute(self, _statement):
+            return FakeResult([a, b])
+
+    result = service.list_agenda_events(DB2(), start="2026-08-03", end="2026-08-10", tipo=["SEDE TORRE"])
+    assert len(result.events) == 1
+    assert result.events[0].resource_id == "unassigned"
+    assert result.events[0].extended.tipo == "SEDE TORRE"
+
+
+def test_medico_filter_reduces_unassigned(monkeypatch):
+    _stub_map(monkeypatch)
+    a = _row(row_id=1, medico="APECECHEA")
+    b = _row(row_id=2, medico="OTRO")
+
+    class DB2:
+        def execute(self, _statement):
+            return FakeResult([a, b])
+
+    result = service.list_agenda_events(DB2(), start="2026-08-03", end="2026-08-10", medico=["APECECHEA"])
+    assert len(result.events) == 1
+    assert result.events[0].title == "APECECHEA"
