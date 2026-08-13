@@ -19,6 +19,8 @@ Antes de cargar módulo/novedad (o editar fecha) en Carga, consultar si el profe
 
 Proxy backend; check solo al submit/confirmar fecha; bloqueo UI fail-closed; sin revalidación en create API (Q1=A).
 
+**v2:** si `false` en alta → modal force (motivo Vacaciones/Enfermedad + obs) Cancelar/Cargar; persistir en ambas entidades; editar fecha y error API sin force.
+
 ## Ready for Proposal
 
-Yes — survey cerrada.
+Yes — survey v1 + v2 cerradas (`decisions.md` Q1–Q15).

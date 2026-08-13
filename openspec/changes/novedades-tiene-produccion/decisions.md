@@ -1,8 +1,9 @@
 # Decisions: novedades-tiene-produccion
 
-**Survey cerrada** (2026-08-03).
+**Survey v1 cerrada** (2026-08-03).  
+**Survey v2 (modal force-load) cerrada** (2026-08-13).
 
-## Checklist
+## Checklist v1
 
 - [x] Q1 — UI only vs backend enforcement
 - [x] Q2 — Roles afectados (solo jefe vs admin también)
@@ -13,6 +14,17 @@
 - [x] Q6 — Alcance: solo Carga o también otros flujos
 - [x] Q7 — Texto del modal cuando `false`
 - [x] Q8 — URL env (default documentado)
+
+## Checklist v2 — modal sin producción → force load
+
+- [x] Q9 — Opciones del selector “tipo de motivo” (lista fija vs catálogo)
+- [x] Q9b — ¿Solo esos dos motivos o hay más?
+- [x] Q10 — ¿Se persisten motivo + observación en la carga?
+- [x] Q11 — ¿Aplica igual al editar fecha?
+- [x] Q12 — Si el API de producción **falla** (no `false`): ¿mismo modal force o solo error?
+- [x] Q13 — Roles que pueden forzar la carga con motivo
+- [x] Q14 — Backend: ¿exige motivo/obs al crear? (vs solo UI)
+- [x] Q15 — Si se cargan módulo y novedad juntos, ¿mismo motivo/obs en ambos?
 
 ---
 
@@ -51,3 +63,39 @@
 ## Q8 — Config URL
 
 **Elegido: A** — Env `NOVEDADES_BONOS_TIENE_PRODUCCION_URL` con default `https://api.cpmgsa.com.ar:8001/bonos/tiene-produccion`; token = `NOVEDADES_PROF_SYNC_TOKEN`.
+
+---
+
+# Survey v2 — force load con motivo (cerrada)
+
+## Q9 — Selector motivo
+
+**Elegido: A** — Lista fija en código. Default del combo: **vacío** (obligatorio elegir).
+
+## Q9b — Opciones
+
+**Elegido: A** — Solo: `Vacaciones`, `Enfermedad` (+ placeholder vacío por defecto).
+
+## Q10 — Persistencia
+
+**Elegido: A** — Persistir motivo + observación en la asignación/novedad (campos nuevos) y mostrarlos en listados/detalle según aplique.
+
+## Q11 — Editar fecha
+
+**Elegido: B** — Al editar fecha **no** hay force-load: sigue bloqueo simple (modal de error / sin producción, sin combo ni Cargar forzado).
+
+## Q12 — Fallo API vs `false`
+
+**Elegido: A** — Si el API falla: solo error técnico (bloquea). Force con motivo **solo** cuando responde `false`.
+
+## Q13 — Roles force
+
+**Elegido: A** — `admin` y `jefe_medico` (igual que Carga).
+
+## Q14 — Validación backend
+
+**Elegido: A** — Solo UI fuerza el flujo. Backend acepta motivo/obs si vienen; **no** reconsulta `tiene-produccion` ni los exige siempre.
+
+## Q15 — Módulo + novedad juntos
+
+**Elegido: A** — El mismo motivo + observación se guardan en **ambas** filas creadas en ese submit.

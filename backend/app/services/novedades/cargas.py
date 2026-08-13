@@ -28,6 +28,7 @@ from app.services.novedades.helpers import (
     get_modulo_or_404,
     get_professional_or_404,
     get_servicio_or_404,
+    normalize_motivo_sin_produccion,
     require_periodo_open,
     require_profesional_en_servicio,
     scoped_servicio_ids,
@@ -259,6 +260,9 @@ def create_asignacion(db: Session, payload: AsignacionCreateRequest, user: User)
     from app.services.novedades.masters import require_modulo_en_servicio
 
     require_modulo_en_servicio(db, payload.modulo_id, payload.servicio_id)
+    motivo, observacion = normalize_motivo_sin_produccion(
+        payload.motivo_sin_produccion, payload.observacion_sin_produccion
+    )
     now = datetime.utcnow()
     item = NovedadesAsignacionModulo(
         periodo_id=payload.periodo_id,
@@ -266,6 +270,8 @@ def create_asignacion(db: Session, payload: AsignacionCreateRequest, user: User)
         professional_id=payload.professional_id,
         modulo_id=payload.modulo_id,
         fecha_realizacion=payload.fecha_realizacion,
+        motivo_sin_produccion=motivo,
+        observacion_sin_produccion=observacion,
         created_at=now,
         updated_at=now,
         created_by=user.id,
@@ -351,6 +357,9 @@ def create_novedad(db: Session, payload: NovedadCreateRequest, user: User) -> No
     get_professional_or_404(db, payload.professional_id, require_active=True)
     assert_can_load_servicio(db, user, payload.servicio_id)
     require_profesional_en_servicio(db, payload.professional_id, payload.servicio_id)
+    motivo, observacion = normalize_motivo_sin_produccion(
+        payload.motivo_sin_produccion, payload.observacion_sin_produccion
+    )
     now = datetime.utcnow()
     item = NovedadesNovedad(
         periodo_id=payload.periodo_id,
@@ -359,6 +368,8 @@ def create_novedad(db: Session, payload: NovedadCreateRequest, user: User) -> No
         tipo=NovedadTipo(payload.tipo),
         horas=payload.horas,
         fecha_realizacion=payload.fecha_realizacion,
+        motivo_sin_produccion=motivo,
+        observacion_sin_produccion=observacion,
         created_at=now,
         updated_at=now,
         created_by=user.id,
