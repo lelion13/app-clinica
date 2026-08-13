@@ -23,6 +23,7 @@ from app.schemas.novedades import (
     JefeServicioResponse,
     ModuloCreateRequest,
     ModuloResponse,
+    ModuloServiciosUpdateRequest,
     ModuloUpdateRequest,
     NovedadCreateRequest,
     NovedadResponse,
@@ -76,6 +77,7 @@ def _modulo_response(db: Session, item) -> ModuloResponse:
         descripcion=item.descripcion,
         comentario=item.comentario,
         valor=item.valor,
+        produccion=bool(getattr(item, "produccion", False)),
         servicio_ids=masters_service.list_modulo_servicio_ids(db, item.id),
         servicio_nombres=masters_service.list_modulo_servicio_nombres(db, item.id),
         created_at=item.created_at,
@@ -248,6 +250,20 @@ def modulos_update(
 ) -> ModuloResponse:
     item = masters_service.update_modulo(db, modulo_id, payload, actor_id=user.id)
     return _modulo_response(db, item)
+
+
+@router.put("/modulos/{modulo_id}/servicios", response_model=ModuloResponse)
+def modulos_update_servicios(
+    modulo_id: int,
+    payload: ModuloServiciosUpdateRequest,
+    db: Session = Depends(get_db),
+    user: User = Depends(require_admin_or_rrhh),
+) -> ModuloResponse:
+    item = masters_service.update_modulo_servicios(
+        db, modulo_id, payload.servicio_ids, actor_id=user.id
+    )
+    return _modulo_response(db, item)
+
 
 @router.delete("/modulos/{modulo_id}", status_code=status.HTTP_204_NO_CONTENT)
 def modulos_delete(

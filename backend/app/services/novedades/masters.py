@@ -72,9 +72,11 @@ def delete_servicio(db: Session, servicio_id: int, actor_id: int) -> None:
     db.commit()
 
 
-def _validate_servicio_ids(db: Session, servicio_ids: list[int]) -> list[int]:
+def _validate_servicio_ids(db: Session, servicio_ids: list[int], *, allow_empty: bool = False) -> list[int]:
     unique_ids = list(dict.fromkeys(servicio_ids))
     if not unique_ids:
+        if allow_empty:
+            return []
         raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail="Debe asociar al menos un servicio")
     for sid in unique_ids:
         get_servicio_or_404(db, sid)
@@ -175,6 +177,7 @@ def create_modulo(db: Session, payload: ModuloCreateRequest, actor_id: int) -> N
         descripcion=payload.descripcion.strip(),
         comentario=(payload.comentario or "").strip() or None,
         valor=Decimal(payload.valor),
+        produccion=bool(payload.produccion),
         created_at=now,
         updated_at=now,
         created_by=actor_id,
@@ -195,13 +198,29 @@ def update_modulo(db: Session, modulo_id: int, payload: ModuloUpdateRequest, act
     ).scalar_one_or_none()
     if not item:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Modulo no encontrado")
-    servicio_ids = _validate_servicio_ids(db, payload.servicio_ids)
     item.descripcion = payload.descripcion.strip()
     item.comentario = (payload.comentario or "").strip() or None
     item.valor = Decimal(payload.valor)
+    item.produccion = bool(payload.produccion)
     item.updated_at = datetime.utcnow()
     item.updated_by = actor_id
-    _set_modulo_servicios(db, item.id, servicio_ids, actor_id)
+    db.commit()
+    db.refresh(item)
+    return item
+
+
+def update_modulo_servicios(
+    db: Session, modulo_id: int, servicio_ids: list[int], actor_id: int
+) -> NovedadesModulo:
+    item = db.execute(
+        select(NovedadesModulo).where(NovedadesModulo.id == modulo_id, NovedadesModulo.deleted_at.is_(None))
+    ).scalar_one_or_none()
+    if not item:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Modulo no encontrado")
+    validated = _validate_servicio_ids(db, servicio_ids, allow_empty=True)
+    item.updated_at = datetime.utcnow()
+    item.updated_by = actor_id
+    _set_modulo_servicios(db, item.id, validated, actor_id)
     db.commit()
     db.refresh(item)
     return item

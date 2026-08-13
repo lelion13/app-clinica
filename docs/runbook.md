@@ -66,6 +66,8 @@
   - Proxy `GET /novedades/bonos/tiene-produccion` → `NOVEDADES_BONOS_TIENE_PRODUCCION_URL` (mismo Bearer)
   - UI Carga (admin/jefe): al **crear**, si `false` → modal force (motivo Vacaciones/Enfermedad + observación) → POST con `motivo_sin_produccion` / `observacion_sin_produccion` (rev `0017_sin_prod_motivo`); Cancelar no POST
   - Editar fecha o error del proxy: bloqueo simple (sin force). Create API no reconsulta producción; valida enum/obs si vienen
+  - Si el **módulo** tiene `produccion=false` (rev `0018_modulo_produccion`), al cargar ese módulo (solo o con novedad) **no** se llama al proxy
+- Cambio `novedades-modulos-edicion`: Param → Módulos: `editar` (datos + checkbox producción) y `servicios` (permite 0); `PUT /modulos/{id}` vs `PUT /modulos/{id}/servicios`
 
 ## Roles (panel)
 - `admin`: distribución + novedades (todo) + usuarios

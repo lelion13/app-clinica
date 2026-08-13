@@ -30,6 +30,7 @@ class ModuloCreateRequest(BaseModel):
     descripcion: str = Field(min_length=2, max_length=200)
     comentario: str | None = Field(default=None, max_length=500)
     valor: Decimal = Field(ge=0)
+    produccion: bool = False
     servicio_ids: list[int] = Field(min_length=1)
 
 
@@ -37,7 +38,11 @@ class ModuloUpdateRequest(BaseModel):
     descripcion: str = Field(min_length=2, max_length=200)
     comentario: str | None = Field(default=None, max_length=500)
     valor: Decimal = Field(ge=0)
-    servicio_ids: list[int] = Field(min_length=1)
+    produccion: bool = False
+
+
+class ModuloServiciosUpdateRequest(BaseModel):
+    servicio_ids: list[int] = Field(default_factory=list)
 
 
 class ModuloResponse(BaseModel):
@@ -45,6 +50,7 @@ class ModuloResponse(BaseModel):
     descripcion: str
     comentario: str | None
     valor: Decimal
+    produccion: bool = False
     servicio_ids: list[int] = []
     servicio_nombres: list[str] = []
     created_at: datetime
