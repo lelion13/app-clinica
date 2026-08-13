@@ -29,7 +29,17 @@ export function NovedadesParamPage() {
   const [moduloDesc, setModuloDesc] = useState("");
   const [moduloComentario, setModuloComentario] = useState("");
   const [moduloValor, setModuloValor] = useState("");
+  const [moduloProduccion, setModuloProduccion] = useState(false);
   const [moduloServicioIds, setModuloServicioIds] = useState([]);
+  const [editModulo, setEditModulo] = useState(null);
+  const [editDesc, setEditDesc] = useState("");
+  const [editComentario, setEditComentario] = useState("");
+  const [editValor, setEditValor] = useState("");
+  const [editProduccion, setEditProduccion] = useState(false);
+  const [editSaving, setEditSaving] = useState(false);
+  const [serviciosModulo, setServiciosModulo] = useState(null);
+  const [serviciosIdsEdit, setServiciosIdsEdit] = useState([]);
+  const [serviciosSaving, setServiciosSaving] = useState(false);
   const [jefeUserId, setJefeUserId] = useState("");
   const [jefeServicioId, setJefeServicioId] = useState("");
   const [profId, setProfId] = useState("");
@@ -115,14 +125,86 @@ export function NovedadesParamPage() {
         descripcion: moduloDesc,
         comentario: moduloComentario || null,
         valor: Number(moduloValor),
+        produccion: Boolean(moduloProduccion),
         servicio_ids: moduloServicioIds.map(Number),
       }),
     });
     setModuloDesc("");
     setModuloComentario("");
     setModuloValor("");
+    setModuloProduccion(false);
     setModuloServicioIds([]);
     await load();
+  };
+
+  const openEditModulo = (item) => {
+    setEditModulo(item);
+    setEditDesc(item.descripcion || "");
+    setEditComentario(item.comentario || "");
+    setEditValor(String(item.valor ?? ""));
+    setEditProduccion(Boolean(item.produccion));
+  };
+
+  const closeEditModulo = () => {
+    if (editSaving) return;
+    setEditModulo(null);
+  };
+
+  const saveEditModulo = async () => {
+    if (!editModulo) return;
+    setEditSaving(true);
+    setError("");
+    try {
+      await apiRequestWithRefresh(`/novedades/modulos/${editModulo.id}`, {
+        method: "PUT",
+        body: JSON.stringify({
+          descripcion: editDesc,
+          comentario: editComentario || null,
+          valor: Number(editValor),
+          produccion: Boolean(editProduccion),
+        }),
+      });
+      setEditModulo(null);
+      await load();
+    } catch (err) {
+      setError(err.message || "No se pudo guardar el módulo");
+    } finally {
+      setEditSaving(false);
+    }
+  };
+
+  const openServiciosModulo = (item) => {
+    setServiciosModulo(item);
+    setServiciosIdsEdit([...(item.servicio_ids || [])]);
+  };
+
+  const closeServiciosModulo = () => {
+    if (serviciosSaving) return;
+    setServiciosModulo(null);
+  };
+
+  const toggleServicioEdit = (id) => {
+    setServiciosIdsEdit((current) =>
+      current.includes(id) ? current.filter((x) => x !== id) : [...current, id]
+    );
+  };
+
+  const saveServiciosModulo = async () => {
+    if (!serviciosModulo) return;
+    setServiciosSaving(true);
+    setError("");
+    try {
+      await apiRequestWithRefresh(`/novedades/modulos/${serviciosModulo.id}/servicios`, {
+        method: "PUT",
+        body: JSON.stringify({ servicio_ids: serviciosIdsEdit.map(Number) }),
+      });
+      setServiciosModulo(null);
+      await load();
+    } catch (err) {
+      setError(err.message || "No se pudieron actualizar los servicios");
+    } finally {
+      setServiciosSaving(false);
+    }
   };
 
   const createJefe = async (event) => {
@@ -317,6 +399,14 @@ export function NovedadesParamPage() {
               <input value={moduloDesc} onChange={(e) => setModuloDesc(e.target.value)} placeholder="Descripción" required style={uiStyles.formControl} />
               <input value={moduloComentario} onChange={(e) => setModuloComentario(e.target.value)} placeholder="Comentario" style={uiStyles.formControl} />
               <input type="number" step="0.01" min="0" value={moduloValor} onChange={(e) => setModuloValor(e.target.value)} placeholder="Valor ARS" required style={uiStyles.formControl} />
+              <label style={{ display: "inline-flex", gap: 6, alignItems: "center" }}>
+                <input
+                  type="checkbox"
+                  checked={moduloProduccion}
+                  onChange={(e) => setModuloProduccion(e.target.checked)}
+                />
+                Producción
+              </label>
             </div>
             <div>
               <div style={{ ...uiStyles.helpText, marginBottom: 6 }}>Servicios (obligatorio, puede ser más de uno)</div>
@@ -338,16 +428,161 @@ export function NovedadesParamPage() {
           <ul style={uiStyles.listCard}>
             {modulos.map((item) => (
               <li key={item.id} style={{ padding: "8px 10px", borderBottom: `1px solid ${uiTheme.colors.border}` }}>
-                #{item.id} · {item.descripcion} · ${item.valor}
-                <div style={uiStyles.helpText}>
-                  Servicios: {(item.servicio_nombres || []).join(", ") || "sin asociar"}
+                <div style={{ display: "flex", gap: 8, flexWrap: "wrap", alignItems: "flex-start", justifyContent: "space-between" }}>
+                  <div style={{ flex: "1 1 200px" }}>
+                    #{item.id} · {item.descripcion} · ${item.valor}
+                    <div style={uiStyles.helpText}>
+                      Servicios: {(item.servicio_nombres || []).join(", ") || "sin asociar"}
+                    </div>
+                  </div>
+                  <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
+                    <button type="button" style={uiStyles.buttonSecondary} onClick={() => openEditModulo(item)}>
+                      editar
+                    </button>
+                    <button type="button" style={uiStyles.buttonSecondary} onClick={() => openServiciosModulo(item)}>
+                      servicios
+                    </button>
+                    <button type="button" style={uiStyles.buttonDanger} onClick={async () => { await apiRequestWithRefresh(`/novedades/modulos/${item.id}`, { method: "DELETE" }); await load(); }}>
+                      eliminar
+                    </button>
+                  </div>
                 </div>
-                <button type="button" style={{ ...uiStyles.buttonDanger, marginTop: 6 }} onClick={async () => { await apiRequestWithRefresh(`/novedades/modulos/${item.id}`, { method: "DELETE" }); await load(); }}>
-                  eliminar
-                </button>
               </li>
             ))}
           </ul>
+
+          {editModulo ? (
+            <div
+              role="presentation"
+              style={{
+                position: "fixed",
+                inset: 0,
+                zIndex: 1000,
+                background: "rgba(15, 43, 39, 0.45)",
+                display: "flex",
+                alignItems: "flex-start",
+                justifyContent: "center",
+                padding: "max(16px, 4vh) 16px",
+                overflowY: "auto",
+              }}
+              onClick={closeEditModulo}
+            >
+              <div
+                role="dialog"
+                aria-modal="true"
+                aria-labelledby="edit-modulo-title"
+                onClick={(e) => e.stopPropagation()}
+                style={{
+                  background: "#fff",
+                  borderRadius: uiTheme.radius.md,
+                  maxWidth: 480,
+                  width: "100%",
+                  marginBottom: 24,
+                  padding: 22,
+                  boxShadow: uiTheme.shadow.md,
+                  border: `1px solid ${uiTheme.colors.border}`,
+                }}
+              >
+                <h2 id="edit-modulo-title" style={{ marginTop: 0, marginBottom: 12, fontSize: "1.1rem" }}>
+                  Editar módulo #{editModulo.id}
+                </h2>
+                <div style={{ display: "grid", gap: 10 }}>
+                  <label style={{ display: "grid", gap: 4 }}>
+                    <span style={{ fontSize: 12, color: uiTheme.colors.textMuted }}>Descripción</span>
+                    <input value={editDesc} onChange={(e) => setEditDesc(e.target.value)} required style={uiStyles.formControl} disabled={editSaving} />
+                  </label>
+                  <label style={{ display: "grid", gap: 4 }}>
+                    <span style={{ fontSize: 12, color: uiTheme.colors.textMuted }}>Comentario</span>
+                    <input value={editComentario} onChange={(e) => setEditComentario(e.target.value)} style={uiStyles.formControl} disabled={editSaving} />
+                  </label>
+                  <label style={{ display: "grid", gap: 4 }}>
+                    <span style={{ fontSize: 12, color: uiTheme.colors.textMuted }}>Valor ARS</span>
+                    <input type="number" step="0.01" min="0" value={editValor} onChange={(e) => setEditValor(e.target.value)} required style={uiStyles.formControl} disabled={editSaving} />
+                  </label>
+                  <label style={{ display: "inline-flex", gap: 6, alignItems: "center" }}>
+                    <input
+                      type="checkbox"
+                      checked={editProduccion}
+                      onChange={(e) => setEditProduccion(e.target.checked)}
+                      disabled={editSaving}
+                    />
+                    Producción
+                  </label>
+                </div>
+                <div style={{ display: "flex", gap: 8, justifyContent: "flex-end", flexWrap: "wrap", marginTop: 16 }}>
+                  <button type="button" onClick={closeEditModulo} style={uiStyles.buttonSecondary} disabled={editSaving}>
+                    Cancelar
+                  </button>
+                  <button type="button" onClick={saveEditModulo} style={uiStyles.buttonPrimary} disabled={editSaving || !editDesc || editValor === ""}>
+                    {editSaving ? "Guardando…" : "Guardar"}
+                  </button>
+                </div>
+              </div>
+            </div>
+          ) : null}
+
+          {serviciosModulo ? (
+            <div
+              role="presentation"
+              style={{
+                position: "fixed",
+                inset: 0,
+                zIndex: 1000,
+                background: "rgba(15, 43, 39, 0.45)",
+                display: "flex",
+                alignItems: "flex-start",
+                justifyContent: "center",
+                padding: "max(16px, 4vh) 16px",
+                overflowY: "auto",
+              }}
+              onClick={closeServiciosModulo}
+            >
+              <div
+                role="dialog"
+                aria-modal="true"
+                aria-labelledby="servicios-modulo-title"
+                onClick={(e) => e.stopPropagation()}
+                style={{
+                  background: "#fff",
+                  borderRadius: uiTheme.radius.md,
+                  maxWidth: 480,
+                  width: "100%",
+                  marginBottom: 24,
+                  padding: 22,
+                  boxShadow: uiTheme.shadow.md,
+                  border: `1px solid ${uiTheme.colors.border}`,
+                }}
+              >
+                <h2 id="servicios-modulo-title" style={{ marginTop: 0, marginBottom: 8, fontSize: "1.1rem" }}>
+                  Servicios — módulo #{serviciosModulo.id}
+                </h2>
+                <p style={{ ...uiStyles.helpText, marginTop: 0, marginBottom: 12 }}>
+                  {serviciosModulo.descripcion}. Podés dejar sin servicios.
+                </p>
+                <div style={{ display: "grid", gap: 8, marginBottom: 16 }}>
+                  {servicios.map((s) => (
+                    <label key={s.id} style={{ display: "inline-flex", gap: 8, alignItems: "center" }}>
+                      <input
+                        type="checkbox"
+                        checked={serviciosIdsEdit.includes(s.id)}
+                        onChange={() => toggleServicioEdit(s.id)}
+                        disabled={serviciosSaving}
+                      />
+                      {s.nombre}
+                    </label>
+                  ))}
+                </div>
+                <div style={{ display: "flex", gap: 8, justifyContent: "flex-end", flexWrap: "wrap" }}>
+                  <button type="button" onClick={closeServiciosModulo} style={uiStyles.buttonSecondary} disabled={serviciosSaving}>
+                    Cancelar
+                  </button>
+                  <button type="button" onClick={saveServiciosModulo} style={uiStyles.buttonPrimary} disabled={serviciosSaving}>
+                    {serviciosSaving ? "Guardando…" : "Aceptar"}
+                  </button>
+                </div>
+              </div>
+            </div>
+          ) : null}
         </>
       ) : null}
 

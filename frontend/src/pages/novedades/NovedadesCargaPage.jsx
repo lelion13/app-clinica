@@ -313,17 +313,21 @@ export function NovedadesCargaPage() {
 
     const selectedProf = profesionales.find((p) => String(p.id) === String(professionalId));
     const codprof = selectedProf?.codprof;
-    if (!codprof) {
+    const skipProduccionCheck = hasModulo && selectedModulo && selectedModulo.produccion === false;
+
+    if (!skipProduccionCheck && !codprof) {
       setError("El profesional seleccionado no tiene CODPROF; no se puede verificar producción");
       return;
     }
 
     setSubmitting(true);
     try {
-      const tiene = await checkTieneProduccion(fechaRealizacion, codprof);
-      if (!tiene) {
-        setForceOpen(true);
-        return;
+      if (!skipProduccionCheck) {
+        const tiene = await checkTieneProduccion(fechaRealizacion, codprof);
+        if (!tiene) {
+          setForceOpen(true);
+          return;
+        }
       }
       await performCreate(null);
     } catch (err) {
