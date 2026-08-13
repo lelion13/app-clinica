@@ -25,6 +25,17 @@ NOVEDAD_TIPO_LABELS = {
 }
 
 
+class MotivoSinProduccion(str, enum.Enum):
+    vacaciones = "vacaciones"
+    enfermedad = "enfermedad"
+
+
+MOTIVO_SIN_PRODUCCION_LABELS = {
+    MotivoSinProduccion.vacaciones: "Vacaciones",
+    MotivoSinProduccion.enfermedad: "Enfermedad",
+}
+
+
 class NovedadesServicio(AuditMixin, Base):
     __tablename__ = "novedades_servicio"
 
@@ -158,6 +169,8 @@ class NovedadesAsignacionModulo(AuditMixin, Base):
     professional_id: Mapped[int] = mapped_column(ForeignKey("novedades_profesional.id"), nullable=False)
     modulo_id: Mapped[int] = mapped_column(ForeignKey("novedades_modulo.id"), nullable=False)
     fecha_realizacion: Mapped[date] = mapped_column(Date, nullable=False)
+    motivo_sin_produccion: Mapped[str | None] = mapped_column(String(40), nullable=True)
+    observacion_sin_produccion: Mapped[str | None] = mapped_column(String(500), nullable=True)
 
 
 class NovedadesNovedad(AuditMixin, Base):
@@ -173,3 +186,5 @@ class NovedadesNovedad(AuditMixin, Base):
     )
     horas: Mapped[Decimal] = mapped_column(Numeric(10, 2), nullable=False)
     fecha_realizacion: Mapped[date] = mapped_column(Date, nullable=False)
+    motivo_sin_produccion: Mapped[str | None] = mapped_column(String(40), nullable=True)
+    observacion_sin_produccion: Mapped[str | None] = mapped_column(String(500), nullable=True)

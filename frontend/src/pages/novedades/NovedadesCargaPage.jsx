@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from "react";
 
 import { ProfessionalCombobox } from "../../components/ProfessionalCombobox";
 import { AlertModal } from "../../components/AlertModal";
+import { ForceSinProduccionModal } from "../../components/ForceSinProduccionModal";
 import { apiRequestWithRefresh } from "../../services/api";
 import { uiStyles, uiTheme } from "../../ui/theme";
 import { CargasListGrid } from "./CargasListGrid";
@@ -14,12 +15,18 @@ const TIPO_OPTIONS = [
 const MSG_SIN_PRODUCCION =
   "El profesional no tiene producción en esa fecha. No se puede cargar módulo ni novedad para ese día.";
 
+const MOTIVO_LABELS = {
+  vacaciones: "Vacaciones",
+  enfermedad: "Enfermedad",
+};
+
 function todayISO() {
   const d = new Date();
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
 }
 
-async function assertTieneProduccion(fecha, codprof) {
+/** @returns {Promise<boolean>} true if tiene producción */
+async function checkTieneProduccion(fecha, codprof) {
   if (!fecha || !codprof) {
     const err = new Error("Faltan fecha o CODPROF para verificar producción");
     err.code = "produccion_params";
@@ -27,7 +34,13 @@ async function assertTieneProduccion(fecha, codprof) {
   }
   const params = new URLSearchParams({ fecha, codprof: String(codprof) });
   const result = await apiRequestWithRefresh(`/novedades/bonos/tiene-produccion?${params}`);
-  if (!result?.tiene_produccion) {
+  return Boolean(result?.tiene_produccion);
+}
+
+/** Edit fecha: block without force modal */
+async function assertTieneProduccion(fecha, codprof) {
+  const ok = await checkTieneProduccion(fecha, codprof);
+  if (!ok) {
     const err = new Error(MSG_SIN_PRODUCCION);
     err.code = "sin_produccion";
     throw err;
@@ -54,6 +67,8 @@ export function NovedadesCargaPage() {
   const [fechaRealizacion, setFechaRealizacion] = useState(todayISO());
   const [loadingServicio, setLoadingServicio] = useState(false);
   const [submitting, setSubmitting] = useState(false);
+  const [forceOpen, setForceOpen] = useState(false);
+  const [forceLoading, setForceLoading] = useState(false);
 
   const openPeriodo = useMemo(() => periodos.find((p) => p.estado === "open"), [periodos]);
   const selectedModulo = useMemo(
@@ -110,6 +125,11 @@ export function NovedadesCargaPage() {
       valor: item.modulo_valor,
       fecha_realizacion: item.fecha_realizacion,
       fecha_carga: item.created_at,
+      motivo_sin_produccion: item.motivo_sin_produccion,
+      motivo_sin_produccion_label: item.motivo_sin_produccion
+        ? MOTIVO_LABELS[item.motivo_sin_produccion] || item.motivo_sin_produccion
+        : null,
+      observacion_sin_produccion: item.observacion_sin_produccion,
       periodo_estado: periodos.find((p) => p.id === item.periodo_id)?.estado,
     }));
     const novedadRows = novedades.map((item) => ({
@@ -128,6 +148,11 @@ export function NovedadesCargaPage() {
       valor: item.valor_calculado,
       fecha_realizacion: item.fecha_realizacion,
       fecha_carga: item.created_at,
+      motivo_sin_produccion: item.motivo_sin_produccion,
+      motivo_sin_produccion_label: item.motivo_sin_produccion
+        ? MOTIVO_LABELS[item.motivo_sin_produccion] || item.motivo_sin_produccion
+        : null,
+      observacion_sin_produccion: item.observacion_sin_produccion,
       periodo_estado: periodos.find((p) => p.id === item.periodo_id)?.estado,
     }));
     return [...moduloRows, ...novedadRows];
@@ -217,9 +242,50 @@ export function NovedadesCargaPage() {
     };
   }, [servicioId, servicios]);
 
+  const performCreate = async (sinProd = null) => {
+    const hasModulo = Boolean(moduloId);
+    const hasNovedad = incluirNovedad || Boolean(horas);
+    const extra = sinProd
+      ? {
+          motivo_sin_produccion: sinProd.motivo_sin_produccion,
+          observacion_sin_produccion: sinProd.observacion_sin_produccion,
+        }
+      : {};
+    if (hasModulo) {
+      await apiRequestWithRefresh("/novedades/asignaciones-modulos", {
+        method: "POST",
+        body: JSON.stringify({
+          periodo_id: Number(periodoId),
+          servicio_id: Number(servicioId),
+          professional_id: Number(professionalId),
+          modulo_id: Number(moduloId),
+          fecha_realizacion: fechaRealizacion,
+          ...extra,
+        }),
+      });
+    }
+    if (hasNovedad) {
+      await apiRequestWithRefresh("/novedades/cargas", {
+        method: "POST",
+        body: JSON.stringify({
+          periodo_id: Number(periodoId),
+          servicio_id: Number(servicioId),
+          professional_id: Number(professionalId),
+          tipo,
+          horas: Number(horas),
+          fecha_realizacion: fechaRealizacion,
+          ...extra,
+        }),
+      });
+    }
+    clearCargaFields();
+    await load();
+  };
+
   const submitCarga = async (event) => {
     event.preventDefault();
     setError("");
+    setForceOpen(false);
 
     if (!periodoId || !servicioId || !professionalId || !fechaRealizacion) {
       setError("Completá período, servicio, profesional y fecha de realización");
@@ -254,38 +320,30 @@ export function NovedadesCargaPage() {
 
     setSubmitting(true);
     try {
-      await assertTieneProduccion(fechaRealizacion, codprof);
-      if (hasModulo) {
-        await apiRequestWithRefresh("/novedades/asignaciones-modulos", {
-          method: "POST",
-          body: JSON.stringify({
-            periodo_id: Number(periodoId),
-            servicio_id: Number(servicioId),
-            professional_id: Number(professionalId),
-            modulo_id: Number(moduloId),
-            fecha_realizacion: fechaRealizacion,
-          }),
-        });
+      const tiene = await checkTieneProduccion(fechaRealizacion, codprof);
+      if (!tiene) {
+        setForceOpen(true);
+        return;
       }
-      if (hasNovedad) {
-        await apiRequestWithRefresh("/novedades/cargas", {
-          method: "POST",
-          body: JSON.stringify({
-            periodo_id: Number(periodoId),
-            servicio_id: Number(servicioId),
-            professional_id: Number(professionalId),
-            tipo,
-            horas: Number(horas),
-            fecha_realizacion: fechaRealizacion,
-          }),
-        });
-      }
-      clearCargaFields();
-      await load();
+      await performCreate(null);
     } catch (err) {
       setError(err.message || "No se pudo cargar");
     } finally {
       setSubmitting(false);
+    }
+  };
+
+  const confirmForceLoad = async (sinProd) => {
+    setForceLoading(true);
+    setError("");
+    try {
+      await performCreate(sinProd);
+      setForceOpen(false);
+    } catch (err) {
+      setError(err.message || "No se pudo cargar");
+      setForceOpen(false);
+    } finally {
+      setForceLoading(false);
     }
   };
 
@@ -300,6 +358,13 @@ export function NovedadesCargaPage() {
           {valorHora != null ? ` Valor hora del servicio: $${valorHora}.` : ""}
         </p>
         <AlertModal open={Boolean(error)} title="Atención" message={error} onClose={() => setError("")} />
+        <ForceSinProduccionModal
+          open={forceOpen}
+          message={MSG_SIN_PRODUCCION}
+          loading={forceLoading}
+          onCancel={() => setForceOpen(false)}
+          onConfirm={confirmForceLoad}
+        />
 
         <form onSubmit={submitCarga}>
           <h2 style={{ margin: "12px 0 8px", fontSize: "1rem" }}>Contexto</h2>

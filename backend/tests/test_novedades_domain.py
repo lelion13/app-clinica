@@ -6,9 +6,13 @@ from fastapi import HTTPException
 
 from app.models.novedades import PeriodoEstado
 from app.models.user import UserRole
-from app.schemas.novedades import NovedadCreateRequest, PeriodoCreateRequest
+from app.schemas.novedades import AsignacionCreateRequest, NovedadCreateRequest, PeriodoCreateRequest
 from app.services.novedades import cargas as cargas_service
-from app.services.novedades.helpers import assert_can_load_servicio, require_periodo_open
+from app.services.novedades.helpers import (
+    assert_can_load_servicio,
+    normalize_motivo_sin_produccion,
+    require_periodo_open,
+)
 
 
 class FakeResult:
@@ -174,3 +178,102 @@ def test_export_xlsx_content_type_bytes(monkeypatch):
     content = export_xls.export_xlsx_bytes(FakeDB())
     assert isinstance(content, (bytes, bytearray))
     assert content[:2] == b"PK"
+
+
+def test_normalize_motivo_ambos_none():
+    assert normalize_motivo_sin_produccion(None, None) == (None, None)
+    assert normalize_motivo_sin_produccion("", "  ") == (None, None)
+
+
+def test_normalize_motivo_requiere_ambos():
+    with pytest.raises(HTTPException) as exc:
+        normalize_motivo_sin_produccion("vacaciones", None)
+    assert exc.value.status_code == 422
+    with pytest.raises(HTTPException) as exc2:
+        normalize_motivo_sin_produccion(None, "nota")
+    assert exc2.value.status_code == 422
+
+
+def test_normalize_motivo_enum_y_trim():
+    m, o = normalize_motivo_sin_produccion("enfermedad", "  licencia  ")
+    assert m == "enfermedad"
+    assert o == "licencia"
+    with pytest.raises(HTTPException) as exc:
+        normalize_motivo_sin_produccion("otro", "x")
+    assert exc.value.status_code == 422
+
+
+def _stub_create_deps(monkeypatch):
+    periodo = SimpleNamespace(
+        id=1,
+        estado=PeriodoEstado.open,
+        deleted_at=None,
+        fecha_inicio=date(2026, 7, 1),
+        fecha_fin=date(2026, 7, 31),
+    )
+    monkeypatch.setattr(cargas_service, "require_periodo_open", lambda _db, _id: periodo)
+    monkeypatch.setattr(cargas_service, "validate_fecha_realizacion", lambda *_a, **_k: None)
+    monkeypatch.setattr(cargas_service, "get_servicio_or_404", lambda *_a, **_k: SimpleNamespace(id=1))
+    monkeypatch.setattr(cargas_service, "get_professional_or_404", lambda *_a, **_k: SimpleNamespace(id=1))
+    monkeypatch.setattr(cargas_service, "get_modulo_or_404", lambda *_a, **_k: SimpleNamespace(id=1))
+    monkeypatch.setattr(cargas_service, "assert_can_load_servicio", lambda *_a, **_k: None)
+    monkeypatch.setattr(cargas_service, "require_profesional_en_servicio", lambda *_a, **_k: None)
+    monkeypatch.setattr(
+        "app.services.novedades.masters.require_modulo_en_servicio",
+        lambda *_a, **_k: None,
+    )
+
+
+def test_create_novedad_sin_motivo(monkeypatch):
+    _stub_create_deps(monkeypatch)
+    db = FakeDB()
+    user = SimpleNamespace(id=7, role=UserRole.admin)
+    payload = NovedadCreateRequest(
+        periodo_id=1,
+        servicio_id=1,
+        professional_id=1,
+        tipo="hora_extra",
+        horas=2,
+        fecha_realizacion=date(2026, 7, 15),
+    )
+    item = cargas_service.create_novedad(db, payload, user)
+    assert item.motivo_sin_produccion is None
+    assert item.observacion_sin_produccion is None
+    assert db.committed
+
+
+def test_create_novedad_con_motivo(monkeypatch):
+    _stub_create_deps(monkeypatch)
+    db = FakeDB()
+    user = SimpleNamespace(id=7, role=UserRole.admin)
+    payload = NovedadCreateRequest(
+        periodo_id=1,
+        servicio_id=1,
+        professional_id=1,
+        tipo="hora_extra",
+        horas=2,
+        fecha_realizacion=date(2026, 7, 15),
+        motivo_sin_produccion="vacaciones",
+        observacion_sin_produccion="viaje familiar",
+    )
+    item = cargas_service.create_novedad(db, payload, user)
+    assert item.motivo_sin_produccion == "vacaciones"
+    assert item.observacion_sin_produccion == "viaje familiar"
+
+
+def test_create_asignacion_con_motivo(monkeypatch):
+    _stub_create_deps(monkeypatch)
+    db = FakeDB()
+    user = SimpleNamespace(id=7, role=UserRole.admin)
+    payload = AsignacionCreateRequest(
+        periodo_id=1,
+        servicio_id=1,
+        professional_id=1,
+        modulo_id=3,
+        fecha_realizacion=date(2026, 7, 15),
+        motivo_sin_produccion="enfermedad",
+        observacion_sin_produccion="certificado médico",
+    )
+    item = cargas_service.create_asignacion(db, payload, user)
+    assert item.motivo_sin_produccion == "enfermedad"
+    assert item.observacion_sin_produccion == "certificado médico"

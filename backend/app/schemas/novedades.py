@@ -125,12 +125,17 @@ class NovedadesTransaccionalPurgeResponse(BaseModel):
     deleted_profesional_servicios: int
 
 
+MotivoSinProduccionLiteral = Literal["vacaciones", "enfermedad"]
+
+
 class AsignacionCreateRequest(BaseModel):
     periodo_id: int
     servicio_id: int
     professional_id: int
     modulo_id: int
     fecha_realizacion: date
+    motivo_sin_produccion: MotivoSinProduccionLiteral | None = None
+    observacion_sin_produccion: str | None = Field(default=None, max_length=500)
 
 
 class AsignacionUpdateRequest(BaseModel):
@@ -151,6 +156,8 @@ class AsignacionResponse(BaseModel):
     modulo_descripcion: str | None = None
     modulo_valor: Decimal | None = None
     fecha_realizacion: date
+    motivo_sin_produccion: str | None = None
+    observacion_sin_produccion: str | None = None
     created_at: datetime
     updated_at: datetime
     created_by: int | None = None
@@ -166,6 +173,8 @@ class NovedadCreateRequest(BaseModel):
     tipo: NovedadTipoLiteral
     horas: int = Field(ge=1)
     fecha_realizacion: date
+    motivo_sin_produccion: MotivoSinProduccionLiteral | None = None
+    observacion_sin_produccion: str | None = Field(default=None, max_length=500)
 
 
 class NovedadUpdateRequest(BaseModel):
@@ -188,6 +197,8 @@ class NovedadResponse(BaseModel):
     horas: Decimal
     valor_calculado: Decimal | None = None
     fecha_realizacion: date
+    motivo_sin_produccion: str | None = None
+    observacion_sin_produccion: str | None = None
     created_at: datetime
     updated_at: datetime
     created_by: int | None = None

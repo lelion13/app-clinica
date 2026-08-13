@@ -139,6 +139,8 @@ export function CargasListGrid({ rows, onAnular, onUpdateFecha }) {
         row.concepto,
         row.periodo_nombre,
         row.kind_label,
+        row.motivo_sin_produccion_label,
+        row.observacion_sin_produccion,
       ]
         .filter(Boolean)
         .join(" ")
@@ -165,6 +167,9 @@ export function CargasListGrid({ rows, onAnular, onUpdateFecha }) {
           break;
         case "valor":
           cmp = compareNumber(a.valor, b.valor);
+          break;
+        case "sin_prod":
+          cmp = compareText(a.motivo_sin_produccion_label, b.motivo_sin_produccion_label);
           break;
         case "fecha":
           cmp = compareText(a.fecha_carga, b.fecha_carga);
@@ -292,6 +297,7 @@ export function CargasListGrid({ rows, onAnular, onUpdateFecha }) {
               <th style={thStyle} onClick={() => toggleSort("horas")}>Horas{sortMark("horas")}</th>
               <th style={thStyle} onClick={() => toggleSort("valor")}>Valor{sortMark("valor")}</th>
               <th style={thStyle} onClick={() => toggleSort("fecha_realizacion")}>F. realización{sortMark("fecha_realizacion")}</th>
+              <th style={thStyle} onClick={() => toggleSort("sin_prod")}>Sin prod.{sortMark("sin_prod")}</th>
               <th style={thStyle} onClick={() => toggleSort("periodo")}>Período{sortMark("periodo")}</th>
               <th style={thStyle} onClick={() => toggleSort("fecha")}>F. carga{sortMark("fecha")}</th>
               <th style={{ ...thStyle, cursor: "default" }}> </th>
@@ -318,6 +324,20 @@ export function CargasListGrid({ rows, onAnular, onUpdateFecha }) {
                 <td style={tdStyle}>{row.horas != null ? row.horas : "—"}</td>
                 <td style={{ ...tdStyle, fontVariantNumeric: "tabular-nums" }}>{formatMoney(row.valor)}</td>
                 <td style={tdStyle}>{formatDateOnly(row.fecha_realizacion)}</td>
+                <td style={{ ...tdStyle, fontSize: 13, maxWidth: 180 }}>
+                  {row.motivo_sin_produccion_label ? (
+                    <span title={row.observacion_sin_produccion || ""}>
+                      {row.motivo_sin_produccion_label}
+                      {row.observacion_sin_produccion
+                        ? `: ${row.observacion_sin_produccion.length > 40
+                          ? `${row.observacion_sin_produccion.slice(0, 40)}…`
+                          : row.observacion_sin_produccion}`
+                        : ""}
+                    </span>
+                  ) : (
+                    "—"
+                  )}
+                </td>
                 <td style={tdStyle}>{row.periodo_nombre || `#${row.periodo_id}`}</td>
                 <td style={{ ...tdStyle, whiteSpace: "nowrap", color: uiTheme.colors.textMuted, fontSize: 13 }}>
                   {formatDate(row.fecha_carga)}

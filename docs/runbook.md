@@ -64,7 +64,8 @@
   - Si Actions Backend GHCR falla con `failed to fetch oauth token: denied`: revisar Package settings del package `app-clinica-backend` → Manage Actions access (Write); re-run workflow (Frontend puede haber pasado igual)
 - Cambio `novedades-tiene-produccion`:
   - Proxy `GET /novedades/bonos/tiene-produccion` → `NOVEDADES_BONOS_TIENE_PRODUCCION_URL` (mismo Bearer)
-  - UI Carga (admin/jefe): al Cargar o editar fecha; si `false` o error → bloquea (solo UI; create API no revalida)
+  - UI Carga (admin/jefe): al **crear**, si `false` → modal force (motivo Vacaciones/Enfermedad + observación) → POST con `motivo_sin_produccion` / `observacion_sin_produccion` (rev `0017_sin_prod_motivo`); Cancelar no POST
+  - Editar fecha o error del proxy: bloqueo simple (sin force). Create API no reconsulta producción; valida enum/obs si vienen
 
 ## Roles (panel)
 - `admin`: distribución + novedades (todo) + usuarios

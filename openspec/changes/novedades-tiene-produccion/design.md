@@ -2,41 +2,68 @@
 
 ## Decisions
 
-See `decisions.md` Q1–Q8.
+See `decisions.md` Q1–Q15 (v1 + v2).
 
-## External API
+## External API / App proxy (v1)
 
 ```
 GET {NOVEDADES_BONOS_TIENE_PRODUCCION_URL}?fecha=YYYY-MM-DD&codprof={CODPROF}
 Authorization: Bearer {NOVEDADES_PROF_SYNC_TOKEN}
-→ true | false  (JSON boolean o string parseable)
+→ true | false
+
+GET /novedades/bonos/tiene-produccion?fecha=&codprof=
+→ { "tiene_produccion": boolean }
 ```
 
-## App API
+## Data model (v2)
 
+On `novedades_asignacion_modulo` and `novedades_novedad`:
+
+| Column | Type | Notes |
+|--------|------|--------|
+| `motivo_sin_produccion` | VARCHAR(40) NULL | `vacaciones` \| `enfermedad` |
+| `observacion_sin_produccion` | VARCHAR(500) NULL | required in UI when forcing |
+
+Alembic new revision (after current head). Both NULL when hay producción / carga normal.
+
+## Create API (v2)
+
+Optional fields on create módulo/novedad:
+
+```json
+{
+  "motivo_sin_produccion": "vacaciones",
+  "observacion_sin_produccion": "texto…"
+}
 ```
-GET /novedades/bonos/tiene-produccion?fecha=YYYY-MM-DD&codprof=...
-Auth: JWT; roles admin | jefe_medico (mismos que pueden cargar)
-Response: { "tiene_produccion": boolean }
-```
 
-- 422 si faltan params / no configurado token|url
-- 502 si falla el externo (front trata como bloqueo)
+- If either present: both MUST be valid (motivo ∈ enum, obs strip non-empty, max 500) → 422 otherwise.
+- If both absent: create as today.
+- Backend MUST NOT call `tiene-produccion` on create.
 
-## UI flow
+## UI flow (v2 alta)
 
-1. Usuario completa form / modal fecha.
-2. Al confirmar: llamar proxy con `fecha_realizacion` + `professional.codprof`.
-3. Si `tiene_produccion === true` → continuar submit actual.
-4. Si `false` → AlertModal con texto Q7; abort.
-5. Si error → AlertModal error técnico; abort.
+1. Submit form → proxy check.
+2. `true` → POST sin motivo/obs.
+3. `false` → open **force modal** (not plain OK-only):
+   - Text Q7
+   - Select motivo (default `""`; options Vacaciones / Enfermedad)
+   - Textarea observación (required)
+   - **Cancelar** → close; no POST
+   - **Cargar** → if missing motivo/obs show inline/modal error; else POST with fields on every entity created in that submit
+4. Proxy/network error → error modal only (no force).
 
-## Files
+## UI flow editar fecha (unchanged v1)
+
+`false` or error → block; no force modal.
+
+## Files (v2)
 
 | File | Action |
 |------|--------|
-| `config.py`, `.env*.example`, runbook | Modify |
-| `services/novedades/tiene_produccion.py` | Create |
-| `routers/novedades.py` | Modify |
-| `NovedadesCargaPage.jsx`, `CargasListGrid.jsx` | Modify |
-| tests | Create |
+| Alembic | Create |
+| models + schemas + cargas service responses | Modify |
+| `NovedadesCargaPage.jsx` (+ modal component) | Modify |
+| `CargasListGrid.jsx` | Show columns or tooltip for motivo/obs |
+| tests | Modify/Create |
+| runbook | Modify |

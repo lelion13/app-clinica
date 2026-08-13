@@ -7,6 +7,7 @@ from sqlalchemy.orm import Session
 
 from app.core.config import settings
 from app.models.novedades import (
+    MotivoSinProduccion,
     NovedadesConfig,
     NovedadesJefeServicio,
     NovedadesModulo,
@@ -17,6 +18,29 @@ from app.models.novedades import (
     PeriodoEstado,
 )
 from app.models.user import User, UserRole
+
+_MOTIVO_VALUES = {m.value for m in MotivoSinProduccion}
+
+
+def normalize_motivo_sin_produccion(
+    motivo: str | None, observacion: str | None
+) -> tuple[str | None, str | None]:
+    """If either field is provided, both must be valid. Otherwise both None."""
+    motivo_s = (motivo or "").strip() or None
+    obs_s = (observacion or "").strip() or None
+    if motivo_s is None and obs_s is None:
+        return None, None
+    if motivo_s is None or obs_s is None:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail="motivo_sin_produccion y observacion_sin_produccion deben enviarse juntos",
+        )
+    if motivo_s not in _MOTIVO_VALUES:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail="motivo_sin_produccion inválido (vacaciones|enfermedad)",
+        )
+    return motivo_s, obs_s[:500]
 
 
 def business_today() -> date:
