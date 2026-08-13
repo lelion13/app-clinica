@@ -362,7 +362,10 @@ export function NovedadesCargaPage() {
           open={forceOpen}
           message={MSG_SIN_PRODUCCION}
           loading={forceLoading}
-          onCancel={() => setForceOpen(false)}
+          onCancel={() => {
+            setForceOpen(false);
+            clearCargaFields();
+          }}
           onConfirm={confirmForceLoad}
         />
 
