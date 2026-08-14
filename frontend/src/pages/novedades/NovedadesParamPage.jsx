@@ -31,6 +31,8 @@ export function NovedadesParamPage() {
   const [moduloValor, setModuloValor] = useState("");
   const [moduloProduccion, setModuloProduccion] = useState(false);
   const [moduloServicioIds, setModuloServicioIds] = useState([]);
+  const [createModuloOpen, setCreateModuloOpen] = useState(false);
+  const [createModuloSaving, setCreateModuloSaving] = useState(false);
   const [editModulo, setEditModulo] = useState(null);
   const [editDesc, setEditDesc] = useState("");
   const [editComentario, setEditComentario] = useState("");
@@ -113,28 +115,55 @@ export function NovedadesParamPage() {
     await load();
   };
 
-  const createModulo = async (event) => {
-    event.preventDefault();
-    if (!moduloServicioIds.length) {
-      setError("Seleccioná al menos un servicio para el módulo");
-      return;
-    }
-    await apiRequestWithRefresh("/novedades/modulos", {
-      method: "POST",
-      body: JSON.stringify({
-        descripcion: moduloDesc,
-        comentario: moduloComentario || null,
-        valor: Number(moduloValor),
-        produccion: Boolean(moduloProduccion),
-        servicio_ids: moduloServicioIds.map(Number),
-      }),
-    });
+  const resetCreateModuloForm = () => {
     setModuloDesc("");
     setModuloComentario("");
     setModuloValor("");
     setModuloProduccion(false);
     setModuloServicioIds([]);
-    await load();
+  };
+
+  const openCreateModulo = () => {
+    resetCreateModuloForm();
+    setCreateModuloOpen(true);
+  };
+
+  const closeCreateModulo = () => {
+    if (createModuloSaving) return;
+    setCreateModuloOpen(false);
+    resetCreateModuloForm();
+  };
+
+  const createModulo = async () => {
+    if (!moduloDesc.trim() || moduloValor === "") {
+      setError("Completá descripción y valor del módulo");
+      return;
+    }
+    if (!moduloServicioIds.length) {
+      setError("Seleccioná al menos un servicio para el módulo");
+      return;
+    }
+    setCreateModuloSaving(true);
+    setError("");
+    try {
+      await apiRequestWithRefresh("/novedades/modulos", {
+        method: "POST",
+        body: JSON.stringify({
+          descripcion: moduloDesc,
+          comentario: moduloComentario || null,
+          valor: Number(moduloValor),
+          produccion: Boolean(moduloProduccion),
+          servicio_ids: moduloServicioIds.map(Number),
+        }),
+      });
+      setCreateModuloOpen(false);
+      resetCreateModuloForm();
+      await load();
+    } catch (err) {
+      setError(err.message || "No se pudo crear el módulo");
+    } finally {
+      setCreateModuloSaving(false);
+    }
   };
 
   const openEditModulo = (item) => {
@@ -394,37 +423,11 @@ export function NovedadesParamPage() {
 
       {tab === "modulos" ? (
         <>
-          <form onSubmit={createModulo} style={{ display: "grid", gap: 10, marginBottom: 12 }}>
-            <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
-              <input value={moduloDesc} onChange={(e) => setModuloDesc(e.target.value)} placeholder="Descripción" required style={uiStyles.formControl} />
-              <input value={moduloComentario} onChange={(e) => setModuloComentario(e.target.value)} placeholder="Comentario" style={uiStyles.formControl} />
-              <input type="number" step="0.01" min="0" value={moduloValor} onChange={(e) => setModuloValor(e.target.value)} placeholder="Valor ARS" required style={uiStyles.formControl} />
-              <label style={{ display: "inline-flex", gap: 6, alignItems: "center" }}>
-                <input
-                  type="checkbox"
-                  checked={moduloProduccion}
-                  onChange={(e) => setModuloProduccion(e.target.checked)}
-                />
-                Producción
-              </label>
-            </div>
-            <div>
-              <div style={{ ...uiStyles.helpText, marginBottom: 6 }}>Servicios (obligatorio, puede ser más de uno)</div>
-              <div style={{ display: "flex", gap: 10, flexWrap: "wrap" }}>
-                {servicios.map((s) => (
-                  <label key={s.id} style={{ display: "inline-flex", gap: 6, alignItems: "center" }}>
-                    <input
-                      type="checkbox"
-                      checked={moduloServicioIds.includes(s.id)}
-                      onChange={() => toggleModuloServicio(s.id)}
-                    />
-                    {s.nombre}
-                  </label>
-                ))}
-              </div>
-            </div>
-            <button type="submit" style={{ ...uiStyles.buttonPrimary, width: "fit-content" }}>Agregar módulo</button>
-          </form>
+          <div style={{ marginBottom: 12 }}>
+            <button type="button" style={uiStyles.buttonPrimary} onClick={openCreateModulo}>
+              Nuevo módulo
+            </button>
+          </div>
           <ul style={uiStyles.listCard}>
             {modulos.map((item) => (
               <li key={item.id} style={{ padding: "8px 10px", borderBottom: `1px solid ${uiTheme.colors.border}` }}>
@@ -450,6 +453,118 @@ export function NovedadesParamPage() {
               </li>
             ))}
           </ul>
+
+          {createModuloOpen ? (
+            <div
+              role="presentation"
+              style={{
+                position: "fixed",
+                inset: 0,
+                zIndex: 1000,
+                background: "rgba(15, 43, 39, 0.45)",
+                display: "flex",
+                alignItems: "flex-start",
+                justifyContent: "center",
+                padding: "max(16px, 4vh) 16px",
+                overflowY: "auto",
+              }}
+              onClick={closeCreateModulo}
+            >
+              <div
+                role="dialog"
+                aria-modal="true"
+                aria-labelledby="create-modulo-title"
+                onClick={(e) => e.stopPropagation()}
+                style={{
+                  background: "#fff",
+                  borderRadius: uiTheme.radius.md,
+                  maxWidth: 520,
+                  width: "100%",
+                  marginBottom: 24,
+                  padding: 22,
+                  boxShadow: uiTheme.shadow.md,
+                  border: `1px solid ${uiTheme.colors.border}`,
+                }}
+              >
+                <h2 id="create-modulo-title" style={{ marginTop: 0, marginBottom: 12, fontSize: "1.1rem" }}>
+                  Nuevo módulo
+                </h2>
+                <div style={{ display: "grid", gap: 10 }}>
+                  <label style={{ display: "grid", gap: 4 }}>
+                    <span style={{ fontSize: 12, color: uiTheme.colors.textMuted }}>Descripción</span>
+                    <input
+                      value={moduloDesc}
+                      onChange={(e) => setModuloDesc(e.target.value)}
+                      placeholder="Descripción"
+                      style={uiStyles.formControl}
+                      disabled={createModuloSaving}
+                    />
+                  </label>
+                  <label style={{ display: "grid", gap: 4 }}>
+                    <span style={{ fontSize: 12, color: uiTheme.colors.textMuted }}>Comentario</span>
+                    <input
+                      value={moduloComentario}
+                      onChange={(e) => setModuloComentario(e.target.value)}
+                      placeholder="Comentario"
+                      style={uiStyles.formControl}
+                      disabled={createModuloSaving}
+                    />
+                  </label>
+                  <label style={{ display: "grid", gap: 4 }}>
+                    <span style={{ fontSize: 12, color: uiTheme.colors.textMuted }}>Valor ARS</span>
+                    <input
+                      type="number"
+                      step="0.01"
+                      min="0"
+                      value={moduloValor}
+                      onChange={(e) => setModuloValor(e.target.value)}
+                      placeholder="Valor ARS"
+                      style={uiStyles.formControl}
+                      disabled={createModuloSaving}
+                    />
+                  </label>
+                  <label style={{ display: "inline-flex", gap: 6, alignItems: "center" }}>
+                    <input
+                      type="checkbox"
+                      checked={moduloProduccion}
+                      onChange={(e) => setModuloProduccion(e.target.checked)}
+                      disabled={createModuloSaving}
+                    />
+                    Producción
+                  </label>
+                  <div>
+                    <div style={{ ...uiStyles.helpText, marginBottom: 6 }}>Servicios (obligatorio, puede ser más de uno)</div>
+                    <div style={{ display: "grid", gap: 8 }}>
+                      {servicios.map((s) => (
+                        <label key={s.id} style={{ display: "inline-flex", gap: 8, alignItems: "center" }}>
+                          <input
+                            type="checkbox"
+                            checked={moduloServicioIds.includes(s.id)}
+                            onChange={() => toggleModuloServicio(s.id)}
+                            disabled={createModuloSaving}
+                          />
+                          {s.nombre}
+                        </label>
+                      ))}
+                    </div>
+                  </div>
+                </div>
+                <div style={{ display: "flex", gap: 8, justifyContent: "flex-end", flexWrap: "wrap", marginTop: 16 }}>
+                  <button type="button" onClick={closeCreateModulo} style={uiStyles.buttonSecondary} disabled={createModuloSaving}>
+                    Cancelar
+                  </button>
+                  <button
+                    type="button"
+                    onClick={createModulo}
+                    style={uiStyles.buttonPrimary}
+                    disabled={createModuloSaving || !moduloDesc.trim() || moduloValor === ""}
+                  >
+                    {createModuloSaving ? "Cargando…" : "Cargar"}
+                  </button>
+                </div>
+              </div>
+            </div>
+          ) : null}
 
           {editModulo ? (
             <div
