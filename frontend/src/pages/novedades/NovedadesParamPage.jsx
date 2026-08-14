@@ -42,6 +42,8 @@ export function NovedadesParamPage() {
   const [serviciosModulo, setServiciosModulo] = useState(null);
   const [serviciosIdsEdit, setServiciosIdsEdit] = useState([]);
   const [serviciosSaving, setServiciosSaving] = useState(false);
+  const [deleteModulo, setDeleteModulo] = useState(null);
+  const [deleteModuloSaving, setDeleteModuloSaving] = useState(false);
   const [jefeUserId, setJefeUserId] = useState("");
   const [jefeServicioId, setJefeServicioId] = useState("");
   const [profId, setProfId] = useState("");
@@ -235,6 +237,48 @@ export function NovedadesParamPage() {
       setServiciosSaving(false);
     }
   };
+
+  const closeDeleteModulo = () => {
+    if (deleteModuloSaving) return;
+    setDeleteModulo(null);
+  };
+
+  const confirmDeleteModulo = async () => {
+    if (!deleteModulo) return;
+    setDeleteModuloSaving(true);
+    setError("");
+    try {
+      await apiRequestWithRefresh(`/novedades/modulos/${deleteModulo.id}`, { method: "DELETE" });
+      setDeleteModulo(null);
+      await load();
+    } catch (err) {
+      setError(err.message || "No se pudo eliminar el módulo");
+    } finally {
+      setDeleteModuloSaving(false);
+    }
+  };
+
+  useEffect(() => {
+    if (!createModuloOpen && !editModulo && !serviciosModulo && !deleteModulo) return undefined;
+    const onKey = (e) => {
+      if (e.key !== "Escape") return;
+      if (deleteModulo) closeDeleteModulo();
+      else if (serviciosModulo) closeServiciosModulo();
+      else if (editModulo) closeEditModulo();
+      else if (createModuloOpen) closeCreateModulo();
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [
+    createModuloOpen,
+    createModuloSaving,
+    editModulo,
+    editSaving,
+    serviciosModulo,
+    serviciosSaving,
+    deleteModulo,
+    deleteModuloSaving,
+  ]);
 
   const createJefe = async (event) => {
     event.preventDefault();
@@ -445,7 +489,7 @@ export function NovedadesParamPage() {
                     <button type="button" style={uiStyles.buttonSecondary} onClick={() => openServiciosModulo(item)}>
                       servicios
                     </button>
-                    <button type="button" style={uiStyles.buttonDanger} onClick={async () => { await apiRequestWithRefresh(`/novedades/modulos/${item.id}`, { method: "DELETE" }); await load(); }}>
+                    <button type="button" style={uiStyles.buttonDanger} onClick={() => setDeleteModulo(item)}>
                       eliminar
                     </button>
                   </div>
@@ -693,6 +737,77 @@ export function NovedadesParamPage() {
                   </button>
                   <button type="button" onClick={saveServiciosModulo} style={uiStyles.buttonPrimary} disabled={serviciosSaving}>
                     {serviciosSaving ? "Guardando…" : "Aceptar"}
+                  </button>
+                </div>
+              </div>
+            </div>
+          ) : null}
+
+          {deleteModulo ? (
+            <div
+              role="presentation"
+              style={{
+                position: "fixed",
+                inset: 0,
+                zIndex: 1000,
+                background: "rgba(15, 43, 39, 0.45)",
+                display: "flex",
+                alignItems: "flex-start",
+                justifyContent: "center",
+                padding: "max(16px, 4vh) 16px",
+                overflowY: "auto",
+              }}
+              onClick={closeDeleteModulo}
+            >
+              <div
+                role="dialog"
+                aria-modal="true"
+                aria-labelledby="delete-modulo-title"
+                onClick={(e) => e.stopPropagation()}
+                style={{
+                  background: "#fff",
+                  borderRadius: uiTheme.radius.md,
+                  maxWidth: 480,
+                  width: "100%",
+                  marginBottom: 24,
+                  padding: 22,
+                  boxShadow: uiTheme.shadow.md,
+                  border: `1px solid ${uiTheme.colors.border}`,
+                }}
+              >
+                <h2 id="delete-modulo-title" style={{ marginTop: 0, marginBottom: 10, fontSize: "1.1rem" }}>
+                  ¿Eliminar este módulo?
+                </h2>
+                <p style={{ marginTop: 0, marginBottom: 12, color: uiTheme.colors.textMuted, fontSize: 14 }}>
+                  Vas a eliminar el siguiente módulo. Esta acción no se puede deshacer desde acá.
+                </p>
+                <div style={{ ...uiStyles.kpiCard, marginBottom: 14, lineHeight: 1.55, fontSize: 14 }}>
+                  <div>
+                    <strong>ID:</strong> #{deleteModulo.id}
+                  </div>
+                  <div>
+                    <strong>Descripción:</strong> {deleteModulo.descripcion || "—"}
+                  </div>
+                  <div>
+                    <strong>Comentario:</strong> {deleteModulo.comentario || "—"}
+                  </div>
+                  <div>
+                    <strong>Valor:</strong> ${deleteModulo.valor}
+                  </div>
+                  <div>
+                    <strong>Producción:</strong> {deleteModulo.produccion ? "sí" : "no"}
+                  </div>
+                  <div>
+                    <strong>Servicios:</strong>{" "}
+                    {(deleteModulo.servicio_nombres || []).join(", ") || "sin asociar"}
+                  </div>
+                </div>
+                <div style={{ display: "flex", gap: 8, justifyContent: "flex-end", flexWrap: "wrap" }}>
+                  <button type="button" onClick={closeDeleteModulo} style={uiStyles.buttonSecondary} disabled={deleteModuloSaving}>
+                    Cancelar
+                  </button>
+                  <button type="button" onClick={confirmDeleteModulo} style={uiStyles.buttonDanger} disabled={deleteModuloSaving}>
+                    {deleteModuloSaving ? "Eliminando…" : "Eliminar"}
                   </button>
                 </div>
               </div>
