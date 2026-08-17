@@ -127,6 +127,13 @@ Estado: **CLOSED** (Q1–Q10).
 - Solo novedad (sin módulo) → sí llama (como hoy).
 - Ambos: si el módulo seleccionado tiene `produccion=false` → no llama; si `true` → sí llama.
 
+## Post-survey UX (documentado, no reabre survey)
+
+- **R1** — Alta de módulo solo vía modal **Nuevo módulo** (Cancelar/Cargar); lista sin form inline.
+- **R2** — Eliminar abre modal de confirmación con datos; Cancelar/Eliminar; Esc = cancelar.
+
+Detalle: `implementation-notes.md`.
+
 ---
 
 ## Notas de contexto (no son preguntas)

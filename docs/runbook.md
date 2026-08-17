@@ -68,6 +68,10 @@
   - Editar fecha o error del proxy: bloqueo simple (sin force). Create API no reconsulta producción; valida enum/obs si vienen
   - Si el **módulo** tiene `produccion=false` (rev `0018_modulo_produccion`), al cargar ese módulo (solo o con novedad) **no** se llama al proxy
 - Cambio `novedades-modulos-edicion`: Param → Módulos: `editar` (datos + checkbox producción) y `servicios` (permite 0); `PUT /modulos/{id}` vs `PUT /modulos/{id}/servicios`
+- Cambio `novedades-sadofe-feriados-descuento` (rev `0019_sadofe_feriados`):
+  - Módulo checkbox **SADOFE** (off = Semana); Carga filtra combo según fecha + feriados (lun–vie no feriado = Semana; sáb/dom/feriado = SADOFE)
+  - Param tab **Feriados** (fecha + nombre; ABM admin/rrhh)
+  - Novedad tipo **Horas a descontar**: valor = −(horas × valor_hora); entra en grilla/XLS/Capital Humano
 
 ## Roles (panel)
 - `admin`: distribución + novedades (todo) + usuarios
@@ -78,9 +82,10 @@
 ## Flujo Novedades (resumen)
 1. Parametrización: servicios (**con valor hora**), módulos (**asociados a uno o más servicios**), jefes↔servicios, profesionales↔servicios, período abierto.
 2. Mis profesionales: asociar/quitar profesionales al servicio (typeahead); desasociar no borra cargas históricas.
-3. Carga: módulo solo / novedad solo / ambos + **fecha de realización** (calendario; sin días si el período aún no empezó). Valor novedad = horas × valor hora **del servicio**. Errores en modal OK.
+3. Carga: módulo solo / novedad solo / ambos + **fecha de realización** (calendario; sin días si el período aún no empezó). Valor novedad = horas × valor hora **del servicio** (negativo si tipo Horas a descontar). Combo de módulos filtrado Semana/SADOFE según fecha y feriados. Errores en modal OK.
 4. Listado inferior (Carga): grilla unificada con F. realización y F. carga; editar fecha si período abierto; **anular** con modal.
 5. Generación XLS (admin/rrhh): grilla + filtros + descarga (incluye ambas fechas).
+6. Parametrización: Feriados globales (fecha + nombre) al lado de Períodos.
 
 ## Docs del change
 - Archivados: `openspec/changes/archive/2026-07-29-novedades-modulos/`, `openspec/changes/archive/2026-07-29-novedades-jefe-profesionales-fecha-carga/`, `openspec/changes/archive/2026-07-30-novedades-sincro-profesionales/`

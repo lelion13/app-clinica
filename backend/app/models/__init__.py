@@ -10,6 +10,7 @@ from app.models.novedades import (
     NovedadesModuloServicio,
     NovedadesNovedad,
     NovedadesPeriodo,
+    NovedadesFeriado,
     NovedadesProfesionalServicio,
     NovedadesServicio,
 )
@@ -30,6 +31,7 @@ __all__ = [
     "NovedadesModulo",
     "NovedadesModuloServicio",
     "NovedadesPeriodo",
+    "NovedadesFeriado",
     "NovedadesConfig",
     "NovedadesJefeServicio",
     "NovedadesProfesionalServicio",

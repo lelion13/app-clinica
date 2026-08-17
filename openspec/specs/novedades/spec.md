@@ -43,13 +43,45 @@ The system MUST support roles `admin`, `operador`, `jefe_medico`, `rrhh`. Users 
 
 ### Requirement: Servicios y módulos
 
-The system MUST provide ABM of **servicios** (id, nombre, activo, **valor_hora**) and **módulos** (id, descripción, comentario, valor ARS) with **N:N** association to services. Admin and `rrhh` MUST manage them; `jefe_medico` MUST NOT.
+The system MUST provide ABM of **servicios** (id, nombre, activo, **valor_hora**) and **módulos** (id, descripción, comentario, valor ARS, **produccion** boolean) with **N:N** association to services. Admin and `rrhh` MUST manage them; `jefe_medico` MUST NOT.
+
+Modules MUST support:
+- Create with optional `produccion` (default false) and at least one `servicio_id`, via Param UI modal **Nuevo módulo** (Cancelar / Cargar → `POST /modulos`)
+- Update of data fields (descripción, comentario, valor, produccion) without changing associations (`PUT /modulos/{id}`)
+- Replace of service associations (including empty set) via `PUT /modulos/{id}/servicios`
+- Soft-delete only after confirmation modal showing module summary (Cancelar / Eliminar; Escape cancels)
+- Param list buttons: `editar`, `servicios`, `eliminar`; no inline create form; no `produccion` badge on list rows
 
 #### Scenario: Alta módulo asociado a servicios
 
+- GIVEN `rrhh` autenticado en tab Módulos
+- WHEN abre Nuevo módulo, completa descripción, valor y ≥1 servicio, y pulsa Cargar
+- THEN queda disponible solo para cargas en esos servicios (o “sin asociar” si luego se vacían)
+
+#### Scenario: Alta módulo con produccion
+
 - GIVEN `rrhh` autenticado
-- WHEN crea módulo con descripción, valor y uno o más `servicio_ids`
-- THEN queda disponible solo para cargas en esos servicios
+- WHEN crea módulo con `produccion` desmarcado (default) y ≥1 servicio
+- THEN el módulo se persiste con `produccion=false`
+
+#### Scenario: Editar datos sin tocar servicios
+
+- GIVEN módulo asociado a servicios S1,S2
+- WHEN admin guarda el modal editar cambiando valor y `produccion`
+- THEN descripción/comentario/valor/produccion se actualizan y las asociaciones permanecen
+
+#### Scenario: Desasociar todos los servicios
+
+- GIVEN módulo con servicios
+- WHEN admin acepta el modal servicios con ningún checkbox
+- THEN el módulo queda sin asociaciones activas (“sin asociar”)
+
+#### Scenario: Confirmar eliminación de módulo
+
+- GIVEN módulo en la lista
+- WHEN pulsa eliminar y confirma en el modal
+- THEN MUST soft-delete el módulo
+- AND Cancelar o Escape MUST NOT eliminar
 
 #### Scenario: Valor hora por servicio
 
@@ -221,9 +253,92 @@ While period open, admin/jefe scoped MUST be able to update `fecha_realizacion`.
 - WHEN se intenta actualizar `fecha_realizacion`
 - THEN MUST be rejected
 
+### Requirement: Verificación de producción al cargar
+
+On the Carga page, before creating a module assignment and/or novedad, and before confirming an update of `fecha_realizacion`, the system MUST verify production for that professional and date via a **backend proxy** to the external `tiene-produccion` API (Bearer = Novedades professional sync token; URL from `NOVEDADES_BONOS_TIENE_PRODUCCION_URL`). The query MUST use `fecha` = selected realization date and `codprof` = catalog `CODPROF` (not internal id).
+
+The check MUST run when the user confirms the action (submit Cargar / confirm fecha edit), for roles `admin` and `jefe_medico`.
+
+If the proxy/external call **fails**, the UI MUST block the action (fail-closed) with an error modal and MUST NOT offer force-load.
+
+If the external result is **false** on **create** (alta): see Requirement “Force-load sin producción”.
+
+If the external result is **false** on **edit fecha**: the UI MUST block the update with a simple message and MUST NOT offer force-load. The create/update backend endpoints are NOT required to re-validate `tiene-produccion`.
+
+**Exception (módulo flag):** When the create includes a selected módulo with `produccion=false`, the UI MUST NOT call the external check for that submit (see Requirement “Verificación de producción en Carga — flag módulo”). Solo-novedad and módulos with `produccion=true` MUST still check. Editing `fecha_realizacion` MUST always check.
+
+#### Scenario: Con producción
+
+- GIVEN proxy responde true
+- WHEN pulsa Cargar con payload válido
+- THEN MUST continuar el flujo de alta normal (sin motivo/obs)
+
+#### Scenario: API caído
+
+- GIVEN el proxy/externo falla
+- WHEN pulsa Cargar
+- THEN MUST bloquearse la carga con modal de error
+- AND MUST NOT mostrar el flujo de force-load
+
+#### Scenario: Editar fecha sin producción
+
+- GIVEN carga existente
+- WHEN confirma nueva fecha y el proxy responde false
+- THEN MUST NO actualizar la fecha
+- AND MUST NOT ofrecer force-load con motivo
+
+### Requirement: Force-load sin producción
+
+When create-submit receives `tiene_produccion: false`, the UI MUST show a modal containing: the message “El profesional no tiene producción en esa fecha. No se puede cargar módulo ni novedad para ese día.”; a motivo select defaulting to empty with options **Vacaciones** and **Enfermedad** only; a mandatory observation field; buttons **Cancelar** and **Cargar**.
+
+- **Cancelar** MUST close the modal, MUST NOT create cargas, and MUST clear the carga form controls used for that attempt (profesional, módulo, novedad tipo/horas, fecha de realización); período and servicio MAY remain.
+- **Cargar** MUST require a selected motivo and non-blank observation; then MUST create the intended module and/or novedad including the same `motivo_sin_produccion` and `observacion_sin_produccion` on each created row.
+- Roles: `admin` and `jefe_medico`.
+
+The system MUST persist those fields on `novedades_asignacion_modulo` and `novedades_novedad` and expose them on list responses for Carga. Backend MUST accept optional motivo/obs on create (validate enum + non-empty obs when provided) and MUST NOT require them on every create nor re-check production server-side.
+
+#### Scenario: Cancelar force
+
+- GIVEN modal force visible tras `false`
+- WHEN pulsa Cancelar
+- THEN MUST cerrarse el modal
+- AND MUST NOT crearse módulo ni novedad
+- AND MUST limpiarse profesional / módulo / novedad / fecha del form de carga
+
+#### Scenario: Cargar force incompleto
+
+- GIVEN modal force sin motivo o sin observación
+- WHEN pulsa Cargar
+- THEN MUST rechazar (validación UI)
+- AND MUST NOT enviar POST
+
+#### Scenario: Cargar force OK (módulo + novedad)
+
+- GIVEN modal force con motivo Vacaciones y observación “texto”
+- AND el form pedía módulo y novedad
+- WHEN pulsa Cargar
+- THEN MUST crearse ambas filas
+- AND ambas MUST tener el mismo motivo y observación persistidos
+
+### Requirement: Verificación de producción en Carga — flag módulo
+
+When creating a carga that includes a **módulo** with `produccion=false`, the UI MUST NOT call the external `tiene-produccion` check for that submit. When the carga is only a novedad, or the selected módulo has `produccion=true`, Requirements “Verificación de producción al cargar” and “Force-load sin producción” MUST apply.
+
+#### Scenario: Carga módulo sin producción propia
+
+- GIVEN módulo M con `produccion=false`
+- WHEN admin/jefe carga solo M (o M + novedad) en una fecha
+- THEN MUST NOT llamar `GET .../bonos/tiene-produccion` y MUST permitir el POST
+
+#### Scenario: Carga solo novedad
+
+- GIVEN formulario sin módulo
+- WHEN se carga solo novedad
+- THEN MUST verificar producción externa
+
 ### Requirement: Listado de cargas en Carga
 
-The Carga page MUST show a **unified grid** with columns at least: tipo, servicio, profesional, concepto, horas, valor, **fecha realización**, período, **fecha carga**. Filter/sort by column; default sort servicio → profesional.
+The Carga page MUST show a **unified grid** with columns at least: tipo, servicio, profesional, concepto, horas, valor, **fecha realización**, **Sin prod.** (motivo/obs when present), período, **fecha carga**. Filter/sort by column; default sort servicio → profesional.
 
 Anular MUST use a confirmation modal (Cancelar / Confirmar). Editing fecha (period open) MAY use a dedicated modal.
 

@@ -31,6 +31,7 @@ class ModuloCreateRequest(BaseModel):
     comentario: str | None = Field(default=None, max_length=500)
     valor: Decimal = Field(ge=0)
     produccion: bool = False
+    sadofe: bool = False
     servicio_ids: list[int] = Field(min_length=1)
 
 
@@ -39,6 +40,7 @@ class ModuloUpdateRequest(BaseModel):
     comentario: str | None = Field(default=None, max_length=500)
     valor: Decimal = Field(ge=0)
     produccion: bool = False
+    sadofe: bool = False
 
 
 class ModuloServiciosUpdateRequest(BaseModel):
@@ -51,6 +53,7 @@ class ModuloResponse(BaseModel):
     comentario: str | None
     valor: Decimal
     produccion: bool = False
+    sadofe: bool = False
     servicio_ids: list[int] = []
     servicio_nombres: list[str] = []
     created_at: datetime
@@ -70,6 +73,24 @@ class PeriodoResponse(BaseModel):
     fecha_inicio: date
     fecha_fin: date
     estado: str
+    created_at: datetime
+    updated_at: datetime
+
+
+class FeriadoCreateRequest(BaseModel):
+    fecha: date
+    nombre: str = Field(min_length=2, max_length=200)
+
+
+class FeriadoUpdateRequest(BaseModel):
+    fecha: date
+    nombre: str = Field(min_length=2, max_length=200)
+
+
+class FeriadoResponse(BaseModel):
+    id: int
+    fecha: date
+    nombre: str
     created_at: datetime
     updated_at: datetime
 
@@ -169,7 +190,7 @@ class AsignacionResponse(BaseModel):
     created_by: int | None = None
 
 
-NovedadTipoLiteral = Literal["hora_extra", "hora_extra_por_ausencia"]
+NovedadTipoLiteral = Literal["hora_extra", "hora_extra_por_ausencia", "horas_a_descontar"]
 
 
 class NovedadCreateRequest(BaseModel):

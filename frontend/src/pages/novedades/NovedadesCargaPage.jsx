@@ -10,6 +10,7 @@ import { CargasListGrid } from "./CargasListGrid";
 const TIPO_OPTIONS = [
   { value: "hora_extra", label: "Hora extra" },
   { value: "hora_extra_por_ausencia", label: "Hora extra por ausencia" },
+  { value: "horas_a_descontar", label: "Horas a descontar" },
 ];
 
 const MSG_SIN_PRODUCCION =
@@ -23,6 +24,25 @@ const MOTIVO_LABELS = {
 function todayISO() {
   const d = new Date();
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+}
+
+function weekdayFromISO(iso) {
+  const [y, m, d] = String(iso || "").slice(0, 10).split("-").map(Number);
+  if (!y || !m || !d) return null;
+  return new Date(y, m - 1, d).getDay();
+}
+
+function isSadofeDay(iso, feriadoSet) {
+  const key = String(iso || "").slice(0, 10);
+  if (!key) return false;
+  if (feriadoSet.has(key)) return true;
+  const wd = weekdayFromISO(key);
+  return wd === 0 || wd === 6;
+}
+
+function moduloValidoParaFecha(modulo, fecha, feriadoSet) {
+  const sadofeDay = isSadofeDay(fecha, feriadoSet);
+  return Boolean(modulo?.sadofe) === sadofeDay;
 }
 
 /** @returns {Promise<boolean>} true if tiene producción */
@@ -69,12 +89,23 @@ export function NovedadesCargaPage() {
   const [submitting, setSubmitting] = useState(false);
   const [forceOpen, setForceOpen] = useState(false);
   const [forceLoading, setForceLoading] = useState(false);
+  const [feriados, setFeriados] = useState([]);
 
   const openPeriodo = useMemo(() => periodos.find((p) => p.estado === "open"), [periodos]);
   const selectedModulo = useMemo(
     () => modulos.find((m) => String(m.id) === String(moduloId)),
     [modulos, moduloId]
   );
+
+  const feriadoSet = useMemo(
+    () => new Set((feriados || []).map((f) => String(f.fecha || "").slice(0, 10))),
+    [feriados]
+  );
+
+  const modulosVisibles = useMemo(() => {
+    if (!fechaRealizacion) return [];
+    return modulos.filter((m) => moduloValidoParaFecha(m, fechaRealizacion, feriadoSet));
+  }, [modulos, fechaRealizacion, feriadoSet]);
 
   const fechaBounds = useMemo(() => {
     const periodo = periodos.find((p) => String(p.id) === String(periodoId)) || openPeriodo;
@@ -107,6 +138,12 @@ export function NovedadesCargaPage() {
       return fechaBounds.max || todayISO();
     });
   }, [fechaBounds.min, fechaBounds.max, fechaBounds.valid]);
+
+  useEffect(() => {
+    if (!moduloId) return;
+    const stillValid = modulosVisibles.some((m) => String(m.id) === String(moduloId));
+    if (!stillValid) setModuloId("");
+  }, [moduloId, modulosVisibles]);
 
   const gridRows = useMemo(() => {
     const moduloRows = asignaciones.map((item) => ({
@@ -170,16 +207,18 @@ export function NovedadesCargaPage() {
   const load = async () => {
     setError("");
     try {
-      const [s, p, a, n] = await Promise.all([
+      const [s, p, a, n, f] = await Promise.all([
         apiRequestWithRefresh("/novedades/servicios"),
         apiRequestWithRefresh("/novedades/periodos"),
         apiRequestWithRefresh("/novedades/asignaciones-modulos"),
         apiRequestWithRefresh("/novedades/cargas"),
+        apiRequestWithRefresh("/novedades/feriados"),
       ]);
       setServicios(s);
       setPeriodos(p);
       setAsignaciones(a);
       setNovedades(n);
+      setFeriados(f || []);
       setPeriodoId((current) => {
         if (current) return current;
         const open = p.find((item) => item.estado === "open");
@@ -441,7 +480,7 @@ export function NovedadesCargaPage() {
           <div style={{ display: "flex", gap: 8, flexWrap: "wrap", alignItems: "center", marginBottom: 16 }}>
             <select value={moduloId} onChange={(e) => setModuloId(e.target.value)} style={uiStyles.formControl}>
               <option value="">Sin módulo</option>
-              {modulos.map((m) => (
+              {modulosVisibles.map((m) => (
                 <option key={m.id} value={m.id}>{m.descripcion}</option>
               ))}
             </select>
@@ -477,7 +516,9 @@ export function NovedadesCargaPage() {
               style={uiStyles.formControl}
             />
             <span style={uiStyles.helpText}>
-              Valor estimado: {horas && valorHora != null ? `$${(Number(horas) * Number(valorHora)).toFixed(2)}` : "—"}
+              Valor estimado: {horas && valorHora != null
+                ? `$${(Number(horas) * Number(valorHora) * (tipo === "horas_a_descontar" ? -1 : 1)).toFixed(2)}`
+                : "—"}
             </span>
           </div>
 

@@ -1,4 +1,5 @@
 from datetime import date, datetime
+from decimal import Decimal
 from zoneinfo import ZoneInfo
 
 from fastapi import HTTPException, status
@@ -8,6 +9,7 @@ from sqlalchemy.orm import Session
 from app.core.config import settings
 from app.models.novedades import (
     MotivoSinProduccion,
+    NovedadTipo,
     NovedadesConfig,
     NovedadesJefeServicio,
     NovedadesModulo,
@@ -41,6 +43,13 @@ def normalize_motivo_sin_produccion(
             detail="motivo_sin_produccion inválido (vacaciones|enfermedad)",
         )
     return motivo_s, obs_s[:500]
+
+
+def novedad_valor_calculado(tipo, horas, valor_hora) -> Decimal:
+    """Positive for extras; negative for horas_a_descontar."""
+    t = tipo.value if isinstance(tipo, NovedadTipo) else str(tipo)
+    sign = Decimal("-1") if t == NovedadTipo.horas_a_descontar.value else Decimal("1")
+    return sign * Decimal(horas) * Decimal(valor_hora)
 
 
 def business_today() -> date:

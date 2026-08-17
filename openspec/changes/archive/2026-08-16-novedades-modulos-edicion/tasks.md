@@ -10,9 +10,11 @@
 
 ## 2. Frontend Param
 
-- [x] 2.1 Create checkbox `produccion`
+- [x] 2.1 Create checkbox `produccion` (en modal alta)
 - [x] 2.2 Modal editar (Cancelar/Guardar) + botón `editar`
 - [x] 2.3 Modal servicios (Cancelar/Aceptar, allow 0) + botón `servicios`
+- [x] 2.4 Alta solo vía modal **Nuevo módulo** (Cancelar/Cargar); lista sin form inline
+- [x] 2.5 Modal confirmar eliminar (datos + Cancelar/Eliminar; Esc cancela)
 
 ## 3. Frontend Carga
 
@@ -21,3 +23,4 @@
 ## 4. Docs
 
 - [x] 4.1 Runbook breve + marcar tasks
+- [x] 4.2 implementation-notes + verify-report (pre-archive)

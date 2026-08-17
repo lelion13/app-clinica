@@ -49,7 +49,7 @@ Optional fields on create módulo/novedad:
    - Text Q7
    - Select motivo (default `""`; options Vacaciones / Enfermedad)
    - Textarea observación (required)
-   - **Cancelar** → close; no POST
+   - **Cancelar** → close; no POST; clear carga fields (profesional, módulo, novedad, fecha)
    - **Cargar** → if missing motivo/obs show inline/modal error; else POST with fields on every entity created in that submit
 4. Proxy/network error → error modal only (no force).
 
