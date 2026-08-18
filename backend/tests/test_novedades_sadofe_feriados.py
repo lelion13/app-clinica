@@ -6,7 +6,14 @@ import pytest
 from fastapi import HTTPException
 
 from app.models.novedades import NovedadTipo
-from app.schemas.novedades import FeriadoCreateRequest, ModuloCreateRequest, NovedadCreateRequest
+from pydantic import ValidationError
+
+from app.schemas.novedades import (
+    FeriadoCreateRequest,
+    ModuloCreateRequest,
+    NovedadCreateRequest,
+    ServicioCreateRequest,
+)
 from app.services.novedades.helpers import novedad_valor_calculado
 from app.services.novedades import masters as masters_service
 
@@ -38,6 +45,27 @@ def test_modulo_create_default_sadofe_false():
         servicio_ids=[1],
     )
     assert payload.sadofe is False
+
+
+def test_servicio_concepto_cero_queda_null():
+    payload = ServicioCreateRequest(nombre="Guardia", valor_hora=Decimal("100"), concepto_liquidacion=0)
+    assert payload.concepto_liquidacion is None
+
+
+def test_servicio_concepto_positivo():
+    payload = ServicioCreateRequest(nombre="Guardia", valor_hora=Decimal("100"), concepto_liquidacion=101)
+    assert payload.concepto_liquidacion == 101
+
+
+def test_servicio_concepto_negativo_invalido():
+    with pytest.raises(ValidationError):
+        ServicioCreateRequest(nombre="Guardia", valor_hora=Decimal("100"), concepto_liquidacion=-1)
+
+
+def test_servicio_concepto_se_puede_repetir():
+    a = ServicioCreateRequest(nombre="Uno", valor_hora=Decimal("1"), concepto_liquidacion=205)
+    b = ServicioCreateRequest(nombre="Dos", valor_hora=Decimal("2"), concepto_liquidacion=205)
+    assert a.concepto_liquidacion == b.concepto_liquidacion == 205
 
 
 def test_create_feriado_rechaza_fecha_duplicada(monkeypatch):

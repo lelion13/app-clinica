@@ -2,19 +2,39 @@ from datetime import date, datetime
 from decimal import Decimal
 from typing import Literal
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, field_validator
+
+
+def _normalize_concepto_liquidacion(value: int | None) -> int | None:
+    if value is None or value == 0:
+        return None
+    if value < 0:
+        raise ValueError("concepto_liquidacion debe ser un entero positivo o vacío")
+    return value
 
 
 class ServicioCreateRequest(BaseModel):
     nombre: str = Field(min_length=2, max_length=120)
     activo: bool = True
     valor_hora: Decimal = Field(default=Decimal("0"), ge=0)
+    concepto_liquidacion: int | None = None
+
+    @field_validator("concepto_liquidacion")
+    @classmethod
+    def _concepto_create(cls, value: int | None) -> int | None:
+        return _normalize_concepto_liquidacion(value)
 
 
 class ServicioUpdateRequest(BaseModel):
     nombre: str = Field(min_length=2, max_length=120)
     activo: bool = True
     valor_hora: Decimal = Field(ge=0)
+    concepto_liquidacion: int | None = None
+
+    @field_validator("concepto_liquidacion")
+    @classmethod
+    def _concepto_update(cls, value: int | None) -> int | None:
+        return _normalize_concepto_liquidacion(value)
 
 
 class ServicioResponse(BaseModel):
@@ -22,6 +42,7 @@ class ServicioResponse(BaseModel):
     nombre: str
     activo: bool
     valor_hora: Decimal
+    concepto_liquidacion: int | None = None
     created_at: datetime
     updated_at: datetime
 

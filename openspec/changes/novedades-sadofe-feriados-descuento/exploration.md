@@ -37,6 +37,12 @@ Un solo change SDD `novedades-sadofe-feriados-descuento` (cohesión fecha↔mód
 
 Abierta en `decisions.md` — **una pregunta a la vez**.
 
+## Addendum: concepto liquidación
+
+Parametrización → Servicios: campo numérico **concepto liquidación**. Se persistirá ahora; Capital Humano lo usará más adelante como organizador de archivos importados (fuera de este apply).
+
+Current: servicio = `nombre`, `activo`, `valor_hora`; alta inline; solo `valor_hora` editable en grilla; delete directo.
+
 ## Ready for Proposal
 
-Yes — survey Q1–Q14 closed (`decisions.md`).
+Yes — survey Q1–Q23 closed (`decisions.md`).

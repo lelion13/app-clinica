@@ -28,6 +28,17 @@ export function NovedadesParamPage() {
 
   const [servicioNombre, setServicioNombre] = useState("");
   const [servicioValorHora, setServicioValorHora] = useState("0");
+  const [servicioConcepto, setServicioConcepto] = useState("");
+  const [createServicioOpen, setCreateServicioOpen] = useState(false);
+  const [createServicioSaving, setCreateServicioSaving] = useState(false);
+  const [editServicio, setEditServicio] = useState(null);
+  const [editServicioNombre, setEditServicioNombre] = useState("");
+  const [editServicioValorHora, setEditServicioValorHora] = useState("0");
+  const [editServicioConcepto, setEditServicioConcepto] = useState("");
+  const [editServicioActivo, setEditServicioActivo] = useState(true);
+  const [editServicioSaving, setEditServicioSaving] = useState(false);
+  const [deleteServicio, setDeleteServicio] = useState(null);
+  const [deleteServicioSaving, setDeleteServicioSaving] = useState(false);
   const [moduloDesc, setModuloDesc] = useState("");
   const [moduloComentario, setModuloComentario] = useState("");
   const [moduloValor, setModuloValor] = useState("");
@@ -100,37 +111,132 @@ export function NovedadesParamPage() {
     load();
   }, []);
 
+  const parseConceptoLiquidacion = (raw) => {
+    const trimmed = String(raw ?? "").trim();
+    if (trimmed === "") return null;
+    const n = Number(trimmed);
+    if (!Number.isFinite(n) || n < 0 || !Number.isInteger(n)) return undefined;
+    return n === 0 ? null : n;
+  };
+
+  const resetCreateServicioForm = () => {
+    setServicioNombre("");
+    setServicioValorHora("0");
+    setServicioConcepto("");
+  };
+
+  const openCreateServicio = () => {
+    resetCreateServicioForm();
+    setCreateServicioOpen(true);
+  };
+
+  const closeCreateServicio = () => {
+    if (createServicioSaving) return;
+    setCreateServicioOpen(false);
+    resetCreateServicioForm();
+  };
+
+  const createServicio = async () => {
+    if (!servicioNombre.trim() || servicioValorHora === "") {
+      setError("Completá nombre y valor hora del servicio");
+      return;
+    }
+    const concepto = parseConceptoLiquidacion(servicioConcepto);
+    if (concepto === undefined) {
+      setError("Concepto liquidación debe ser un entero positivo o vacío");
+      return;
+    }
+    setCreateServicioSaving(true);
+    setError("");
+    try {
+      await apiRequestWithRefresh("/novedades/servicios", {
+        method: "POST",
+        body: JSON.stringify({
+          nombre: servicioNombre.trim(),
+          activo: true,
+          valor_hora: Number(servicioValorHora),
+          concepto_liquidacion: concepto,
+        }),
+      });
+      setCreateServicioOpen(false);
+      resetCreateServicioForm();
+      await load();
+    } catch (err) {
+      setError(err.message || "No se pudo crear el servicio");
+    } finally {
+      setCreateServicioSaving(false);
+    }
+  };
+
+  const openEditServicio = (item) => {
+    setEditServicio(item);
+    setEditServicioNombre(item.nombre || "");
+    setEditServicioValorHora(String(item.valor_hora ?? "0"));
+    setEditServicioConcepto(item.concepto_liquidacion == null ? "" : String(item.concepto_liquidacion));
+    setEditServicioActivo(Boolean(item.activo));
+  };
+
+  const closeEditServicio = () => {
+    if (editServicioSaving) return;
+    setEditServicio(null);
+  };
+
+  const saveEditServicio = async () => {
+    if (!editServicio) return;
+    if (!editServicioNombre.trim() || editServicioValorHora === "") {
+      setError("Completá nombre y valor hora del servicio");
+      return;
+    }
+    const concepto = parseConceptoLiquidacion(editServicioConcepto);
+    if (concepto === undefined) {
+      setError("Concepto liquidación debe ser un entero positivo o vacío");
+      return;
+    }
+    setEditServicioSaving(true);
+    setError("");
+    try {
+      await apiRequestWithRefresh(`/novedades/servicios/${editServicio.id}`, {
+        method: "PUT",
+        body: JSON.stringify({
+          nombre: editServicioNombre.trim(),
+          activo: Boolean(editServicioActivo),
+          valor_hora: Number(editServicioValorHora),
+          concepto_liquidacion: concepto,
+        }),
+      });
+      setEditServicio(null);
+      await load();
+    } catch (err) {
+      setError(err.message || "No se pudo guardar el servicio");
+    } finally {
+      setEditServicioSaving(false);
+    }
+  };
+
+  const closeDeleteServicio = () => {
+    if (deleteServicioSaving) return;
+    setDeleteServicio(null);
+  };
+
+  const confirmDeleteServicio = async () => {
+    if (!deleteServicio) return;
+    setDeleteServicioSaving(true);
+    setError("");
+    try {
+      await apiRequestWithRefresh(`/novedades/servicios/${deleteServicio.id}`, { method: "DELETE" });
+      setDeleteServicio(null);
+      await load();
+    } catch (err) {
+      setError(err.message || "No se pudo eliminar el servicio");
+    } finally {
+      setDeleteServicioSaving(false);
+    }
+  };
+
   const toggleModuloServicio = (id) => {
     setModuloServicioIds((prev) =>
       prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id]
     );
-  };
-
-  const createServicio = async (event) => {
-    event.preventDefault();
-    await apiRequestWithRefresh("/novedades/servicios", {
-      method: "POST",
-      body: JSON.stringify({
-        nombre: servicioNombre,
-        activo: true,
-        valor_hora: Number(servicioValorHora),
-      }),
-    });
-    setServicioNombre("");
-    setServicioValorHora("0");
-    await load();
-  };
-
-  const updateServicioValorHora = async (item, valor) => {
-    await apiRequestWithRefresh(`/novedades/servicios/${item.id}`, {
-      method: "PUT",
-      body: JSON.stringify({
-        nombre: item.nombre,
-        activo: item.activo,
-        valor_hora: Number(valor),
-      }),
-    });
-    await load();
   };
 
   const resetCreateModuloForm = () => {
@@ -367,12 +473,16 @@ export function NovedadesParamPage() {
 
   useEffect(() => {
     if (
-      !createModuloOpen && !editModulo && !serviciosModulo && !deleteModulo
+      !createServicioOpen && !editServicio && !deleteServicio
+      && !createModuloOpen && !editModulo && !serviciosModulo && !deleteModulo
       && !createFeriadoOpen && !editFeriado && !deleteFeriado
     ) return undefined;
     const onKey = (e) => {
       if (e.key !== "Escape") return;
-      if (deleteFeriado) closeDeleteFeriado();
+      if (deleteServicio) closeDeleteServicio();
+      else if (editServicio) closeEditServicio();
+      else if (createServicioOpen) closeCreateServicio();
+      else if (deleteFeriado) closeDeleteFeriado();
       else if (editFeriado) closeEditFeriado();
       else if (createFeriadoOpen) closeCreateFeriado();
       else if (deleteModulo) closeDeleteModulo();
@@ -383,6 +493,12 @@ export function NovedadesParamPage() {
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
   }, [
+    createServicioOpen,
+    createServicioSaving,
+    editServicio,
+    editServicioSaving,
+    deleteServicio,
+    deleteServicioSaving,
     createModuloOpen,
     createModuloSaving,
     editModulo,
@@ -550,37 +666,288 @@ export function NovedadesParamPage() {
 
       {tab === "servicios" ? (
         <>
-          <form onSubmit={createServicio} style={{ display: "flex", gap: 8, flexWrap: "wrap", marginBottom: 12, alignItems: "center" }}>
-            <input value={servicioNombre} onChange={(e) => setServicioNombre(e.target.value)} placeholder="Nombre servicio" required style={uiStyles.formControl} />
-            <input type="number" step="0.01" min="0" value={servicioValorHora} onChange={(e) => setServicioValorHora(e.target.value)} placeholder="Valor hora" required style={uiStyles.formControl} />
-            <button type="submit" style={uiStyles.buttonPrimary}>Agregar</button>
-          </form>
+          <div style={{ marginBottom: 12 }}>
+            <button type="button" style={uiStyles.buttonPrimary} onClick={openCreateServicio}>
+              Nuevo servicio
+            </button>
+          </div>
           <ul style={uiStyles.listCard}>
             {servicios.map((item) => (
-              <li key={item.id} style={{ padding: "8px 10px", borderBottom: `1px solid ${uiTheme.colors.border}`, display: "flex", gap: 8, flexWrap: "wrap", alignItems: "center" }}>
-                <span>#{item.id} · {item.nombre} {item.activo ? "" : "(inactivo)"}</span>
-                <label style={{ ...uiStyles.helpText, display: "inline-flex", gap: 6, alignItems: "center" }}>
-                  Valor hora
-                  <input
-                    type="number"
-                    step="0.01"
-                    min="0"
-                    defaultValue={item.valor_hora}
-                    key={`${item.id}-${item.valor_hora}`}
-                    style={{ ...uiStyles.formControl, width: 120 }}
-                    onBlur={async (e) => {
-                      if (String(e.target.value) !== String(item.valor_hora)) {
-                        await updateServicioValorHora(item, e.target.value);
-                      }
-                    }}
-                  />
-                </label>
-                <button type="button" style={uiStyles.buttonDanger} onClick={async () => { await apiRequestWithRefresh(`/novedades/servicios/${item.id}`, { method: "DELETE" }); await load(); }}>
-                  eliminar
-                </button>
+              <li key={item.id} style={{ padding: "8px 10px", borderBottom: `1px solid ${uiTheme.colors.border}` }}>
+                <div style={{ display: "flex", gap: 8, flexWrap: "wrap", alignItems: "flex-start", justifyContent: "space-between" }}>
+                  <div style={{ flex: "1 1 200px" }}>
+                    #{item.id} · {item.nombre} {item.activo ? "" : "(inactivo)"} · Concepto liquidación {item.concepto_liquidacion == null ? "—" : item.concepto_liquidacion}
+                    <div style={uiStyles.helpText}>
+                      Concepto liquidación {item.concepto_liquidacion == null ? "—" : item.concepto_liquidacion}
+                      {" · "}
+                      Valor hora ${item.valor_hora}
+                    </div>
+                  </div>
+                  <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
+                    <button type="button" style={uiStyles.buttonSecondary} onClick={() => openEditServicio(item)}>
+                      editar
+                    </button>
+                    <button type="button" style={uiStyles.buttonDanger} onClick={() => setDeleteServicio(item)}>
+                      eliminar
+                    </button>
+                  </div>
+                </div>
               </li>
             ))}
           </ul>
+
+          {createServicioOpen ? (
+            <div
+              role="presentation"
+              style={{
+                position: "fixed",
+                inset: 0,
+                zIndex: 1000,
+                background: "rgba(15, 43, 39, 0.45)",
+                display: "flex",
+                alignItems: "flex-start",
+                justifyContent: "center",
+                padding: "max(16px, 4vh) 16px",
+                overflowY: "auto",
+              }}
+              onClick={closeCreateServicio}
+            >
+              <div
+                role="dialog"
+                aria-modal="true"
+                aria-labelledby="create-servicio-title"
+                onClick={(e) => e.stopPropagation()}
+                style={{
+                  background: "#fff",
+                  borderRadius: uiTheme.radius.md,
+                  maxWidth: 520,
+                  width: "100%",
+                  marginBottom: 24,
+                  padding: 22,
+                  boxShadow: uiTheme.shadow.md,
+                  border: `1px solid ${uiTheme.colors.border}`,
+                }}
+              >
+                <h2 id="create-servicio-title" style={{ marginTop: 0, marginBottom: 12, fontSize: "1.1rem" }}>
+                  Nuevo servicio
+                </h2>
+                <div style={{ display: "grid", gap: 10 }}>
+                  <label style={{ display: "grid", gap: 4 }}>
+                    <span style={{ fontSize: 12, color: uiTheme.colors.textMuted }}>Nombre</span>
+                    <input
+                      value={servicioNombre}
+                      onChange={(e) => setServicioNombre(e.target.value)}
+                      placeholder="Nombre servicio"
+                      style={uiStyles.formControl}
+                      disabled={createServicioSaving}
+                    />
+                  </label>
+                  <label style={{ display: "grid", gap: 4 }}>
+                    <span style={{ fontSize: 12, color: uiTheme.colors.textMuted }}>Valor hora</span>
+                    <input
+                      type="number"
+                      step="0.01"
+                      min="0"
+                      value={servicioValorHora}
+                      onChange={(e) => setServicioValorHora(e.target.value)}
+                      placeholder="Valor hora"
+                      style={uiStyles.formControl}
+                      disabled={createServicioSaving}
+                    />
+                  </label>
+                  <label style={{ display: "grid", gap: 4 }}>
+                    <span style={{ fontSize: 12, color: uiTheme.colors.textMuted }}>Concepto liquidación</span>
+                    <input
+                      type="number"
+                      step="1"
+                      min="0"
+                      value={servicioConcepto}
+                      onChange={(e) => setServicioConcepto(e.target.value)}
+                      placeholder="Opcional"
+                      style={uiStyles.formControl}
+                      disabled={createServicioSaving}
+                    />
+                  </label>
+                </div>
+                <div style={{ display: "flex", gap: 8, justifyContent: "flex-end", flexWrap: "wrap", marginTop: 16 }}>
+                  <button type="button" onClick={closeCreateServicio} style={uiStyles.buttonSecondary} disabled={createServicioSaving}>
+                    Cancelar
+                  </button>
+                  <button
+                    type="button"
+                    onClick={createServicio}
+                    style={uiStyles.buttonPrimary}
+                    disabled={createServicioSaving || !servicioNombre.trim() || servicioValorHora === ""}
+                  >
+                    {createServicioSaving ? "Cargando…" : "Cargar"}
+                  </button>
+                </div>
+              </div>
+            </div>
+          ) : null}
+
+          {editServicio ? (
+            <div
+              role="presentation"
+              style={{
+                position: "fixed",
+                inset: 0,
+                zIndex: 1000,
+                background: "rgba(15, 43, 39, 0.45)",
+                display: "flex",
+                alignItems: "flex-start",
+                justifyContent: "center",
+                padding: "max(16px, 4vh) 16px",
+                overflowY: "auto",
+              }}
+              onClick={closeEditServicio}
+            >
+              <div
+                role="dialog"
+                aria-modal="true"
+                aria-labelledby="edit-servicio-title"
+                onClick={(e) => e.stopPropagation()}
+                style={{
+                  background: "#fff",
+                  borderRadius: uiTheme.radius.md,
+                  maxWidth: 520,
+                  width: "100%",
+                  marginBottom: 24,
+                  padding: 22,
+                  boxShadow: uiTheme.shadow.md,
+                  border: `1px solid ${uiTheme.colors.border}`,
+                }}
+              >
+                <h2 id="edit-servicio-title" style={{ marginTop: 0, marginBottom: 12, fontSize: "1.1rem" }}>
+                  Editar servicio #{editServicio.id}
+                </h2>
+                <div style={{ display: "grid", gap: 10 }}>
+                  <label style={{ display: "grid", gap: 4 }}>
+                    <span style={{ fontSize: 12, color: uiTheme.colors.textMuted }}>Nombre</span>
+                    <input
+                      value={editServicioNombre}
+                      onChange={(e) => setEditServicioNombre(e.target.value)}
+                      style={uiStyles.formControl}
+                      disabled={editServicioSaving}
+                    />
+                  </label>
+                  <label style={{ display: "grid", gap: 4 }}>
+                    <span style={{ fontSize: 12, color: uiTheme.colors.textMuted }}>Valor hora</span>
+                    <input
+                      type="number"
+                      step="0.01"
+                      min="0"
+                      value={editServicioValorHora}
+                      onChange={(e) => setEditServicioValorHora(e.target.value)}
+                      style={uiStyles.formControl}
+                      disabled={editServicioSaving}
+                    />
+                  </label>
+                  <label style={{ display: "grid", gap: 4 }}>
+                    <span style={{ fontSize: 12, color: uiTheme.colors.textMuted }}>Concepto liquidación</span>
+                    <input
+                      type="number"
+                      step="1"
+                      min="0"
+                      value={editServicioConcepto}
+                      onChange={(e) => setEditServicioConcepto(e.target.value)}
+                      placeholder="Opcional"
+                      style={uiStyles.formControl}
+                      disabled={editServicioSaving}
+                    />
+                  </label>
+                  <label style={{ display: "inline-flex", gap: 6, alignItems: "center" }}>
+                    <input
+                      type="checkbox"
+                      checked={editServicioActivo}
+                      onChange={(e) => setEditServicioActivo(e.target.checked)}
+                      disabled={editServicioSaving}
+                    />
+                    Activo
+                  </label>
+                </div>
+                <div style={{ display: "flex", gap: 8, justifyContent: "flex-end", flexWrap: "wrap", marginTop: 16 }}>
+                  <button type="button" onClick={closeEditServicio} style={uiStyles.buttonSecondary} disabled={editServicioSaving}>
+                    Cancelar
+                  </button>
+                  <button
+                    type="button"
+                    onClick={saveEditServicio}
+                    style={uiStyles.buttonPrimary}
+                    disabled={editServicioSaving || !editServicioNombre.trim() || editServicioValorHora === ""}
+                  >
+                    {editServicioSaving ? "Guardando…" : "Guardar"}
+                  </button>
+                </div>
+              </div>
+            </div>
+          ) : null}
+
+          {deleteServicio ? (
+            <div
+              role="presentation"
+              style={{
+                position: "fixed",
+                inset: 0,
+                zIndex: 1000,
+                background: "rgba(15, 43, 39, 0.45)",
+                display: "flex",
+                alignItems: "flex-start",
+                justifyContent: "center",
+                padding: "max(16px, 4vh) 16px",
+                overflowY: "auto",
+              }}
+              onClick={closeDeleteServicio}
+            >
+              <div
+                role="dialog"
+                aria-modal="true"
+                aria-labelledby="delete-servicio-title"
+                onClick={(e) => e.stopPropagation()}
+                style={{
+                  background: "#fff",
+                  borderRadius: uiTheme.radius.md,
+                  maxWidth: 520,
+                  width: "100%",
+                  marginBottom: 24,
+                  padding: 22,
+                  boxShadow: uiTheme.shadow.md,
+                  border: `1px solid ${uiTheme.colors.border}`,
+                }}
+              >
+                <h2 id="delete-servicio-title" style={{ marginTop: 0, marginBottom: 12, fontSize: "1.1rem" }}>
+                  Eliminar servicio
+                </h2>
+                <p style={{ marginTop: 0 }}>¿Confirmás eliminar este servicio?</p>
+                <div style={{ display: "grid", gap: 6, marginBottom: 16, fontSize: 14 }}>
+                  <div>
+                    <strong>ID:</strong> #{deleteServicio.id}
+                  </div>
+                  <div>
+                    <strong>Nombre:</strong> {deleteServicio.nombre || "—"}
+                  </div>
+                  <div>
+                    <strong>Valor hora:</strong> ${deleteServicio.valor_hora}
+                  </div>
+                  <div>
+                    <strong>Concepto liquidación:</strong>{" "}
+                    {deleteServicio.concepto_liquidacion == null ? "—" : deleteServicio.concepto_liquidacion}
+                  </div>
+                  <div>
+                    <strong>Activo:</strong> {deleteServicio.activo ? "sí" : "no"}
+                  </div>
+                </div>
+                <div style={{ display: "flex", gap: 8, justifyContent: "flex-end", flexWrap: "wrap" }}>
+                  <button type="button" onClick={closeDeleteServicio} style={uiStyles.buttonSecondary} disabled={deleteServicioSaving}>
+                    Cancelar
+                  </button>
+                  <button type="button" onClick={confirmDeleteServicio} style={uiStyles.buttonDanger} disabled={deleteServicioSaving}>
+                    {deleteServicioSaving ? "Eliminando…" : "Eliminar"}
+                  </button>
+                </div>
+              </div>
+            </div>
+          ) : null}
         </>
       ) : null}
 

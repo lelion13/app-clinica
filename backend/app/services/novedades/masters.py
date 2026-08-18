@@ -36,6 +36,7 @@ def create_servicio(db: Session, payload: ServicioCreateRequest, actor_id: int) 
         nombre=name,
         activo=payload.activo,
         valor_hora=Decimal(payload.valor_hora),
+        concepto_liquidacion=payload.concepto_liquidacion,
         created_at=now,
         updated_at=now,
         created_by=actor_id,
@@ -57,6 +58,7 @@ def update_servicio(db: Session, servicio_id: int, payload: ServicioUpdateReques
     item.nombre = payload.nombre.strip()
     item.activo = payload.activo
     item.valor_hora = Decimal(payload.valor_hora)
+    item.concepto_liquidacion = payload.concepto_liquidacion
     item.updated_at = datetime.utcnow()
     item.updated_by = actor_id
     db.commit()

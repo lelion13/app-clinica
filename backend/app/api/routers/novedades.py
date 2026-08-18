@@ -69,6 +69,7 @@ def _servicio_response(item) -> ServicioResponse:
         nombre=item.nombre,
         activo=item.activo,
         valor_hora=item.valor_hora,
+        concepto_liquidacion=getattr(item, "concepto_liquidacion", None),
         created_at=item.created_at,
         updated_at=item.updated_at,
     )
