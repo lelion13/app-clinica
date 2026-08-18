@@ -17,6 +17,7 @@ from app.models.novedades import (
 )
 from app.models.user import User
 from app.schemas.novedades import GridRowResponse
+from app.services.novedades.helpers import novedad_valor_calculado
 
 
 def build_grid_rows(
@@ -171,7 +172,7 @@ def _novedad_row(db: Session, item: NovedadesNovedad) -> GridRowResponse | None:
         professional_name=professional.full_name,
         concepto=label,
         horas=horas,
-        valor=horas * valor_hora,
+        valor=novedad_valor_calculado(tipo, horas, valor_hora),
         valor_hora=valor_hora,
         cargado_por=actor.name if actor else None,
         fecha_realizacion=item.fecha_realizacion,

@@ -17,11 +17,13 @@ class PeriodoEstado(str, enum.Enum):
 class NovedadTipo(str, enum.Enum):
     hora_extra = "hora_extra"
     hora_extra_por_ausencia = "hora_extra_por_ausencia"
+    horas_a_descontar = "horas_a_descontar"
 
 
 NOVEDAD_TIPO_LABELS = {
     NovedadTipo.hora_extra: "Hora extra",
     NovedadTipo.hora_extra_por_ausencia: "Hora extra por ausencia",
+    NovedadTipo.horas_a_descontar: "Horas a descontar",
 }
 
 
@@ -53,6 +55,7 @@ class NovedadesModulo(AuditMixin, Base):
     comentario: Mapped[str | None] = mapped_column(String(500), nullable=True)
     valor: Mapped[Decimal] = mapped_column(Numeric(12, 2), nullable=False)
     produccion: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
+    sadofe: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
 
 
 class NovedadesModuloServicio(AuditMixin, Base):
@@ -75,6 +78,14 @@ class NovedadesPeriodo(AuditMixin, Base):
         nullable=False,
         default=PeriodoEstado.open,
     )
+
+
+class NovedadesFeriado(AuditMixin, Base):
+    __tablename__ = "novedades_feriado"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    fecha: Mapped[date] = mapped_column(Date, nullable=False)
+    nombre: Mapped[str] = mapped_column(String(200), nullable=False)
 
 
 class NovedadesConfig(AuditMixin, Base):

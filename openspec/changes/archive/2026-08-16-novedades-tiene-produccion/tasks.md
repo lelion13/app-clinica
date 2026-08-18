@@ -35,3 +35,5 @@
 ## 6. Docs (v2)
 
 - [x] 6.1 Runbook breve + marcar tasks v2
+- [x] 6.2 implementation-notes + verify-report (pre-archive)
+- [x] 6.3 Cancelar force limpia controles de carga (post-survey UX)

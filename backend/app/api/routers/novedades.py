@@ -21,6 +21,9 @@ from app.schemas.novedades import (
     SoloBonoRowResponse,
     JefeServicioCreateRequest,
     JefeServicioResponse,
+    FeriadoCreateRequest,
+    FeriadoResponse,
+    FeriadoUpdateRequest,
     ModuloCreateRequest,
     ModuloResponse,
     ModuloServiciosUpdateRequest,
@@ -48,7 +51,7 @@ from app.services.novedades import masters as masters_service
 from app.services.novedades import prof_sync as prof_sync_service
 from app.services.novedades import purge as purge_service
 from app.services.novedades import tiene_produccion as tiene_produccion_service
-from app.services.novedades.helpers import get_servicio_or_404, list_servicios_for_user
+from app.services.novedades.helpers import get_servicio_or_404, list_servicios_for_user, novedad_valor_calculado
 from app.services.novedades.professional_directory import list_professionals_for_servicio
 
 router = APIRouter()
@@ -78,6 +81,7 @@ def _modulo_response(db: Session, item) -> ModuloResponse:
         comentario=item.comentario,
         valor=item.valor,
         produccion=bool(getattr(item, "produccion", False)),
+        sadofe=bool(getattr(item, "sadofe", False)),
         servicio_ids=masters_service.list_modulo_servicio_ids(db, item.id),
         servicio_nombres=masters_service.list_modulo_servicio_nombres(db, item.id),
         created_at=item.created_at,
@@ -122,7 +126,7 @@ def _novedad_response(db: Session, item) -> NovedadResponse:
         tipo=tipo.value,
         tipo_label=NOVEDAD_TIPO_LABELS.get(tipo, tipo.value),
         horas=item.horas,
-        valor_calculado=item.horas * valor_hora,
+        valor_calculado=novedad_valor_calculado(tipo, item.horas, valor_hora),
         fecha_realizacion=item.fecha_realizacion,
         motivo_sin_produccion=item.motivo_sin_produccion,
         observacion_sin_produccion=item.observacion_sin_produccion,
@@ -272,6 +276,50 @@ def modulos_delete(
     user: User = Depends(require_admin_or_rrhh),
 ) -> None:
     masters_service.delete_modulo(db, modulo_id, actor_id=user.id)
+
+
+def _feriado_response(item) -> FeriadoResponse:
+    return FeriadoResponse(
+        id=item.id,
+        fecha=item.fecha,
+        nombre=item.nombre,
+        created_at=item.created_at,
+        updated_at=item.updated_at,
+    )
+
+
+@router.get("/feriados", response_model=list[FeriadoResponse])
+def feriados_list(db: Session = Depends(get_db), user: User = Depends(require_novedades_reader)) -> list[FeriadoResponse]:
+    _ = user
+    return [_feriado_response(item) for item in masters_service.list_feriados(db)]
+
+
+@router.post("/feriados", response_model=FeriadoResponse, status_code=status.HTTP_201_CREATED)
+def feriados_create(
+    payload: FeriadoCreateRequest,
+    db: Session = Depends(get_db),
+    user: User = Depends(require_admin_or_rrhh),
+) -> FeriadoResponse:
+    return _feriado_response(masters_service.create_feriado(db, payload, actor_id=user.id))
+
+
+@router.put("/feriados/{feriado_id}", response_model=FeriadoResponse)
+def feriados_update(
+    feriado_id: int,
+    payload: FeriadoUpdateRequest,
+    db: Session = Depends(get_db),
+    user: User = Depends(require_admin_or_rrhh),
+) -> FeriadoResponse:
+    return _feriado_response(masters_service.update_feriado(db, feriado_id, payload, actor_id=user.id))
+
+
+@router.delete("/feriados/{feriado_id}", status_code=status.HTTP_204_NO_CONTENT)
+def feriados_delete(
+    feriado_id: int,
+    db: Session = Depends(get_db),
+    user: User = Depends(require_admin_or_rrhh),
+) -> None:
+    masters_service.delete_feriado(db, feriado_id, actor_id=user.id)
 
 
 @router.get("/periodos", response_model=list[PeriodoResponse])

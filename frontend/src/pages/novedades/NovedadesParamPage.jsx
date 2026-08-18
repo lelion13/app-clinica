@@ -11,6 +11,7 @@ const tabs = [
   { id: "jefes", label: "Jefes ↔ servicios" },
   { id: "profesionales", label: "Profesionales ↔ servicios" },
   { id: "periodos", label: "Períodos" },
+  { id: "feriados", label: "Feriados" },
 ];
 
 export function NovedadesParamPage() {
@@ -21,6 +22,7 @@ export function NovedadesParamPage() {
   const [jefes, setJefes] = useState([]);
   const [profLinks, setProfLinks] = useState([]);
   const [periodos, setPeriodos] = useState([]);
+  const [feriados, setFeriados] = useState([]);
   const [users, setUsers] = useState([]);
   const [allPros, setAllPros] = useState([]);
 
@@ -30,6 +32,7 @@ export function NovedadesParamPage() {
   const [moduloComentario, setModuloComentario] = useState("");
   const [moduloValor, setModuloValor] = useState("");
   const [moduloProduccion, setModuloProduccion] = useState(false);
+  const [moduloSadofe, setModuloSadofe] = useState(false);
   const [moduloServicioIds, setModuloServicioIds] = useState([]);
   const [createModuloOpen, setCreateModuloOpen] = useState(false);
   const [createModuloSaving, setCreateModuloSaving] = useState(false);
@@ -38,12 +41,23 @@ export function NovedadesParamPage() {
   const [editComentario, setEditComentario] = useState("");
   const [editValor, setEditValor] = useState("");
   const [editProduccion, setEditProduccion] = useState(false);
+  const [editSadofe, setEditSadofe] = useState(false);
   const [editSaving, setEditSaving] = useState(false);
   const [serviciosModulo, setServiciosModulo] = useState(null);
   const [serviciosIdsEdit, setServiciosIdsEdit] = useState([]);
   const [serviciosSaving, setServiciosSaving] = useState(false);
   const [deleteModulo, setDeleteModulo] = useState(null);
   const [deleteModuloSaving, setDeleteModuloSaving] = useState(false);
+  const [createFeriadoOpen, setCreateFeriadoOpen] = useState(false);
+  const [createFeriadoSaving, setCreateFeriadoSaving] = useState(false);
+  const [feriadoFecha, setFeriadoFecha] = useState("");
+  const [feriadoNombre, setFeriadoNombre] = useState("");
+  const [editFeriado, setEditFeriado] = useState(null);
+  const [editFeriadoFecha, setEditFeriadoFecha] = useState("");
+  const [editFeriadoNombre, setEditFeriadoNombre] = useState("");
+  const [editFeriadoSaving, setEditFeriadoSaving] = useState(false);
+  const [deleteFeriado, setDeleteFeriado] = useState(null);
+  const [deleteFeriadoSaving, setDeleteFeriadoSaving] = useState(false);
   const [jefeUserId, setJefeUserId] = useState("");
   const [jefeServicioId, setJefeServicioId] = useState("");
   const [profId, setProfId] = useState("");
@@ -59,7 +73,7 @@ export function NovedadesParamPage() {
   const load = async () => {
     setError("");
     try {
-      const [s, m, j, p, u, pl, pros] = await Promise.all([
+      const [s, m, j, p, u, pl, pros, f] = await Promise.all([
         apiRequestWithRefresh("/novedades/servicios"),
         apiRequestWithRefresh("/novedades/modulos"),
         apiRequestWithRefresh("/novedades/jefe-servicios"),
@@ -67,6 +81,7 @@ export function NovedadesParamPage() {
         apiRequestWithRefresh("/novedades/jefes-candidatos"),
         apiRequestWithRefresh("/novedades/profesional-servicios"),
         apiRequestWithRefresh("/novedades/profesionales"),
+        apiRequestWithRefresh("/novedades/feriados"),
       ]);
       setServicios(s);
       setModulos(m);
@@ -75,6 +90,7 @@ export function NovedadesParamPage() {
       setUsers(u || []);
       setProfLinks(pl || []);
       setAllPros(pros || []);
+      setFeriados(f || []);
     } catch (err) {
       setError(err.message || "Error al cargar");
     }
@@ -122,6 +138,7 @@ export function NovedadesParamPage() {
     setModuloComentario("");
     setModuloValor("");
     setModuloProduccion(false);
+    setModuloSadofe(false);
     setModuloServicioIds([]);
   };
 
@@ -155,6 +172,7 @@ export function NovedadesParamPage() {
           comentario: moduloComentario || null,
           valor: Number(moduloValor),
           produccion: Boolean(moduloProduccion),
+          sadofe: Boolean(moduloSadofe),
           servicio_ids: moduloServicioIds.map(Number),
         }),
       });
@@ -174,6 +192,7 @@ export function NovedadesParamPage() {
     setEditComentario(item.comentario || "");
     setEditValor(String(item.valor ?? ""));
     setEditProduccion(Boolean(item.produccion));
+    setEditSadofe(Boolean(item.sadofe));
   };
 
   const closeEditModulo = () => {
@@ -193,6 +212,7 @@ export function NovedadesParamPage() {
           comentario: editComentario || null,
           valor: Number(editValor),
           produccion: Boolean(editProduccion),
+          sadofe: Boolean(editSadofe),
         }),
       });
       setEditModulo(null);
@@ -258,11 +278,104 @@ export function NovedadesParamPage() {
     }
   };
 
+  const resetFeriadoForm = () => {
+    setFeriadoFecha("");
+    setFeriadoNombre("");
+  };
+
+  const openCreateFeriado = () => {
+    resetFeriadoForm();
+    setCreateFeriadoOpen(true);
+  };
+
+  const closeCreateFeriado = () => {
+    if (createFeriadoSaving) return;
+    setCreateFeriadoOpen(false);
+    resetFeriadoForm();
+  };
+
+  const createFeriado = async () => {
+    if (!feriadoFecha || !feriadoNombre.trim()) {
+      setError("Completá fecha y nombre del feriado");
+      return;
+    }
+    setCreateFeriadoSaving(true);
+    setError("");
+    try {
+      await apiRequestWithRefresh("/novedades/feriados", {
+        method: "POST",
+        body: JSON.stringify({ fecha: feriadoFecha, nombre: feriadoNombre.trim() }),
+      });
+      setCreateFeriadoOpen(false);
+      resetFeriadoForm();
+      await load();
+    } catch (err) {
+      setError(err.message || "No se pudo crear el feriado");
+    } finally {
+      setCreateFeriadoSaving(false);
+    }
+  };
+
+  const openEditFeriado = (item) => {
+    setEditFeriado(item);
+    setEditFeriadoFecha(String(item.fecha || "").slice(0, 10));
+    setEditFeriadoNombre(item.nombre || "");
+  };
+
+  const closeEditFeriado = () => {
+    if (editFeriadoSaving) return;
+    setEditFeriado(null);
+  };
+
+  const saveEditFeriado = async () => {
+    if (!editFeriado) return;
+    setEditFeriadoSaving(true);
+    setError("");
+    try {
+      await apiRequestWithRefresh(`/novedades/feriados/${editFeriado.id}`, {
+        method: "PUT",
+        body: JSON.stringify({ fecha: editFeriadoFecha, nombre: editFeriadoNombre.trim() }),
+      });
+      setEditFeriado(null);
+      await load();
+    } catch (err) {
+      setError(err.message || "No se pudo guardar el feriado");
+    } finally {
+      setEditFeriadoSaving(false);
+    }
+  };
+
+  const closeDeleteFeriado = () => {
+    if (deleteFeriadoSaving) return;
+    setDeleteFeriado(null);
+  };
+
+  const confirmDeleteFeriado = async () => {
+    if (!deleteFeriado) return;
+    setDeleteFeriadoSaving(true);
+    setError("");
+    try {
+      await apiRequestWithRefresh(`/novedades/feriados/${deleteFeriado.id}`, { method: "DELETE" });
+      setDeleteFeriado(null);
+      await load();
+    } catch (err) {
+      setError(err.message || "No se pudo eliminar el feriado");
+    } finally {
+      setDeleteFeriadoSaving(false);
+    }
+  };
+
   useEffect(() => {
-    if (!createModuloOpen && !editModulo && !serviciosModulo && !deleteModulo) return undefined;
+    if (
+      !createModuloOpen && !editModulo && !serviciosModulo && !deleteModulo
+      && !createFeriadoOpen && !editFeriado && !deleteFeriado
+    ) return undefined;
     const onKey = (e) => {
       if (e.key !== "Escape") return;
-      if (deleteModulo) closeDeleteModulo();
+      if (deleteFeriado) closeDeleteFeriado();
+      else if (editFeriado) closeEditFeriado();
+      else if (createFeriadoOpen) closeCreateFeriado();
+      else if (deleteModulo) closeDeleteModulo();
       else if (serviciosModulo) closeServiciosModulo();
       else if (editModulo) closeEditModulo();
       else if (createModuloOpen) closeCreateModulo();
@@ -278,6 +391,12 @@ export function NovedadesParamPage() {
     serviciosSaving,
     deleteModulo,
     deleteModuloSaving,
+    createFeriadoOpen,
+    createFeriadoSaving,
+    editFeriado,
+    editFeriadoSaving,
+    deleteFeriado,
+    deleteFeriadoSaving,
   ]);
 
   const createJefe = async (event) => {
@@ -576,6 +695,15 @@ export function NovedadesParamPage() {
                     />
                     Producción
                   </label>
+                  <label style={{ display: "inline-flex", gap: 6, alignItems: "center" }}>
+                    <input
+                      type="checkbox"
+                      checked={moduloSadofe}
+                      onChange={(e) => setModuloSadofe(e.target.checked)}
+                      disabled={createModuloSaving}
+                    />
+                    SADOFE
+                  </label>
                   <div>
                     <div style={{ ...uiStyles.helpText, marginBottom: 6 }}>Servicios (obligatorio, puede ser más de uno)</div>
                     <div style={{ display: "grid", gap: 8 }}>
@@ -666,6 +794,15 @@ export function NovedadesParamPage() {
                       disabled={editSaving}
                     />
                     Producción
+                  </label>
+                  <label style={{ display: "inline-flex", gap: 6, alignItems: "center" }}>
+                    <input
+                      type="checkbox"
+                      checked={editSadofe}
+                      onChange={(e) => setEditSadofe(e.target.checked)}
+                      disabled={editSaving}
+                    />
+                    SADOFE
                   </label>
                 </div>
                 <div style={{ display: "flex", gap: 8, justifyContent: "flex-end", flexWrap: "wrap", marginTop: 16 }}>
@@ -798,6 +935,9 @@ export function NovedadesParamPage() {
                     <strong>Producción:</strong> {deleteModulo.produccion ? "sí" : "no"}
                   </div>
                   <div>
+                    <strong>SADOFE:</strong> {deleteModulo.sadofe ? "sí" : "no"}
+                  </div>
+                  <div>
                     <strong>Servicios:</strong>{" "}
                     {(deleteModulo.servicio_nombres || []).join(", ") || "sin asociar"}
                   </div>
@@ -905,6 +1045,223 @@ export function NovedadesParamPage() {
               </li>
             ))}
           </ul>
+        </>
+      ) : null}
+
+      {tab === "feriados" ? (
+        <>
+          <div style={{ marginBottom: 12 }}>
+            <button type="button" style={uiStyles.buttonPrimary} onClick={openCreateFeriado}>
+              Nuevo feriado
+            </button>
+          </div>
+          <ul style={uiStyles.listCard}>
+            {feriados.map((item) => (
+              <li key={item.id} style={{ padding: "8px 10px", borderBottom: `1px solid ${uiTheme.colors.border}` }}>
+                <div style={{ display: "flex", gap: 8, flexWrap: "wrap", alignItems: "flex-start", justifyContent: "space-between" }}>
+                  <div style={{ flex: "1 1 200px" }}>
+                    #{item.id} · {String(item.fecha || "").slice(0, 10)} · {item.nombre}
+                  </div>
+                  <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
+                    <button type="button" style={uiStyles.buttonSecondary} onClick={() => openEditFeriado(item)}>
+                      editar
+                    </button>
+                    <button type="button" style={uiStyles.buttonDanger} onClick={() => setDeleteFeriado(item)}>
+                      eliminar
+                    </button>
+                  </div>
+                </div>
+              </li>
+            ))}
+          </ul>
+          {!feriados.length ? (
+            <p style={uiStyles.helpText}>Todavía no hay feriados cargados.</p>
+          ) : null}
+
+          {createFeriadoOpen ? (
+            <div
+              role="presentation"
+              style={{
+                position: "fixed",
+                inset: 0,
+                zIndex: 1000,
+                background: "rgba(15, 43, 39, 0.45)",
+                display: "flex",
+                alignItems: "flex-start",
+                justifyContent: "center",
+                padding: "max(16px, 4vh) 16px",
+                overflowY: "auto",
+              }}
+              onClick={closeCreateFeriado}
+            >
+              <div
+                role="dialog"
+                aria-modal="true"
+                aria-labelledby="create-feriado-title"
+                onClick={(e) => e.stopPropagation()}
+                style={{
+                  background: "#fff",
+                  borderRadius: uiTheme.radius.md,
+                  maxWidth: 480,
+                  width: "100%",
+                  marginBottom: 24,
+                  padding: 22,
+                  boxShadow: uiTheme.shadow.md,
+                  border: `1px solid ${uiTheme.colors.border}`,
+                }}
+              >
+                <h2 id="create-feriado-title" style={{ marginTop: 0, marginBottom: 12, fontSize: "1.1rem" }}>
+                  Nuevo feriado
+                </h2>
+                <div style={{ display: "grid", gap: 10 }}>
+                  <label style={{ display: "grid", gap: 4 }}>
+                    <span style={{ fontSize: 12, color: uiTheme.colors.textMuted }}>Fecha</span>
+                    <input type="date" value={feriadoFecha} onChange={(e) => setFeriadoFecha(e.target.value)} style={uiStyles.formControl} disabled={createFeriadoSaving} />
+                  </label>
+                  <label style={{ display: "grid", gap: 4 }}>
+                    <span style={{ fontSize: 12, color: uiTheme.colors.textMuted }}>Nombre</span>
+                    <input value={feriadoNombre} onChange={(e) => setFeriadoNombre(e.target.value)} placeholder="Nombre" style={uiStyles.formControl} disabled={createFeriadoSaving} />
+                  </label>
+                </div>
+                <div style={{ display: "flex", gap: 8, justifyContent: "flex-end", flexWrap: "wrap", marginTop: 16 }}>
+                  <button type="button" onClick={closeCreateFeriado} style={uiStyles.buttonSecondary} disabled={createFeriadoSaving}>
+                    Cancelar
+                  </button>
+                  <button
+                    type="button"
+                    onClick={createFeriado}
+                    style={uiStyles.buttonPrimary}
+                    disabled={createFeriadoSaving || !feriadoFecha || !feriadoNombre.trim()}
+                  >
+                    {createFeriadoSaving ? "Cargando…" : "Cargar"}
+                  </button>
+                </div>
+              </div>
+            </div>
+          ) : null}
+
+          {editFeriado ? (
+            <div
+              role="presentation"
+              style={{
+                position: "fixed",
+                inset: 0,
+                zIndex: 1000,
+                background: "rgba(15, 43, 39, 0.45)",
+                display: "flex",
+                alignItems: "flex-start",
+                justifyContent: "center",
+                padding: "max(16px, 4vh) 16px",
+                overflowY: "auto",
+              }}
+              onClick={closeEditFeriado}
+            >
+              <div
+                role="dialog"
+                aria-modal="true"
+                aria-labelledby="edit-feriado-title"
+                onClick={(e) => e.stopPropagation()}
+                style={{
+                  background: "#fff",
+                  borderRadius: uiTheme.radius.md,
+                  maxWidth: 480,
+                  width: "100%",
+                  marginBottom: 24,
+                  padding: 22,
+                  boxShadow: uiTheme.shadow.md,
+                  border: `1px solid ${uiTheme.colors.border}`,
+                }}
+              >
+                <h2 id="edit-feriado-title" style={{ marginTop: 0, marginBottom: 12, fontSize: "1.1rem" }}>
+                  Editar feriado #{editFeriado.id}
+                </h2>
+                <div style={{ display: "grid", gap: 10 }}>
+                  <label style={{ display: "grid", gap: 4 }}>
+                    <span style={{ fontSize: 12, color: uiTheme.colors.textMuted }}>Fecha</span>
+                    <input type="date" value={editFeriadoFecha} onChange={(e) => setEditFeriadoFecha(e.target.value)} style={uiStyles.formControl} disabled={editFeriadoSaving} />
+                  </label>
+                  <label style={{ display: "grid", gap: 4 }}>
+                    <span style={{ fontSize: 12, color: uiTheme.colors.textMuted }}>Nombre</span>
+                    <input value={editFeriadoNombre} onChange={(e) => setEditFeriadoNombre(e.target.value)} style={uiStyles.formControl} disabled={editFeriadoSaving} />
+                  </label>
+                </div>
+                <div style={{ display: "flex", gap: 8, justifyContent: "flex-end", flexWrap: "wrap", marginTop: 16 }}>
+                  <button type="button" onClick={closeEditFeriado} style={uiStyles.buttonSecondary} disabled={editFeriadoSaving}>
+                    Cancelar
+                  </button>
+                  <button
+                    type="button"
+                    onClick={saveEditFeriado}
+                    style={uiStyles.buttonPrimary}
+                    disabled={editFeriadoSaving || !editFeriadoFecha || !editFeriadoNombre.trim()}
+                  >
+                    {editFeriadoSaving ? "Guardando…" : "Guardar"}
+                  </button>
+                </div>
+              </div>
+            </div>
+          ) : null}
+
+          {deleteFeriado ? (
+            <div
+              role="presentation"
+              style={{
+                position: "fixed",
+                inset: 0,
+                zIndex: 1000,
+                background: "rgba(15, 43, 39, 0.45)",
+                display: "flex",
+                alignItems: "flex-start",
+                justifyContent: "center",
+                padding: "max(16px, 4vh) 16px",
+                overflowY: "auto",
+              }}
+              onClick={closeDeleteFeriado}
+            >
+              <div
+                role="dialog"
+                aria-modal="true"
+                aria-labelledby="delete-feriado-title"
+                onClick={(e) => e.stopPropagation()}
+                style={{
+                  background: "#fff",
+                  borderRadius: uiTheme.radius.md,
+                  maxWidth: 480,
+                  width: "100%",
+                  marginBottom: 24,
+                  padding: 22,
+                  boxShadow: uiTheme.shadow.md,
+                  border: `1px solid ${uiTheme.colors.border}`,
+                }}
+              >
+                <h2 id="delete-feriado-title" style={{ marginTop: 0, marginBottom: 10, fontSize: "1.1rem" }}>
+                  ¿Eliminar este feriado?
+                </h2>
+                <p style={{ marginTop: 0, marginBottom: 12, color: uiTheme.colors.textMuted, fontSize: 14 }}>
+                  Vas a eliminar el siguiente feriado. Esta acción no se puede deshacer desde acá.
+                </p>
+                <div style={{ ...uiStyles.kpiCard, marginBottom: 14, lineHeight: 1.55, fontSize: 14 }}>
+                  <div>
+                    <strong>ID:</strong> #{deleteFeriado.id}
+                  </div>
+                  <div>
+                    <strong>Fecha:</strong> {String(deleteFeriado.fecha || "").slice(0, 10)}
+                  </div>
+                  <div>
+                    <strong>Nombre:</strong> {deleteFeriado.nombre || "—"}
+                  </div>
+                </div>
+                <div style={{ display: "flex", gap: 8, justifyContent: "flex-end", flexWrap: "wrap" }}>
+                  <button type="button" onClick={closeDeleteFeriado} style={uiStyles.buttonSecondary} disabled={deleteFeriadoSaving}>
+                    Cancelar
+                  </button>
+                  <button type="button" onClick={confirmDeleteFeriado} style={uiStyles.buttonDanger} disabled={deleteFeriadoSaving}>
+                    {deleteFeriadoSaving ? "Eliminando…" : "Eliminar"}
+                  </button>
+                </div>
+              </div>
+            </div>
+          ) : null}
         </>
       ) : null}
     </section>

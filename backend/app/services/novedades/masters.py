@@ -5,8 +5,10 @@ from fastapi import HTTPException, status
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
-from app.models.novedades import NovedadesModulo, NovedadesModuloServicio, NovedadesServicio
+from app.models.novedades import NovedadesFeriado, NovedadesModulo, NovedadesModuloServicio, NovedadesServicio
 from app.schemas.novedades import (
+    FeriadoCreateRequest,
+    FeriadoUpdateRequest,
     ModuloCreateRequest,
     ModuloUpdateRequest,
     ServicioCreateRequest,
@@ -178,6 +180,7 @@ def create_modulo(db: Session, payload: ModuloCreateRequest, actor_id: int) -> N
         comentario=(payload.comentario or "").strip() or None,
         valor=Decimal(payload.valor),
         produccion=bool(payload.produccion),
+        sadofe=bool(payload.sadofe),
         created_at=now,
         updated_at=now,
         created_by=actor_id,
@@ -202,6 +205,7 @@ def update_modulo(db: Session, modulo_id: int, payload: ModuloUpdateRequest, act
     item.comentario = (payload.comentario or "").strip() or None
     item.valor = Decimal(payload.valor)
     item.produccion = bool(payload.produccion)
+    item.sadofe = bool(payload.sadofe)
     item.updated_at = datetime.utcnow()
     item.updated_by = actor_id
     db.commit()
@@ -261,3 +265,72 @@ def require_modulo_en_servicio(db: Session, modulo_id: int, servicio_id: int) ->
             status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
             detail="El modulo no esta asociado al servicio",
         )
+
+
+def list_feriados(db: Session) -> list[NovedadesFeriado]:
+    return list(
+        db.execute(
+            select(NovedadesFeriado)
+            .where(NovedadesFeriado.deleted_at.is_(None))
+            .order_by(NovedadesFeriado.fecha.asc(), NovedadesFeriado.id.asc())
+        )
+        .scalars()
+        .all()
+    )
+
+
+def _feriado_fecha_taken(db: Session, fecha, *, exclude_id: int | None = None) -> bool:
+    query = select(NovedadesFeriado).where(
+        NovedadesFeriado.fecha == fecha,
+        NovedadesFeriado.deleted_at.is_(None),
+    )
+    if exclude_id is not None:
+        query = query.where(NovedadesFeriado.id != exclude_id)
+    return db.execute(query).scalar_one_or_none() is not None
+
+
+def create_feriado(db: Session, payload: FeriadoCreateRequest, actor_id: int) -> NovedadesFeriado:
+    nombre = payload.nombre.strip()
+    if _feriado_fecha_taken(db, payload.fecha):
+        raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="Ya existe un feriado en esa fecha")
+    now = datetime.utcnow()
+    item = NovedadesFeriado(
+        fecha=payload.fecha,
+        nombre=nombre,
+        created_at=now,
+        updated_at=now,
+        created_by=actor_id,
+        updated_by=actor_id,
+        deleted_at=None,
+    )
+    db.add(item)
+    db.commit()
+    db.refresh(item)
+    return item
+
+
+def update_feriado(db: Session, feriado_id: int, payload: FeriadoUpdateRequest, actor_id: int) -> NovedadesFeriado:
+    item = db.execute(
+        select(NovedadesFeriado).where(NovedadesFeriado.id == feriado_id, NovedadesFeriado.deleted_at.is_(None))
+    ).scalar_one_or_none()
+    if not item:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Feriado no encontrado")
+    if _feriado_fecha_taken(db, payload.fecha, exclude_id=feriado_id):
+        raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="Ya existe un feriado en esa fecha")
+    item.fecha = payload.fecha
+    item.nombre = payload.nombre.strip()
+    item.updated_at = datetime.utcnow()
+    item.updated_by = actor_id
+    db.commit()
+    db.refresh(item)
+    return item
+
+
+def delete_feriado(db: Session, feriado_id: int, actor_id: int) -> None:
+    item = db.execute(
+        select(NovedadesFeriado).where(NovedadesFeriado.id == feriado_id, NovedadesFeriado.deleted_at.is_(None))
+    ).scalar_one_or_none()
+    if not item:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Feriado no encontrado")
+    soft_delete(item, actor_id)
+    db.commit()

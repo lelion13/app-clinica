@@ -38,7 +38,7 @@ If the external result is **false** on **edit fecha**: the UI MUST block the upd
 
 When create-submit receives `tiene_produccion: false`, the UI MUST show a modal containing: the message “El profesional no tiene producción en esa fecha. No se puede cargar módulo ni novedad para ese día.”; a motivo select defaulting to empty with options **Vacaciones** and **Enfermedad** only; a mandatory observation field; buttons **Cancelar** and **Cargar**.
 
-- **Cancelar** MUST close the modal and MUST NOT create cargas.
+- **Cancelar** MUST close the modal, MUST NOT create cargas, and MUST clear the carga form controls used for that attempt (profesional, módulo, novedad tipo/horas, fecha de realización); período and servicio MAY remain.
 - **Cargar** MUST require a selected motivo and non-blank observation; then MUST create the intended module and/or novedad including the same `motivo_sin_produccion` and `observacion_sin_produccion` on each created row.
 - Roles: `admin` and `jefe_medico`.
 
@@ -50,6 +50,7 @@ The system MUST persist those fields on `novedades_asignacion_modulo` and `noved
 - WHEN pulsa Cancelar
 - THEN MUST cerrarse el modal
 - AND MUST NOT crearse módulo ni novedad
+- AND MUST limpiarse profesional / módulo / novedad / fecha del form de carga
 
 #### Scenario: Cargar force incompleto
 
