@@ -2,7 +2,7 @@
 
 Survey: **una pregunta a la vez**. Responder con letra (A/B/…).
 
-Estado: **CLOSED** (Q1–Q14).
+Estado: **CLOSED** — Q1–Q14 original + addendum Q15–Q23 (`concepto_liquidacion`).
 
 ---
 
@@ -170,6 +170,15 @@ Pedido base: tab **Feriados** al lado de Períodos; grilla; **Nuevo feriado** mo
 | Q12 | A | Tab Feriados; modales como Módulos |
 | Q13 | A | Existentes = Semana |
 | Q14 | B | Branch actual |
+| Q15 | A | Entero positivo, sin decimales |
+| Q16 | B | Opcional; vacío = `NULL` |
+| Q17 | A | Se puede repetir |
+| Q18 | C | ABM Servicios en modales como Módulos |
+| Q19 | E | Capital Humano más adelante; este change solo persiste el campo |
+| Q20 | B | Vacío o `0` = `NULL` |
+| Q21 | A | Sin tope extra; valor ≥ 1 |
+| Q22 | A | Grilla actual + concepto; `NULL` = “—” |
+| Q23 | B | Activo solo en editar; alta siempre activo |
 
 ---
 
@@ -178,3 +187,93 @@ Pedido base: tab **Feriados** al lado de Períodos; grilla; **Nuevo feriado** mo
 - SADOFE = sábado, domingo y feriado (definición de negocio a cerrar en Q3).
 - `produccion` existente **no** es Semana/SADOFE salvo Q1=D.
 - Q4=B: validación solo UI — documentar riesgo de bypass API en design.
+
+---
+
+## Addendum — `concepto_liquidacion` en Servicios
+
+Campo numérico en Parametrización → Servicios, cargable al crear o editar.
+
+### Q15 — Tipo de número
+
+- **A** — Entero positivo (ej. `101`, `205`) — sin decimales
+- **B** — Entero (puede ser negativo)
+- **C** — Decimal con 2 decimales (como `valor_hora`)
+- **D** — Otro
+
+**Elegido: A** — Entero positivo, sin decimales.
+
+### Q16 — ¿Es obligatorio?
+
+- **A** — Obligatorio al crear y al editar (no se puede guardar sin valor ≥ 1)
+- **B** — Opcional: se puede dejar vacío (en BD queda `NULL`)
+- **C** — Obligatorio al crear; existentes pueden quedar vacíos hasta editarlos
+- **D** — Otro
+
+**Elegido: B** — Opcional; vacío = `NULL`.
+
+### Q17 — Unicidad
+
+- **A** — Se puede repetir (sin unicidad)
+- **B** — Único entre servicios activos
+- **C** — Único entre todos los servicios
+- **D** — Único solo cuando tiene valor (varios `NULL` sí)
+
+**Elegido: A** — Se puede repetir; sin constraint unique.
+
+### Q18 — UI de alta / edición de Servicios
+
+Hoy: formulario inline + `valor_hora` editable en la grilla; delete directo. No hay modal de editar.
+
+- **A** — Input en el alta + input en cada fila (blur como valor hora)
+- **B** — Input en el alta; botón editar con modal (nombre, valor hora, concepto, activo)
+- **C** — Alta y edición en modales como Módulos/Feriados: **Nuevo servicio** + editar/eliminar con confirmación + Esc
+- **D** — Otro
+
+**Elegido: C** (pedido D: “puede ser C; igual que módulos”) — Grilla de servicios; botón **Nuevo servicio**; crear/editar/eliminar por modal (Cancelar/Guardar o Cargar; delete con confirmación; Esc cancela). `concepto_liquidacion` va en crear y editar. `valor_hora` deja de editarse inline.
+
+### Q19 — Uso de `concepto_liquidacion` además de Parametrización
+
+- **A** — Solo Parametrización (API + grilla); no XLS ni Capital Humano en este change
+- **B** — También columna en el XLS
+- **C** — Visible en Carga / grillas de novedades
+- **D** — A + B
+- **E** — Otro
+
+**Elegido: E** — Se va a usar en **Capital Humano** como organizador de los archivos que se importen desde ahí. **Ese uso se define más adelante** (fuera del alcance de implementación de este change). En este change: persistir el campo en Servicios y exponerlo en el ABM.
+
+### Q20 — Vacío vs `0`
+
+- **A** — Vacío = `NULL`; `0` inválido
+- **B** — Vacío o `0` = `NULL` (“sin concepto”)
+- **C** — Vacío = `NULL`; `0` es un concepto válido
+- **D** — Otro
+
+**Elegido: B** — Vacío o `0` se persisten como `NULL`.
+
+### Q21 — Tope numérico
+
+- **A** — Sin tope especial: entero ≥ 1 (límite de `Integer`)
+- **B** — Hasta 9999
+- **C** — Hasta 999999
+- **D** — Otro
+
+**Elegido: A** — Sin tope extra; si hay valor, entero ≥ 1.
+
+### Q22 — Grilla de Servicios
+
+- **A** — Layout actual (`#id · nombre · activo`) más **Concepto liquidación** (`NULL` → vacío o “—”)
+- **B** — Filas tipo Módulos: id, nombre, valor hora, concepto, activo
+- **C** — Como A, vacío = “Sin concepto”
+- **D** — Otro
+
+**Elegido: A** — Misma fila que hoy + concepto; `NULL` se muestra como “—”.
+
+### Q23 — Campo `activo` en modales
+
+- **A** — Checkbox Activo en crear y editar (default ON al crear)
+- **B** — Solo en editar; el alta siempre queda activo
+- **C** — No se toca `activo` en este change
+- **D** — Otro
+
+**Elegido: B** — Alta siempre `activo=true`. Checkbox Activo solo en el modal de editar.

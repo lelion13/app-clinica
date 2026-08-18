@@ -45,6 +45,7 @@ class NovedadesServicio(AuditMixin, Base):
     nombre: Mapped[str] = mapped_column(String(120), nullable=False)
     activo: Mapped[bool] = mapped_column(Boolean, nullable=False, default=True)
     valor_hora: Mapped[Decimal] = mapped_column(Numeric(12, 2), nullable=False, default=Decimal("0"))
+    concepto_liquidacion: Mapped[int | None] = mapped_column(Integer, nullable=True)
 
 
 class NovedadesModulo(AuditMixin, Base):

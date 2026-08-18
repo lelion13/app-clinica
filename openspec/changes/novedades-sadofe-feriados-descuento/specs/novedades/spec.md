@@ -1,4 +1,4 @@
-# Delta: novedades / SADOFE, feriados, horas a descontar
+# Delta: novedades / SADOFE, feriados, horas a descontar, concepto liquidación
 
 ## MODIFIED Requirements
 
@@ -6,11 +6,25 @@
 
 Modules MUST include boolean **sadofe** (checkbox SADOFE; off = Semana). Existing `produccion` MUST remain independent. Existing rows MUST default `sadofe=false`.
 
+Servicios MUST include optional integer **concepto_liquidacion** (label “Concepto liquidación”). Empty or `0` MUST persist as `NULL`. A non-zero value MUST be an integer ≥ 1 (no extra upper bound). Duplicate values across servicios MUST be allowed. Admin/`rrhh` MUST manage servicios in Parametrización like Módulos: grid, **Nuevo servicio** modal (Cancelar/Cargar; always `activo=true`), edit modal (nombre, valor hora, concepto, **Activo**), confirm-delete modal; Escape cancels. Inline `valor_hora` edit MUST be removed. The grid MUST keep `#id · nombre · activo` and show concepto (`NULL` → “—”).
+
 #### Scenario: Alta módulo SADOFE
 
 - GIVEN `rrhh` en Nuevo módulo
 - WHEN marca SADOFE y carga
 - THEN el módulo se persiste con `sadofe=true`
+
+#### Scenario: Alta servicio con concepto
+
+- GIVEN `rrhh` en Nuevo servicio
+- WHEN carga nombre, valor hora y concepto `101`
+- THEN el servicio queda activo con `concepto_liquidacion=101`
+
+#### Scenario: Concepto vacío o cero
+
+- GIVEN `rrhh` creando o editando un servicio
+- WHEN deja concepto vacío o ingresa `0`
+- THEN MUST persistirse `NULL`
 
 ### Requirement: Dos flujos de carga
 
