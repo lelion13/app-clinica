@@ -147,6 +147,49 @@ def _get_or_create_opcion(
     return item
 
 
+def cleanup_unused_opciones(
+    db: Session,
+    *,
+    option_keys_from_import: set[str],
+    actor_id: int,
+    now: datetime,
+) -> int:
+    """Soft-delete opciones absent from import without tarifa and without cantidades anywhere."""
+    from app.models.novedades import NovedadesProduccionTarifa
+
+    tarifadas = set(
+        db.execute(
+            select(NovedadesProduccionTarifa.opcion_id).where(NovedadesProduccionTarifa.deleted_at.is_(None))
+        )
+        .scalars()
+        .all()
+    )
+    with_cantidad = set(
+        db.execute(
+            select(NovedadesBonoCantidad.opcion_id).where(NovedadesBonoCantidad.deleted_at.is_(None)).distinct()
+        )
+        .scalars()
+        .all()
+    )
+    opciones = list(
+        db.execute(select(NovedadesBonoOpcion).where(NovedadesBonoOpcion.deleted_at.is_(None))).scalars().all()
+    )
+    removed = 0
+    for opcion in opciones:
+        key = opcion_key(opcion.centro, opcion.servicio, opcion.semana, opcion.horario)
+        if key in option_keys_from_import:
+            continue
+        if opcion.id in tarifadas:
+            continue
+        if opcion.id in with_cantidad:
+            continue
+        opcion.deleted_at = now
+        opcion.updated_at = now
+        opcion.updated_by = actor_id
+        removed += 1
+    return removed
+
+
 def import_bonos_for_periodo(db: Session, periodo_id: int, user: User) -> BonosImportResponse:
     periodo = db.execute(
         select(NovedadesPeriodo).where(NovedadesPeriodo.id == periodo_id, NovedadesPeriodo.deleted_at.is_(None))
@@ -225,6 +268,7 @@ def import_bonos_for_periodo(db: Session, periodo_id: int, user: User) -> BonosI
         matched_prof_ids.add(professional_id)
         option_keys.add(opcion_key(centro, servicio, semana, horario))
 
+    cleanup_unused_opciones(db, option_keys_from_import=option_keys, actor_id=user.id, now=now)
     db.commit()
 
     from app.services.novedades.capital_humano import build_capital_humano_rows
