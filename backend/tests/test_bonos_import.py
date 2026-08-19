@@ -1,4 +1,4 @@
-from datetime import date
+from datetime import date, datetime
 from types import SimpleNamespace
 
 import pytest
@@ -237,6 +237,152 @@ def test_expand_bono_columns_marks_missing_tarifa():
     assert cols[0].kind == "cantidad"
     assert cols[1].kind == "subtotal"
     assert missing == ["A|B|C|D"]
+
+
+def test_cleanup_unused_opciones_removes_orphan():
+    now = datetime.utcnow()
+    old = SimpleNamespace(
+        id=1,
+        centro="CMG",
+        servicio="GUA",
+        semana="DOMINGO",
+        horario="DIA",
+        deleted_at=None,
+        updated_at=None,
+        updated_by=None,
+    )
+    kept = SimpleNamespace(
+        id=2,
+        centro="CMG",
+        servicio="GUA",
+        semana="SADOFE",
+        horario="DIA",
+        deleted_at=None,
+        updated_at=None,
+        updated_by=None,
+    )
+
+    class _ScalarResult:
+        def __init__(self, items):
+            self._items = items
+
+        def scalars(self):
+            return self
+
+        def all(self):
+            return self._items
+
+    class DB:
+        def __init__(self):
+            self._calls = 0
+
+        def execute(self, _stmt):
+            self._calls += 1
+            if self._calls == 1:
+                return _ScalarResult([])  # tarifadas
+            if self._calls == 2:
+                return _ScalarResult([])  # with_cantidad
+            return _ScalarResult([old, kept])  # opciones
+
+    removed = bonos.cleanup_unused_opciones(
+        DB(),
+        option_keys_from_import={"CMG|GUA|SADOFE|DIA"},
+        actor_id=9,
+        now=now,
+    )
+    assert removed == 1
+    assert old.deleted_at == now
+    assert kept.deleted_at is None
+
+
+def test_cleanup_keeps_opcion_with_tarifa():
+    now = datetime.utcnow()
+    opcion = SimpleNamespace(
+        id=5,
+        centro="CMG",
+        servicio="DEA",
+        semana="DOMINGO",
+        horario="DIA",
+        deleted_at=None,
+        updated_at=None,
+        updated_by=None,
+    )
+
+    class _ScalarResult:
+        def __init__(self, items):
+            self._items = items
+
+        def scalars(self):
+            return self
+
+        def all(self):
+            return self._items
+
+    class DB:
+        def __init__(self):
+            self._calls = 0
+
+        def execute(self, _stmt):
+            self._calls += 1
+            if self._calls == 1:
+                return _ScalarResult([5])  # tarifadas
+            if self._calls == 2:
+                return _ScalarResult([])
+            return _ScalarResult([opcion])
+
+    removed = bonos.cleanup_unused_opciones(
+        DB(),
+        option_keys_from_import=set(),
+        actor_id=1,
+        now=now,
+    )
+    assert removed == 0
+    assert opcion.deleted_at is None
+
+
+def test_cleanup_keeps_opcion_used_in_other_period():
+    now = datetime.utcnow()
+    opcion = SimpleNamespace(
+        id=3,
+        centro="CMG",
+        servicio="CAP",
+        semana="LUNES_VIERNES",
+        horario="DIA",
+        deleted_at=None,
+        updated_at=None,
+        updated_by=None,
+    )
+
+    class _ScalarResult:
+        def __init__(self, items):
+            self._items = items
+
+        def scalars(self):
+            return self
+
+        def all(self):
+            return self._items
+
+    class DB:
+        def __init__(self):
+            self._calls = 0
+
+        def execute(self, _stmt):
+            self._calls += 1
+            if self._calls == 1:
+                return _ScalarResult([])
+            if self._calls == 2:
+                return _ScalarResult([3])  # still has cantidad elsewhere
+            return _ScalarResult([opcion])
+
+    removed = bonos.cleanup_unused_opciones(
+        DB(),
+        option_keys_from_import={"CMG|CAP|SADOFE|DIA"},
+        actor_id=1,
+        now=now,
+    )
+    assert removed == 0
+    assert opcion.deleted_at is None
 
 
 def test_list_solo_bonos_excludes_promoted_special(monkeypatch):

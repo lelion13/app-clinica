@@ -39,6 +39,7 @@ from app.schemas.novedades import (
     ProfesionalDirectoryItem,
     ProfesionalServicioCreateRequest,
     ProfesionalServicioResponse,
+    ProduccionTarifaBulkCreateRequest,
     ProduccionTarifaCreateRequest,
     ProduccionTarifaResponse,
     ProduccionTarifaUpdateRequest,
@@ -344,6 +345,15 @@ def produccion_tarifas_create(
     user: User = Depends(require_admin_or_rrhh),
 ) -> ProduccionTarifaResponse:
     return produccion_tarifas_service.create_tarifa(db, payload, actor_id=user.id)
+
+
+@router.post("/produccion-tarifas/bulk", response_model=list[ProduccionTarifaResponse], status_code=status.HTTP_201_CREATED)
+def produccion_tarifas_create_bulk(
+    payload: ProduccionTarifaBulkCreateRequest,
+    db: Session = Depends(get_db),
+    user: User = Depends(require_admin_or_rrhh),
+) -> list[ProduccionTarifaResponse]:
+    return produccion_tarifas_service.create_tarifas_bulk(db, payload, actor_id=user.id)
 
 
 @router.put("/produccion-tarifas/{tarifa_id}", response_model=ProduccionTarifaResponse)

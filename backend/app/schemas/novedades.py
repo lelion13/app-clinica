@@ -318,6 +318,11 @@ class ProduccionTarifaCreateRequest(BaseModel):
     valor_unitario: int = Field(ge=0)
 
 
+class ProduccionTarifaBulkCreateRequest(BaseModel):
+    opcion_ids: list[int] = Field(min_length=1)
+    valor_unitario: int = Field(ge=0)
+
+
 class ProduccionTarifaUpdateRequest(BaseModel):
     valor_unitario: int = Field(ge=0)
 

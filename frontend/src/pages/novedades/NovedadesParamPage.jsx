@@ -27,7 +27,7 @@ export function NovedadesParamPage() {
   const [produccionTarifas, setProduccionTarifas] = useState([]);
   const [createProduccionOpen, setCreateProduccionOpen] = useState(false);
   const [createProduccionSaving, setCreateProduccionSaving] = useState(false);
-  const [produccionOpcionId, setProduccionOpcionId] = useState("");
+  const [produccionOpcionIds, setProduccionOpcionIds] = useState([]);
   const [produccionValor, setProduccionValor] = useState("");
   const [bonoOpciones, setBonoOpciones] = useState([]);
   const [editTarifa, setEditTarifa] = useState(null);
@@ -486,9 +486,13 @@ export function NovedadesParamPage() {
   };
 
   const resetCreateProduccionForm = () => {
-    setProduccionOpcionId("");
+    setProduccionOpcionIds([]);
     setProduccionValor("");
     setBonoOpciones([]);
+  };
+
+  const toggleProduccionOpcion = (id) => {
+    setProduccionOpcionIds((prev) => (prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id]));
   };
 
   const openCreateProduccion = async () => {
@@ -510,8 +514,8 @@ export function NovedadesParamPage() {
   };
 
   const createProduccion = async () => {
-    if (!produccionOpcionId || produccionValor === "") {
-      setError("Seleccioná una opción e ingresá el valor unitario");
+    if (!produccionOpcionIds.length || produccionValor === "") {
+      setError("Seleccioná al menos una opción e ingresá el valor unitario");
       return;
     }
     const valor = Number(produccionValor);
@@ -522,9 +526,9 @@ export function NovedadesParamPage() {
     setCreateProduccionSaving(true);
     setError("");
     try {
-      await apiRequestWithRefresh("/novedades/produccion-tarifas", {
+      await apiRequestWithRefresh("/novedades/produccion-tarifas/bulk", {
         method: "POST",
-        body: JSON.stringify({ opcion_id: Number(produccionOpcionId), valor_unitario: valor }),
+        body: JSON.stringify({ opcion_ids: produccionOpcionIds.map(Number), valor_unitario: valor }),
       });
       setCreateProduccionOpen(false);
       resetCreateProduccionForm();
@@ -1522,22 +1526,33 @@ export function NovedadesParamPage() {
                   Nueva producción
                 </h2>
                 <div style={{ display: "grid", gap: 10 }}>
-                  <label style={{ display: "grid", gap: 4 }}>
-                    <span style={{ fontSize: 12, color: uiTheme.colors.textMuted }}>Opción de bono</span>
-                    <select
-                      value={produccionOpcionId}
-                      onChange={(e) => setProduccionOpcionId(e.target.value)}
-                      style={uiStyles.formControl}
-                      disabled={createProduccionSaving}
+                  <div>
+                    <div style={{ ...uiStyles.helpText, marginBottom: 6 }}>
+                      Opciones de bono (podés elegir varias con el mismo valor)
+                    </div>
+                    <div
+                      style={{
+                        display: "grid",
+                        gap: 8,
+                        maxHeight: 240,
+                        overflowY: "auto",
+                        padding: "4px 0",
+                      }}
                     >
-                      <option value="">Seleccionar…</option>
                       {bonoOpciones.map((o) => (
-                        <option key={o.id} value={o.id}>
-                          {o.label}
-                        </option>
+                        <label key={o.id} style={{ display: "inline-flex", gap: 8, alignItems: "flex-start" }}>
+                          <input
+                            type="checkbox"
+                            checked={produccionOpcionIds.includes(o.id)}
+                            onChange={() => toggleProduccionOpcion(o.id)}
+                            disabled={createProduccionSaving}
+                            style={{ marginTop: 3 }}
+                          />
+                          <span>{o.label}</span>
+                        </label>
                       ))}
-                    </select>
-                  </label>
+                    </div>
+                  </div>
                   <label style={{ display: "grid", gap: 4 }}>
                     <span style={{ fontSize: 12, color: uiTheme.colors.textMuted }}>Valor unitario (entero ≥ 0)</span>
                     <input
@@ -1558,7 +1573,12 @@ export function NovedadesParamPage() {
                     <button type="button" style={uiStyles.buttonSecondary} onClick={closeCreateProduccion} disabled={createProduccionSaving}>
                       Cancelar
                     </button>
-                    <button type="button" style={uiStyles.buttonPrimary} onClick={createProduccion} disabled={createProduccionSaving}>
+                    <button
+                      type="button"
+                      style={uiStyles.buttonPrimary}
+                      onClick={createProduccion}
+                      disabled={createProduccionSaving || !produccionOpcionIds.length || produccionValor === ""}
+                    >
                       {createProduccionSaving ? "Guardando…" : "Cargar"}
                     </button>
                   </div>

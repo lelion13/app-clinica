@@ -7,6 +7,7 @@ from sqlalchemy.orm import Session
 from app.models.novedades import NovedadesBonoOpcion, NovedadesProduccionTarifa
 from app.schemas.novedades import (
     BonoOpcionResponse,
+    ProduccionTarifaBulkCreateRequest,
     ProduccionTarifaCreateRequest,
     ProduccionTarifaResponse,
     ProduccionTarifaUpdateRequest,
@@ -158,6 +159,44 @@ def create_tarifa(
     db.commit()
     db.refresh(item)
     return _tarifa_response(item, opcion)
+
+
+def create_tarifas_bulk(
+    db: Session, payload: ProduccionTarifaBulkCreateRequest, actor_id: int
+) -> list[ProduccionTarifaResponse]:
+    unique_ids = list(dict.fromkeys(payload.opcion_ids))
+    if not unique_ids:
+        raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail="Seleccioná al menos una opción")
+
+    opciones: dict[int, NovedadesBonoOpcion] = {}
+    for opcion_id in unique_ids:
+        opcion = _get_opcion_or_404(db, opcion_id)
+        if _tarifa_activa_for_opcion(db, opcion_id):
+            label = opcion_label(opcion.centro, opcion.servicio, opcion.semana, opcion.horario)
+            raise HTTPException(
+                status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+                detail=f"Ya existe una tarifa para la opción {label}",
+            )
+        opciones[opcion_id] = opcion
+
+    now = datetime.utcnow()
+    created: list[ProduccionTarifaResponse] = []
+    for opcion_id in unique_ids:
+        opcion = opciones[opcion_id]
+        item = NovedadesProduccionTarifa(
+            opcion_id=opcion_id,
+            valor_unitario=int(payload.valor_unitario),
+            created_at=now,
+            updated_at=now,
+            created_by=actor_id,
+            updated_by=actor_id,
+            deleted_at=None,
+        )
+        db.add(item)
+        db.flush()
+        created.append(_tarifa_response(item, opcion))
+    db.commit()
+    return created
 
 
 def update_tarifa(

@@ -78,11 +78,12 @@
   - Profesionales con solo bonos se incorporan a grilla principal solo si tienen opción de bono con `servicio` exacto `DEA`, `DEP`, `CAP` o `CAI`
   - Esos profesionales dejan de verse en modal **Solo bonos**
 - Cambio `novedades-produccion-valor-bonos` (rev `0021_produccion_tarifa`):
-  - Param tab **Producción** (entre Módulos y Jefes): tarifas por opción de bono importada (`centro|servicio|semana|horario`) + `valor_unitario` entero ≥ 0
+  - Param tab **Producción**: alta múltiple de opciones con el mismo `valor_unitario` (checkboxes + POST bulk)
   - No confundir con flag **Producción** del módulo (skip check externo)
   - Capital Humano: columnas cantidad + subtotal por opción; `monto_total = cargas ± ajustes + bonos valorizados`
   - Opciones sin tarifa: cantidad visible, subtotal 0, banner aviso en CH
   - XLS con bonos incluye subtotales; XLS agregado refleja total con bonos
+  - Tras **Importar bonos**: soft-delete de opciones que no vienen en ese import, **sin tarifa en Producción** y **sin cantidades en ningún período** (limpia DOMINGO/SABADO huérfanos al pasar a SADOFE)
 
 ## Roles (panel)
 - `admin`: distribución + novedades (todo) + usuarios
