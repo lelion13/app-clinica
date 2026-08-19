@@ -30,11 +30,11 @@ export function NovedadesParamPage() {
   const [produccionOpcionId, setProduccionOpcionId] = useState("");
   const [produccionValor, setProduccionValor] = useState("");
   const [bonoOpciones, setBonoOpciones] = useState([]);
-  const [editProduccion, setEditProduccion] = useState(null);
-  const [editProduccionValor, setEditProduccionValor] = useState("");
-  const [editProduccionSaving, setEditProduccionSaving] = useState(false);
-  const [deleteProduccion, setDeleteProduccion] = useState(null);
-  const [deleteProduccionSaving, setDeleteProduccionSaving] = useState(false);
+  const [editTarifa, setEditTarifa] = useState(null);
+  const [editTarifaValor, setEditTarifaValor] = useState("");
+  const [editTarifaSaving, setEditTarifaSaving] = useState(false);
+  const [deleteTarifa, setDeleteTarifa] = useState(null);
+  const [deleteTarifaSaving, setDeleteTarifaSaving] = useState(false);
   const [users, setUsers] = useState([]);
   const [allPros, setAllPros] = useState([]);
 
@@ -536,56 +536,56 @@ export function NovedadesParamPage() {
     }
   };
 
-  const openEditProduccion = (item) => {
-    setEditProduccion(item);
-    setEditProduccionValor(String(item.valor_unitario ?? ""));
+  const openEditTarifa = (item) => {
+    setEditTarifa(item);
+    setEditTarifaValor(String(item.valor_unitario ?? ""));
   };
 
-  const closeEditProduccion = () => {
-    if (editProduccionSaving) return;
-    setEditProduccion(null);
+  const closeEditTarifa = () => {
+    if (editTarifaSaving) return;
+    setEditTarifa(null);
   };
 
-  const saveEditProduccion = async () => {
-    if (!editProduccion) return;
-    const valor = Number(editProduccionValor);
+  const saveEditTarifa = async () => {
+    if (!editTarifa) return;
+    const valor = Number(editTarifaValor);
     if (!Number.isFinite(valor) || valor < 0 || !Number.isInteger(valor)) {
       setError("El valor unitario debe ser un entero ≥ 0");
       return;
     }
-    setEditProduccionSaving(true);
+    setEditTarifaSaving(true);
     setError("");
     try {
-      await apiRequestWithRefresh(`/novedades/produccion-tarifas/${editProduccion.id}`, {
+      await apiRequestWithRefresh(`/novedades/produccion-tarifas/${editTarifa.id}`, {
         method: "PUT",
         body: JSON.stringify({ valor_unitario: valor }),
       });
-      setEditProduccion(null);
+      setEditTarifa(null);
       await load();
     } catch (err) {
       setError(err.message || "No se pudo guardar la tarifa");
     } finally {
-      setEditProduccionSaving(false);
+      setEditTarifaSaving(false);
     }
   };
 
-  const closeDeleteProduccion = () => {
-    if (deleteProduccionSaving) return;
-    setDeleteProduccion(null);
+  const closeDeleteTarifa = () => {
+    if (deleteTarifaSaving) return;
+    setDeleteTarifa(null);
   };
 
-  const confirmDeleteProduccion = async () => {
-    if (!deleteProduccion) return;
-    setDeleteProduccionSaving(true);
+  const confirmDeleteTarifa = async () => {
+    if (!deleteTarifa) return;
+    setDeleteTarifaSaving(true);
     setError("");
     try {
-      await apiRequestWithRefresh(`/novedades/produccion-tarifas/${deleteProduccion.id}`, { method: "DELETE" });
-      setDeleteProduccion(null);
+      await apiRequestWithRefresh(`/novedades/produccion-tarifas/${deleteTarifa.id}`, { method: "DELETE" });
+      setDeleteTarifa(null);
       await load();
     } catch (err) {
       setError(err.message || "No se pudo eliminar la tarifa");
     } finally {
-      setDeleteProduccionSaving(false);
+      setDeleteTarifaSaving(false);
     }
   };
 
@@ -594,15 +594,15 @@ export function NovedadesParamPage() {
       !createServicioOpen && !editServicio && !deleteServicio
       && !createModuloOpen && !editModulo && !serviciosModulo && !deleteModulo
       && !createFeriadoOpen && !editFeriado && !deleteFeriado
-      && !createProduccionOpen && !editProduccion && !deleteProduccion
+      && !createProduccionOpen && !editTarifa && !deleteTarifa
     ) return undefined;
     const onKey = (e) => {
       if (e.key !== "Escape") return;
       if (deleteServicio) closeDeleteServicio();
       else if (editServicio) closeEditServicio();
       else if (createServicioOpen) closeCreateServicio();
-      else if (deleteProduccion) closeDeleteProduccion();
-      else if (editProduccion) closeEditProduccion();
+      else if (deleteTarifa) closeDeleteTarifa();
+      else if (editTarifa) closeEditTarifa();
       else if (createProduccionOpen) closeCreateProduccion();
       else if (deleteFeriado) closeDeleteFeriado();
       else if (editFeriado) closeEditFeriado();
@@ -637,10 +637,10 @@ export function NovedadesParamPage() {
     deleteFeriadoSaving,
     createProduccionOpen,
     createProduccionSaving,
-    editProduccion,
-    editProduccionSaving,
-    deleteProduccion,
-    deleteProduccionSaving,
+    editTarifa,
+    editTarifaSaving,
+    deleteTarifa,
+    deleteTarifaSaving,
   ]);
 
   const createJefe = async (event) => {
@@ -1471,10 +1471,10 @@ export function NovedadesParamPage() {
                     <div style={uiStyles.helpText}>Valor unitario ${Number(item.valor_unitario).toLocaleString("es-AR")}</div>
                   </div>
                   <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
-                    <button type="button" style={uiStyles.buttonSecondary} onClick={() => openEditProduccion(item)}>
+                    <button type="button" style={uiStyles.buttonSecondary} onClick={() => openEditTarifa(item)}>
                       editar
                     </button>
-                    <button type="button" style={uiStyles.buttonDanger} onClick={() => setDeleteProduccion(item)}>
+                    <button type="button" style={uiStyles.buttonDanger} onClick={() => setDeleteTarifa(item)}>
                       eliminar
                     </button>
                   </div>
@@ -1567,7 +1567,7 @@ export function NovedadesParamPage() {
             </div>
           ) : null}
 
-          {editProduccion ? (
+          {editTarifa ? (
             <div
               role="presentation"
               style={{
@@ -1581,7 +1581,7 @@ export function NovedadesParamPage() {
                 padding: "max(16px, 4vh) 16px",
                 overflowY: "auto",
               }}
-              onClick={closeEditProduccion}
+              onClick={closeEditTarifa}
             >
               <div
                 role="dialog"
@@ -1602,32 +1602,32 @@ export function NovedadesParamPage() {
                 <h2 id="edit-produccion-title" style={{ marginTop: 0, marginBottom: 12, fontSize: "1.1rem" }}>
                   Editar tarifa
                 </h2>
-                <p style={uiStyles.helpText}>{editProduccion.label}</p>
+                <p style={uiStyles.helpText}>{editTarifa.label}</p>
                 <label style={{ display: "grid", gap: 4 }}>
                   <span style={{ fontSize: 12, color: uiTheme.colors.textMuted }}>Valor unitario (entero ≥ 0)</span>
                   <input
                     type="number"
                     step="1"
                     min="0"
-                    value={editProduccionValor}
-                    onChange={(e) => setEditProduccionValor(e.target.value)}
+                    value={editTarifaValor}
+                    onChange={(e) => setEditTarifaValor(e.target.value)}
                     style={uiStyles.formControl}
-                    disabled={editProduccionSaving}
+                    disabled={editTarifaSaving}
                   />
                 </label>
                 <div style={{ display: "flex", gap: 8, justifyContent: "flex-end", marginTop: 16 }}>
-                  <button type="button" style={uiStyles.buttonSecondary} onClick={closeEditProduccion} disabled={editProduccionSaving}>
+                  <button type="button" style={uiStyles.buttonSecondary} onClick={closeEditTarifa} disabled={editTarifaSaving}>
                     Cancelar
                   </button>
-                  <button type="button" style={uiStyles.buttonPrimary} onClick={saveEditProduccion} disabled={editProduccionSaving}>
-                    {editProduccionSaving ? "Guardando…" : "Guardar"}
+                  <button type="button" style={uiStyles.buttonPrimary} onClick={saveEditTarifa} disabled={editTarifaSaving}>
+                    {editTarifaSaving ? "Guardando…" : "Guardar"}
                   </button>
                 </div>
               </div>
             </div>
           ) : null}
 
-          {deleteProduccion ? (
+          {deleteTarifa ? (
             <div
               role="presentation"
               style={{
@@ -1640,7 +1640,7 @@ export function NovedadesParamPage() {
                 justifyContent: "center",
                 padding: 16,
               }}
-              onClick={closeDeleteProduccion}
+              onClick={closeDeleteTarifa}
             >
               <div
                 role="dialog"
@@ -1658,14 +1658,14 @@ export function NovedadesParamPage() {
               >
                 <h2 style={{ marginTop: 0 }}>Eliminar tarifa</h2>
                 <p style={uiStyles.helpText}>
-                  ¿Eliminar tarifa de <strong>{deleteProduccion.label}</strong> (${deleteProduccion.valor_unitario})?
+                  ¿Eliminar tarifa de <strong>{deleteTarifa.label}</strong> (${deleteTarifa.valor_unitario})?
                 </p>
                 <div style={{ display: "flex", gap: 8, justifyContent: "flex-end" }}>
-                  <button type="button" style={uiStyles.buttonSecondary} onClick={closeDeleteProduccion} disabled={deleteProduccionSaving}>
+                  <button type="button" style={uiStyles.buttonSecondary} onClick={closeDeleteTarifa} disabled={deleteTarifaSaving}>
                     Cancelar
                   </button>
-                  <button type="button" style={uiStyles.buttonDanger} onClick={confirmDeleteProduccion} disabled={deleteProduccionSaving}>
-                    {deleteProduccionSaving ? "Eliminando…" : "Eliminar"}
+                  <button type="button" style={uiStyles.buttonDanger} onClick={confirmDeleteTarifa} disabled={deleteTarifaSaving}>
+                    {deleteTarifaSaving ? "Eliminando…" : "Eliminar"}
                   </button>
                 </div>
               </div>
