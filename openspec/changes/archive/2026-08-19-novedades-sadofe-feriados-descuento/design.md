@@ -5,7 +5,7 @@
 - `novedades_modulo.sadofe` BOOLEAN NOT NULL DEFAULT false (existentes = Semana).
 - `novedades_feriado`: id, fecha DATE, nombre VARCHAR(200), AuditMixin. Unique active `(fecha)` WHERE `deleted_at IS NULL`.
 - Alembic `0019_sadofe_feriados` revises `0018_modulo_produccion`. Drop/recreate `ck_novedades_novedad_tipo` to include `horas_a_descontar`.
-- `novedades_servicio.concepto_liquidacion` INTEGER NULL. Alembic `0020_servicio_concepto_liquidacion` revises `0019`. No unique. Existing rows stay NULL.
+- `novedades_servicio.concepto_liquidacion` INTEGER NULL. Alembic `0020_servicio_concepto` revises `0019`. No unique. Existing rows stay NULL.
 
 ## API
 

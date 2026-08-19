@@ -229,7 +229,7 @@ def import_bonos_for_periodo(db: Session, periodo_id: int, user: User) -> BonosI
 
     from app.services.novedades.capital_humano import build_capital_humano_rows
 
-    grid_rows = build_capital_humano_rows(db, periodo_id=periodo_id)
+    grid_rows = build_capital_humano_rows(db, periodo_id=periodo_id, include_bonos=True)
     grid_ids = {r.professional_id for r in grid_rows}
     solo_bonos = len(matched_prof_ids - grid_ids)
 
@@ -291,7 +291,10 @@ def list_solo_bonos(
     from app.services.novedades.capital_humano import build_capital_humano_rows
 
     grid_ids = {
-        r.professional_id for r in build_capital_humano_rows(db, periodo_id=periodo_id, servicio_id=servicio_id)
+        r.professional_id
+        for r in build_capital_humano_rows(
+            db, periodo_id=periodo_id, servicio_id=servicio_id, include_bonos=True
+        )
     }
     solo_ids = [pid for pid in by_prof if pid not in grid_ids]
     if not solo_ids:

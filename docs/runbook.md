@@ -73,6 +73,11 @@
   - Param tab **Feriados** (fecha + nombre; ABM admin/rrhh)
   - Novedad tipo **Horas a descontar**: valor = −(horas × valor_hora); entra en grilla/XLS/Capital Humano
   - Servicios: campo opcional **concepto liquidación** (entero ≥ 1; vacío/`0` = NULL); ABM en modales como Módulos (Nuevo servicio / editar / eliminar; Esc). Alta siempre activa. Uso en Capital Humano queda para un change posterior
+- Cambio `capital-humano-bonos-servicios-especiales`:
+  - Capital Humano sin selector de servicio en UI (opera en todos los servicios)
+  - Profesionales con solo bonos se incorporan a grilla principal solo si tienen opción de bono con `servicio` exacto `DEA`, `DEP`, `CAP` o `CAI`
+  - Esos profesionales dejan de verse en modal **Solo bonos**
+  - `monto_total` no valoriza bonos en este change (sigue `cargas ± ajustes`)
 
 ## Roles (panel)
 - `admin`: distribución + novedades (todo) + usuarios

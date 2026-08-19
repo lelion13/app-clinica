@@ -68,10 +68,8 @@ export function NovedadesXlsPage() {
   const [info, setInfo] = useState("");
   const [rows, setRows] = useState([]);
   const [bonoColumns, setBonoColumns] = useState([]);
-  const [servicios, setServicios] = useState([]);
   const [periodos, setPeriodos] = useState([]);
   const [periodoId, setPeriodoId] = useState("");
-  const [servicioId, setServicioId] = useState("");
   const [q, setQ] = useState("");
   const [filterText, setFilterText] = useState("");
   const [sortKey, setSortKey] = useState("professional_name");
@@ -95,7 +93,6 @@ export function NovedadesXlsPage() {
   const queryString = () => {
     const params = new URLSearchParams();
     if (periodoId) params.set("periodo_id", periodoId);
-    if (servicioId) params.set("servicio_id", servicioId);
     if (q.trim()) params.set("q", q.trim());
     const qs = params.toString();
     return qs ? `?${qs}` : "";
@@ -110,14 +107,12 @@ export function NovedadesXlsPage() {
   const load = async () => {
     setError("");
     try {
-      const [grid, s, p] = await Promise.all([
+      const [grid, p] = await Promise.all([
         apiRequestWithRefresh(`/novedades/capital-humano${queryString()}`),
-        apiRequestWithRefresh("/novedades/servicios"),
         apiRequestWithRefresh("/novedades/periodos"),
       ]);
       setRows(Array.isArray(grid?.rows) ? grid.rows : []);
       setBonoColumns(Array.isArray(grid?.columns) ? grid.columns : []);
-      setServicios(s);
       setPeriodos(p);
     } catch (err) {
       setError(err.message || "Error al cargar Capital Humano");
@@ -161,7 +156,6 @@ export function NovedadesXlsPage() {
     setError("");
     try {
       const params = new URLSearchParams({ periodo_id: periodoId });
-      if (servicioId) params.set("servicio_id", servicioId);
       const list = await apiRequestWithRefresh(`/novedades/capital-humano/bonos/solo?${params}`);
       setSoloRows(list);
     } catch (err) {
@@ -205,7 +199,6 @@ export function NovedadesXlsPage() {
         professional_id: String(row.professional_id),
         periodo_id: periodoId,
       });
-      if (servicioId) params.set("servicio_id", servicioId);
       const list = await apiRequestWithRefresh(`/novedades/capital-humano/ajustes?${params}`);
       setAjustes(list);
     } catch (err) {
@@ -230,7 +223,6 @@ export function NovedadesXlsPage() {
         professional_id: String(row.professional_id),
       });
       if (periodoId) params.set("periodo_id", periodoId);
-      if (servicioId) params.set("servicio_id", servicioId);
       const list = await apiRequestWithRefresh(`/novedades/grilla?${params}`);
       setDetailItems(list);
     } catch (err) {
@@ -266,7 +258,7 @@ export function NovedadesXlsPage() {
         body: JSON.stringify({
           professional_id: modalRow.professional_id,
           periodo_id: Number(periodoId),
-          servicio_id: servicioId ? Number(servicioId) : null,
+          servicio_id: null,
           importe: amount,
           comentario: comentario.trim(),
         }),
@@ -323,8 +315,8 @@ export function NovedadesXlsPage() {
       <h1 style={uiStyles.sectionTitle}>Capital Humano</h1>
       <p style={uiStyles.helpText}>
         Un registro por profesional: legajo, nombre y monto total (cargas ± ajustes). Importá bonos del período
-        (columnas a la derecha). Con período cerrado no se puede reimportar. Los profesionales solo con bonos van en
-        un modal aparte.
+        (columnas a la derecha). Con período cerrado no se puede reimportar. Los profesionales solo con bonos de
+        servicios especiales (DEA/DEP/CAP/CAI) se incorporan a la grilla; el resto queda en modal aparte.
       </p>
       <AlertModal open={Boolean(error)} title="Atención" message={error} onClose={() => setError("")} />
       <AlertModal open={Boolean(info)} title="Listo" message={info} onClose={() => setInfo("")} />
@@ -335,14 +327,6 @@ export function NovedadesXlsPage() {
           {periodos.map((p) => (
             <option key={p.id} value={p.id}>
               #{p.id} {p.nombre || ""} ({p.estado})
-            </option>
-          ))}
-        </select>
-        <select value={servicioId} onChange={(e) => setServicioId(e.target.value)} style={uiStyles.formControl}>
-          <option value="">Todos los servicios</option>
-          {servicios.map((s) => (
-            <option key={s.id} value={s.id}>
-              {s.nombre}
             </option>
           ))}
         </select>
@@ -595,7 +579,6 @@ export function NovedadesXlsPage() {
                 <p style={{ ...uiStyles.helpText, marginTop: 0 }}>
                   Legajo: {detailRow.legajo || "—"}
                   {periodoId ? ` · Período #${periodoId}` : " · Todos los períodos"}
-                  {servicioId ? " · Servicio filtrado" : ""}
                 </p>
               </div>
               <button type="button" style={uiStyles.buttonSecondary} onClick={closeDetalle}>
@@ -686,7 +669,6 @@ export function NovedadesXlsPage() {
             </h2>
             <p style={{ ...uiStyles.helpText, marginTop: 0 }}>
               Legajo: {modalRow.legajo || "—"} · Período #{periodoId}
-              {servicioId ? ` · Servicio filtrado` : ""}
             </p>
 
             <form onSubmit={submitAjuste} style={{ display: "grid", gap: 10, marginBottom: 16 }}>
