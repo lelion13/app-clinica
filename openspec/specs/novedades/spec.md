@@ -43,7 +43,11 @@ The system MUST support roles `admin`, `operador`, `jefe_medico`, `rrhh`. Users 
 
 ### Requirement: Servicios y módulos
 
-The system MUST provide ABM of **servicios** (id, nombre, activo, **valor_hora**) and **módulos** (id, descripción, comentario, valor ARS, **produccion** boolean) with **N:N** association to services. Admin and `rrhh` MUST manage them; `jefe_medico` MUST NOT.
+The system MUST provide ABM of **servicios** (id, nombre, activo, **valor_hora**, optional integer **concepto_liquidacion**) and **módulos** (id, descripción, comentario, valor ARS, **produccion** boolean, **sadofe** boolean) with **N:N** association to services. Admin and `rrhh` MUST manage them; `jefe_medico` MUST NOT.
+
+Servicios: `concepto_liquidacion` MUST be optional (empty or `0` → `NULL`); non-zero MUST be integer ≥ 1; negatives MUST be rejected (422); duplicates allowed. ABM MUST use modals like Módulos: grid, **Nuevo servicio** (always `activo=true`), edit modal (nombre, valor hora, concepto, **Activo** checkbox), confirm-delete modal; Escape cancels. No inline `valor_hora` edit. Grid shows `#id · nombre · activo · Concepto liquidación` (`NULL` → "—").
+
+Modules: **sadofe** boolean (default false; off = Semana; `produccion` remains independent).
 
 Modules MUST support:
 - Create with optional `produccion` (default false) and at least one `servicio_id`, via Param UI modal **Nuevo módulo** (Cancelar / Cargar → `POST /modulos`)
@@ -172,7 +176,7 @@ API writes for profesional↔servicio MUST use a roster guard that allows admin/
 The system MUST support in one form (módulo opcional y/o novedad opcional, al menos uno):
 
 1. **Asignar módulo de catálogo** al profesional: `modulo_id` FK; valor mostrado solo lectura desde catálogo.
-2. **Cargar novedad**: `tipo` ∈ {`hora_extra`, `hora_extra_por_ausencia`} + `horas` entero ≥ 1; valor = horas × valor_hora del servicio.
+2. **Cargar novedad**: `tipo` ∈ {`hora_extra`, `hora_extra_por_ausencia`, `horas_a_descontar`} + `horas` entero ≥ 1; valor = horas × valor_hora del servicio (negative for `horas_a_descontar`). Negative values MUST enter Carga grid, XLS, and Capital Humano aggregates.
 
 Create payloads MUST include required `fecha_realizacion` under the fecha rules below. Professional selection on Carga MUST use typeahead over **active** Novedades-catalog professionals linked to the service. Inactive linked professionals MUST NOT be selectable. Submit MUST clear profesional/módulo/horas/fecha (MAY keep período/servicio; MAY reset fecha to today if still valid).
 
@@ -210,6 +214,37 @@ Validation/API error messages on Novedades screens MUST be shown in an **alert m
 - GIVEN profesional inactivo aún vinculado a S1
 - WHEN se intenta crear carga para ese profesional
 - THEN API MUST reject (422)
+
+### Requirement: Filtro módulos por fecha y feriados
+
+The Carga module select MUST list only modules valid for the selected `fecha_realizacion`:
+- Semana (`sadofe=false`): Monday–Friday and the date is **not** a loaded holiday
+- SADOFE (`sadofe=true`): Saturday, Sunday, **or** a loaded holiday
+
+Validation is UI-only. Changing the date MUST clear a previously selected module if it is no longer valid.
+
+#### Scenario: Combo filtra SADOFE
+
+- GIVEN feriado 2026-05-25 y módulo SADOFE asociado al servicio
+- WHEN fecha de realización es 2026-05-25
+- THEN el combo MUST incluir el módulo SADOFE
+- AND MUST NOT incluir módulos Semana de ese servicio
+
+### Requirement: Feriados Novedades
+
+The system MUST provide global holidays (`fecha` + `nombre` required). Admin/`rrhh` MUST manage them in Parametrización tab **Feriados** (next to Períodos): list grid, **Nuevo feriado** modal (Cancelar/Cargar), edit and confirm-delete modals like Módulos (Escape cancels). Duplicate active dates MUST be rejected (409). `jefe_medico` MUST be able to read holidays for Carga filtering but MUST NOT manage them.
+
+#### Scenario: Alta feriado
+
+- GIVEN `rrhh` autenticado
+- WHEN crea feriado con fecha y nombre
+- THEN aparece en la grilla y cuenta como SADOFE en Carga
+
+#### Scenario: Fecha duplicada feriado
+
+- GIVEN feriado activo en 2026-12-25
+- WHEN se intenta crear otro con la misma fecha
+- THEN MUST fail (409)
 
 ### Requirement: Fecha de realización en cargas
 

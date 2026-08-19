@@ -7,6 +7,8 @@ from fastapi import HTTPException
 from app.models.novedades import PeriodoEstado
 from app.models.user import UserRole
 from app.services.novedades import bonos_import as bonos
+from app.services.novedades import capital_humano
+from app.services.novedades.capital_humano import has_special_bono_service
 
 
 def test_normalize_remote_item():
@@ -112,3 +114,99 @@ def test_aggregate_sums_duplicates():
 def test_opcion_key_label():
     assert bonos.opcion_key("CMG", "CAP", "LUNES_VIERNES", "DIA") == "CMG|CAP|LUNES_VIERNES|DIA"
     assert "CAP" in bonos.opcion_label("CMG", "CAP", "LUNES_VIERNES", "DIA")
+
+
+def test_has_special_bono_service_true():
+    bonos_map = {"CMG|CAP|LUNES_VIERNES|DIA": 3}
+    assert has_special_bono_service(bonos_map) is True
+
+
+def test_has_special_bono_service_false_for_other_services():
+    bonos_map = {"CMG|CLINICA|LUNES_VIERNES|DIA": 5}
+    assert has_special_bono_service(bonos_map) is False
+
+
+def test_has_special_bono_service_exact_match_only():
+    bonos_map = {"CMG|cap|LUNES_VIERNES|DIA": 2, "CMG|CAP PED|LUNES_VIERNES|DIA": 1}
+    assert has_special_bono_service(bonos_map) is False
+
+
+def test_build_capital_rows_promotes_special_bonus_only(monkeypatch):
+    monkeypatch.setattr(capital_humano, "build_grid_rows", lambda *a, **k: [])
+    monkeypatch.setattr(
+        bonos,
+        "load_bonos_snapshot",
+        lambda *a, **k: (
+            [],
+            {
+                1: {"CMG|CAP|LUNES_VIERNES|DIA": 4},
+                2: {"CMG|CLINICA|LUNES_VIERNES|DIA": 9},
+            },
+        ),
+    )
+
+    prof_special = SimpleNamespace(id=1, full_name="Prof CAP", legajo="1", codprof="001", deleted_at=None)
+
+    class _ScalarResult:
+        def __init__(self, items):
+            self._items = items
+
+        def scalars(self):
+            return self
+
+        def all(self):
+            return self._items
+
+    class DB:
+        def __init__(self):
+            self._calls = 0
+
+        def execute(self, _stmt):
+            self._calls += 1
+            if self._calls == 1:
+                return _ScalarResult([])  # ajustes
+            return _ScalarResult([prof_special])  # professionals lookup
+
+    rows = capital_humano.build_capital_humano_rows(DB(), periodo_id=1, include_bonos=True)
+    assert len(rows) == 1
+    assert rows[0].professional_name == "Prof CAP"
+    assert rows[0].monto_total == 0
+
+
+def test_list_solo_bonos_excludes_promoted_special(monkeypatch):
+    monkeypatch.setattr(
+        bonos,
+        "load_bonos_snapshot",
+        lambda *a, **k: (
+            [],
+            {
+                1: {"CMG|DEA|LUNES_VIERNES|DIA": 3},
+                2: {"CMG|CLINICA|LUNES_VIERNES|DIA": 2},
+            },
+        ),
+    )
+    monkeypatch.setattr(
+        capital_humano,
+        "build_capital_humano_rows",
+        lambda *a, **k: [SimpleNamespace(professional_id=1)],
+    )
+
+    prof_other = SimpleNamespace(id=2, full_name="Prof Clinica", legajo="2", codprof="002", deleted_at=None)
+
+    class _ScalarResult:
+        def __init__(self, items):
+            self._items = items
+
+        def scalars(self):
+            return self
+
+        def all(self):
+            return self._items
+
+    class DB:
+        def execute(self, _stmt):
+            return _ScalarResult([prof_other])
+
+    rows = bonos.list_solo_bonos(DB(), periodo_id=1)
+    assert len(rows) == 1
+    assert rows[0].professional_id == 2

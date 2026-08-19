@@ -20,6 +20,21 @@ from app.schemas.novedades import (
 from app.services.novedades.export_xls import build_grid_rows
 from app.services.novedades.helpers import get_professional_or_404, get_servicio_or_404
 
+SPECIAL_BONO_SERVICIOS = {"DEA", "DEP", "CAP", "CAI"}
+
+
+def has_special_bono_service(bonos: dict[str, int] | None) -> bool:
+    """True when any bonus option belongs to special service set."""
+    if not bonos:
+        return False
+    for key in bonos:
+        parts = str(key).split("|")
+        if len(parts) != 4:
+            continue
+        if parts[1] in SPECIAL_BONO_SERVICIOS:
+            return True
+    return False
+
 
 def build_capital_humano_rows(
     db: Session,
@@ -52,6 +67,15 @@ def build_capital_humano_rows(
         )
 
     prof_ids = set(cargas_by_prof) | set(ajustes_by_prof)
+
+    bonos_by_prof: dict[int, dict[str, int]] = {}
+    if include_bonos:
+        from app.services.novedades.bonos_import import load_bonos_snapshot
+
+        _, bonos_by_prof = load_bonos_snapshot(db, periodo_id=periodo_id)
+        # Promote bonus-only professionals for DEA/DEP/CAP/CAI.
+        prof_ids |= {pid for pid, bonos in bonos_by_prof.items() if has_special_bono_service(bonos)}
+
     if not prof_ids:
         return []
 
@@ -66,12 +90,6 @@ def build_capital_humano_rows(
         .scalars()
         .all()
     }
-
-    bonos_by_prof: dict[int, dict[str, int]] = {}
-    if include_bonos:
-        from app.services.novedades.bonos_import import load_bonos_snapshot
-
-        _, bonos_by_prof = load_bonos_snapshot(db, periodo_id=periodo_id)
 
     needle = (q or "").strip().lower()
     rows: list[CapitalHumanoRowResponse] = []
