@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 
 import { ProfessionalCombobox } from "../../components/ProfessionalCombobox";
+import { BonoOpcionMultiCombobox } from "../../components/BonoOpcionMultiCombobox";
 import { AlertModal } from "../../components/AlertModal";
 import { apiRequestWithRefresh } from "../../services/api";
 import { uiStyles, uiTheme } from "../../ui/theme";
@@ -489,10 +490,6 @@ export function NovedadesParamPage() {
     setProduccionOpcionIds([]);
     setProduccionValor("");
     setBonoOpciones([]);
-  };
-
-  const toggleProduccionOpcion = (id) => {
-    setProduccionOpcionIds((prev) => (prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id]));
   };
 
   const openCreateProduccion = async () => {
@@ -1526,33 +1523,13 @@ export function NovedadesParamPage() {
                   Nueva producción
                 </h2>
                 <div style={{ display: "grid", gap: 10 }}>
-                  <div>
-                    <div style={{ ...uiStyles.helpText, marginBottom: 6 }}>
-                      Opciones de bono (podés elegir varias con el mismo valor)
-                    </div>
-                    <div
-                      style={{
-                        display: "grid",
-                        gap: 8,
-                        maxHeight: 240,
-                        overflowY: "auto",
-                        padding: "4px 0",
-                      }}
-                    >
-                      {bonoOpciones.map((o) => (
-                        <label key={o.id} style={{ display: "inline-flex", gap: 8, alignItems: "flex-start" }}>
-                          <input
-                            type="checkbox"
-                            checked={produccionOpcionIds.includes(o.id)}
-                            onChange={() => toggleProduccionOpcion(o.id)}
-                            disabled={createProduccionSaving}
-                            style={{ marginTop: 3 }}
-                          />
-                          <span>{o.label}</span>
-                        </label>
-                      ))}
-                    </div>
-                  </div>
+                  <BonoOpcionMultiCombobox
+                    options={bonoOpciones}
+                    selectedIds={produccionOpcionIds}
+                    onChange={setProduccionOpcionIds}
+                    disabled={createProduccionSaving}
+                    label="Opciones de bono (podés elegir varias con el mismo valor)"
+                  />
                   <label style={{ display: "grid", gap: 4 }}>
                     <span style={{ fontSize: 12, color: uiTheme.colors.textMuted }}>Valor unitario (entero ≥ 0)</span>
                     <input
@@ -1567,7 +1544,7 @@ export function NovedadesParamPage() {
                     />
                   </label>
                   {!bonoOpciones.length ? (
-                    <p style={uiStyles.helpText}>No hay opciones sin tarifa. Importá bonos para detectar opciones.</p>
+                    <p style={uiStyles.helpText}>Importá bonos para detectar opciones disponibles.</p>
                   ) : null}
                   <div style={{ display: "flex", gap: 8, justifyContent: "flex-end", marginTop: 8 }}>
                     <button type="button" style={uiStyles.buttonSecondary} onClick={closeCreateProduccion} disabled={createProduccionSaving}>
