@@ -14,11 +14,13 @@ from app.models.user import User
 from app.schemas.novedades import (
     AjusteCapitalCreateRequest,
     AjusteCapitalResponse,
+    BonoColumnaResponse,
     CapitalHumanoGridResponse,
     CapitalHumanoRowResponse,
 )
 from app.services.novedades.export_xls import build_grid_rows
 from app.services.novedades.helpers import get_professional_or_404, get_servicio_or_404
+from app.services.novedades.produccion_tarifas import load_tarifas_by_opcion_key, valorize_bonos
 
 SPECIAL_BONO_SERVICIOS = {"DEA", "DEP", "CAP", "CAI"}
 
@@ -43,6 +45,7 @@ def build_capital_humano_rows(
     servicio_id: int | None = None,
     q: str | None = None,
     include_bonos: bool = False,
+    tarifas: dict[str, int] | None = None,
 ) -> list[CapitalHumanoRowResponse]:
     detail = build_grid_rows(db, periodo_id=periodo_id, servicio_id=servicio_id, q=None, concepto_q=None)
     cargas_by_prof: dict[int, Decimal] = {}
@@ -76,6 +79,11 @@ def build_capital_humano_rows(
         # Promote bonus-only professionals for DEA/DEP/CAP/CAI.
         prof_ids |= {pid for pid, bonos in bonos_by_prof.items() if has_special_bono_service(bonos)}
 
+    if tarifas is None and include_bonos:
+        tarifas = load_tarifas_by_opcion_key(db)
+    elif tarifas is None:
+        tarifas = {}
+
     if not prof_ids:
         return []
 
@@ -103,6 +111,9 @@ def build_capital_humano_rows(
                 continue
         monto_cargas = cargas_by_prof.get(pid, Decimal("0"))
         monto_ajustes = ajustes_by_prof.get(pid, Decimal("0"))
+        prof_bonos = bonos_by_prof.get(pid, {})
+        bonos_subtotales, monto_bonos = valorize_bonos(prof_bonos, tarifas)
+        monto_total = monto_cargas + monto_ajustes + Decimal(monto_bonos)
         rows.append(
             CapitalHumanoRowResponse(
                 professional_id=pid,
@@ -110,12 +121,49 @@ def build_capital_humano_rows(
                 professional_name=prof.full_name,
                 monto_cargas=monto_cargas,
                 monto_ajustes=monto_ajustes,
-                monto_total=monto_cargas + monto_ajustes,
-                bonos=bonos_by_prof.get(pid, {}),
+                monto_bonos=monto_bonos,
+                monto_total=monto_total,
+                bonos=prof_bonos,
+                bonos_subtotales=bonos_subtotales,
             )
         )
     rows.sort(key=lambda r: (r.professional_name or "").lower())
     return rows
+
+
+def _expand_bono_columns(
+    base_columns: list[BonoColumnaResponse], tarifas: dict[str, int]
+) -> tuple[list[BonoColumnaResponse], list[str]]:
+    expanded: list[BonoColumnaResponse] = []
+    sin_tarifa: list[str] = []
+    for col in base_columns:
+        expanded.append(
+            BonoColumnaResponse(
+                key=col.key,
+                label=col.label,
+                centro=col.centro,
+                servicio=col.servicio,
+                semana=col.semana,
+                horario=col.horario,
+                kind="cantidad",
+                opcion_key=col.key,
+            )
+        )
+        expanded.append(
+            BonoColumnaResponse(
+                key=f"{col.key}|$",
+                label=f"{col.label} · $",
+                centro=col.centro,
+                servicio=col.servicio,
+                semana=col.semana,
+                horario=col.horario,
+                kind="subtotal",
+                opcion_key=col.key,
+            )
+        )
+        if col.key not in tarifas:
+            sin_tarifa.append(col.key)
+    return expanded, sin_tarifa
 
 
 def build_capital_humano_grid(
@@ -127,11 +175,18 @@ def build_capital_humano_grid(
 ) -> CapitalHumanoGridResponse:
     from app.services.novedades.bonos_import import load_bonos_snapshot
 
-    columns, _ = load_bonos_snapshot(db, periodo_id=periodo_id)
+    base_columns, _ = load_bonos_snapshot(db, periodo_id=periodo_id)
+    tarifas = load_tarifas_by_opcion_key(db)
+    columns, opciones_sin_tarifa = _expand_bono_columns(base_columns, tarifas)
     rows = build_capital_humano_rows(
-        db, periodo_id=periodo_id, servicio_id=servicio_id, q=q, include_bonos=True
+        db,
+        periodo_id=periodo_id,
+        servicio_id=servicio_id,
+        q=q,
+        include_bonos=True,
+        tarifas=tarifas,
     )
-    return CapitalHumanoGridResponse(columns=columns, rows=rows)
+    return CapitalHumanoGridResponse(columns=columns, rows=rows, opciones_sin_tarifa=opciones_sin_tarifa)
 
 def list_ajustes(
     db: Session,
@@ -215,7 +270,9 @@ def export_capital_xlsx_bytes(
 
     from openpyxl import Workbook
 
-    rows = build_capital_humano_rows(db, periodo_id=periodo_id, servicio_id=servicio_id, q=q)
+    rows = build_capital_humano_rows(
+        db, periodo_id=periodo_id, servicio_id=servicio_id, q=q, include_bonos=True
+    )
     wb = Workbook()
     ws = wb.active
     ws.title = "Capital Humano"
@@ -263,7 +320,11 @@ def export_capital_bonos_xlsx_bytes(
             float(row.monto_total),
         ]
         for col in grid.columns:
-            values.append(row.bonos.get(col.key, 0))
+            opcion_key = col.opcion_key or col.key
+            if col.kind == "subtotal":
+                values.append(row.bonos_subtotales.get(opcion_key, 0))
+            else:
+                values.append(row.bonos.get(opcion_key, 0))
         ws.append(values)
     buffer = BytesIO()
     wb.save(buffer)

@@ -77,7 +77,12 @@
   - Capital Humano sin selector de servicio en UI (opera en todos los servicios)
   - Profesionales con solo bonos se incorporan a grilla principal solo si tienen opción de bono con `servicio` exacto `DEA`, `DEP`, `CAP` o `CAI`
   - Esos profesionales dejan de verse en modal **Solo bonos**
-  - `monto_total` no valoriza bonos en este change (sigue `cargas ± ajustes`)
+- Cambio `novedades-produccion-valor-bonos` (rev `0021_produccion_tarifa`):
+  - Param tab **Producción** (entre Módulos y Jefes): tarifas por opción de bono importada (`centro|servicio|semana|horario`) + `valor_unitario` entero ≥ 0
+  - No confundir con flag **Producción** del módulo (skip check externo)
+  - Capital Humano: columnas cantidad + subtotal por opción; `monto_total = cargas ± ajustes + bonos valorizados`
+  - Opciones sin tarifa: cantidad visible, subtotal 0, banner aviso en CH
+  - XLS con bonos incluye subtotales; XLS agregado refleja total con bonos
 
 ## Roles (panel)
 - `admin`: distribución + novedades (todo) + usuarios
@@ -86,7 +91,7 @@
 - `rrhh`: parametrización + Mis profesionales (todos) + grilla/XLS + cierre/reapertura de período (**sin** carga)
 
 ## Flujo Novedades (resumen)
-1. Parametrización: servicios (**valor hora** + **concepto liquidación** opcional), módulos (**asociados a uno o más servicios**), jefes↔servicios, profesionales↔servicios, período abierto, feriados.
+1. Parametrización: servicios (**valor hora** + **concepto liquidación** opcional), módulos, **Producción** (tarifas bonos), jefes↔servicios, profesionales↔servicios, período abierto, feriados.
 2. Mis profesionales: asociar/quitar profesionales al servicio (typeahead); desasociar no borra cargas históricas.
 3. Carga: módulo solo / novedad solo / ambos + **fecha de realización** (calendario; sin días si el período aún no empezó). Valor novedad = horas × valor hora **del servicio** (negativo si tipo Horas a descontar). Combo de módulos filtrado Semana/SADOFE según fecha y feriados. Errores en modal OK.
 4. Listado inferior (Carga): grilla unificada con F. realización y F. carga; editar fecha si período abierto; **anular** con modal.

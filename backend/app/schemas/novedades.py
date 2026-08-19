@@ -281,6 +281,8 @@ class BonoColumnaResponse(BaseModel):
     servicio: str
     semana: str
     horario: str
+    kind: Literal["cantidad", "subtotal"] = "cantidad"
+    opcion_key: str | None = None
 
 
 class CapitalHumanoRowResponse(BaseModel):
@@ -289,13 +291,49 @@ class CapitalHumanoRowResponse(BaseModel):
     professional_name: str
     monto_cargas: Decimal
     monto_ajustes: Decimal
+    monto_bonos: int = 0
     monto_total: Decimal
     bonos: dict[str, int] = Field(default_factory=dict)
+    bonos_subtotales: dict[str, int] = Field(default_factory=dict)
 
 
 class CapitalHumanoGridResponse(BaseModel):
     columns: list[BonoColumnaResponse] = Field(default_factory=list)
     rows: list[CapitalHumanoRowResponse] = Field(default_factory=list)
+    opciones_sin_tarifa: list[str] = Field(default_factory=list)
+
+
+class BonoOpcionResponse(BaseModel):
+    id: int
+    key: str
+    label: str
+    centro: str
+    servicio: str
+    semana: str
+    horario: str
+
+
+class ProduccionTarifaCreateRequest(BaseModel):
+    opcion_id: int
+    valor_unitario: int = Field(ge=0)
+
+
+class ProduccionTarifaUpdateRequest(BaseModel):
+    valor_unitario: int = Field(ge=0)
+
+
+class ProduccionTarifaResponse(BaseModel):
+    id: int
+    opcion_id: int
+    key: str
+    label: str
+    centro: str
+    servicio: str
+    semana: str
+    horario: str
+    valor_unitario: int
+    created_at: datetime
+    updated_at: datetime
 
 
 class BonosImportRequest(BaseModel):

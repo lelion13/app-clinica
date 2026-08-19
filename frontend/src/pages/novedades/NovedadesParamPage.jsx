@@ -8,6 +8,7 @@ import { uiStyles, uiTheme } from "../../ui/theme";
 const tabs = [
   { id: "servicios", label: "Servicios" },
   { id: "modulos", label: "Módulos" },
+  { id: "produccion", label: "Producción" },
   { id: "jefes", label: "Jefes ↔ servicios" },
   { id: "profesionales", label: "Profesionales ↔ servicios" },
   { id: "periodos", label: "Períodos" },
@@ -23,6 +24,17 @@ export function NovedadesParamPage() {
   const [profLinks, setProfLinks] = useState([]);
   const [periodos, setPeriodos] = useState([]);
   const [feriados, setFeriados] = useState([]);
+  const [produccionTarifas, setProduccionTarifas] = useState([]);
+  const [createProduccionOpen, setCreateProduccionOpen] = useState(false);
+  const [createProduccionSaving, setCreateProduccionSaving] = useState(false);
+  const [produccionOpcionId, setProduccionOpcionId] = useState("");
+  const [produccionValor, setProduccionValor] = useState("");
+  const [bonoOpciones, setBonoOpciones] = useState([]);
+  const [editProduccion, setEditProduccion] = useState(null);
+  const [editProduccionValor, setEditProduccionValor] = useState("");
+  const [editProduccionSaving, setEditProduccionSaving] = useState(false);
+  const [deleteProduccion, setDeleteProduccion] = useState(null);
+  const [deleteProduccionSaving, setDeleteProduccionSaving] = useState(false);
   const [users, setUsers] = useState([]);
   const [allPros, setAllPros] = useState([]);
 
@@ -84,7 +96,7 @@ export function NovedadesParamPage() {
   const load = async () => {
     setError("");
     try {
-      const [s, m, j, p, u, pl, pros, f] = await Promise.all([
+      const [s, m, j, p, u, pl, pros, f, pt] = await Promise.all([
         apiRequestWithRefresh("/novedades/servicios"),
         apiRequestWithRefresh("/novedades/modulos"),
         apiRequestWithRefresh("/novedades/jefe-servicios"),
@@ -93,6 +105,7 @@ export function NovedadesParamPage() {
         apiRequestWithRefresh("/novedades/profesional-servicios"),
         apiRequestWithRefresh("/novedades/profesionales"),
         apiRequestWithRefresh("/novedades/feriados"),
+        apiRequestWithRefresh("/novedades/produccion-tarifas"),
       ]);
       setServicios(s);
       setModulos(m);
@@ -102,6 +115,7 @@ export function NovedadesParamPage() {
       setProfLinks(pl || []);
       setAllPros(pros || []);
       setFeriados(f || []);
+      setProduccionTarifas(pt || []);
     } catch (err) {
       setError(err.message || "Error al cargar");
     }
@@ -471,17 +485,125 @@ export function NovedadesParamPage() {
     }
   };
 
+  const resetCreateProduccionForm = () => {
+    setProduccionOpcionId("");
+    setProduccionValor("");
+    setBonoOpciones([]);
+  };
+
+  const openCreateProduccion = async () => {
+    resetCreateProduccionForm();
+    setError("");
+    try {
+      const opts = await apiRequestWithRefresh("/novedades/bono-opciones?sin_tarifa=1");
+      setBonoOpciones(Array.isArray(opts) ? opts : []);
+      setCreateProduccionOpen(true);
+    } catch (err) {
+      setError(err.message || "No se pudieron cargar opciones de bonos");
+    }
+  };
+
+  const closeCreateProduccion = () => {
+    if (createProduccionSaving) return;
+    setCreateProduccionOpen(false);
+    resetCreateProduccionForm();
+  };
+
+  const createProduccion = async () => {
+    if (!produccionOpcionId || produccionValor === "") {
+      setError("Seleccioná una opción e ingresá el valor unitario");
+      return;
+    }
+    const valor = Number(produccionValor);
+    if (!Number.isFinite(valor) || valor < 0 || !Number.isInteger(valor)) {
+      setError("El valor unitario debe ser un entero ≥ 0");
+      return;
+    }
+    setCreateProduccionSaving(true);
+    setError("");
+    try {
+      await apiRequestWithRefresh("/novedades/produccion-tarifas", {
+        method: "POST",
+        body: JSON.stringify({ opcion_id: Number(produccionOpcionId), valor_unitario: valor }),
+      });
+      setCreateProduccionOpen(false);
+      resetCreateProduccionForm();
+      await load();
+    } catch (err) {
+      setError(err.message || "No se pudo crear la tarifa");
+    } finally {
+      setCreateProduccionSaving(false);
+    }
+  };
+
+  const openEditProduccion = (item) => {
+    setEditProduccion(item);
+    setEditProduccionValor(String(item.valor_unitario ?? ""));
+  };
+
+  const closeEditProduccion = () => {
+    if (editProduccionSaving) return;
+    setEditProduccion(null);
+  };
+
+  const saveEditProduccion = async () => {
+    if (!editProduccion) return;
+    const valor = Number(editProduccionValor);
+    if (!Number.isFinite(valor) || valor < 0 || !Number.isInteger(valor)) {
+      setError("El valor unitario debe ser un entero ≥ 0");
+      return;
+    }
+    setEditProduccionSaving(true);
+    setError("");
+    try {
+      await apiRequestWithRefresh(`/novedades/produccion-tarifas/${editProduccion.id}`, {
+        method: "PUT",
+        body: JSON.stringify({ valor_unitario: valor }),
+      });
+      setEditProduccion(null);
+      await load();
+    } catch (err) {
+      setError(err.message || "No se pudo guardar la tarifa");
+    } finally {
+      setEditProduccionSaving(false);
+    }
+  };
+
+  const closeDeleteProduccion = () => {
+    if (deleteProduccionSaving) return;
+    setDeleteProduccion(null);
+  };
+
+  const confirmDeleteProduccion = async () => {
+    if (!deleteProduccion) return;
+    setDeleteProduccionSaving(true);
+    setError("");
+    try {
+      await apiRequestWithRefresh(`/novedades/produccion-tarifas/${deleteProduccion.id}`, { method: "DELETE" });
+      setDeleteProduccion(null);
+      await load();
+    } catch (err) {
+      setError(err.message || "No se pudo eliminar la tarifa");
+    } finally {
+      setDeleteProduccionSaving(false);
+    }
+  };
+
   useEffect(() => {
     if (
       !createServicioOpen && !editServicio && !deleteServicio
       && !createModuloOpen && !editModulo && !serviciosModulo && !deleteModulo
       && !createFeriadoOpen && !editFeriado && !deleteFeriado
+      && !createProduccionOpen && !editProduccion && !deleteProduccion
     ) return undefined;
     const onKey = (e) => {
       if (e.key !== "Escape") return;
       if (deleteServicio) closeDeleteServicio();
       else if (editServicio) closeEditServicio();
       else if (createServicioOpen) closeCreateServicio();
+      else if (deleteProduccion) closeDeleteProduccion();
+      else if (editProduccion) closeEditProduccion();
+      else if (createProduccionOpen) closeCreateProduccion();
       else if (deleteFeriado) closeDeleteFeriado();
       else if (editFeriado) closeEditFeriado();
       else if (createFeriadoOpen) closeCreateFeriado();
@@ -513,6 +635,12 @@ export function NovedadesParamPage() {
     editFeriadoSaving,
     deleteFeriado,
     deleteFeriadoSaving,
+    createProduccionOpen,
+    createProduccionSaving,
+    editProduccion,
+    editProduccionSaving,
+    deleteProduccion,
+    deleteProduccionSaving,
   ]);
 
   const createJefe = async (event) => {
@@ -1315,6 +1443,229 @@ export function NovedadesParamPage() {
                   </button>
                   <button type="button" onClick={confirmDeleteModulo} style={uiStyles.buttonDanger} disabled={deleteModuloSaving}>
                     {deleteModuloSaving ? "Eliminando…" : "Eliminar"}
+                  </button>
+                </div>
+              </div>
+            </div>
+          ) : null}
+        </>
+      ) : null}
+
+      {tab === "produccion" ? (
+        <>
+          <p style={uiStyles.helpText}>
+            Tarifas para valorizar bonos importados en Capital Humano (cantidad × valor). No confundir con el flag
+            <strong> Producción</strong> del módulo (omite check externo de producción al cargar).
+          </p>
+          <div style={{ marginBottom: 12 }}>
+            <button type="button" style={uiStyles.buttonPrimary} onClick={openCreateProduccion}>
+              Nueva producción
+            </button>
+          </div>
+          <ul style={uiStyles.listCard}>
+            {produccionTarifas.map((item) => (
+              <li key={item.id} style={{ padding: "8px 10px", borderBottom: `1px solid ${uiTheme.colors.border}` }}>
+                <div style={{ display: "flex", gap: 8, flexWrap: "wrap", alignItems: "flex-start", justifyContent: "space-between" }}>
+                  <div style={{ flex: "1 1 200px" }}>
+                    #{item.id} · {item.label}
+                    <div style={uiStyles.helpText}>Valor unitario ${Number(item.valor_unitario).toLocaleString("es-AR")}</div>
+                  </div>
+                  <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
+                    <button type="button" style={uiStyles.buttonSecondary} onClick={() => openEditProduccion(item)}>
+                      editar
+                    </button>
+                    <button type="button" style={uiStyles.buttonDanger} onClick={() => setDeleteProduccion(item)}>
+                      eliminar
+                    </button>
+                  </div>
+                </div>
+              </li>
+            ))}
+          </ul>
+          {!produccionTarifas.length ? (
+            <p style={uiStyles.helpText}>Sin tarifas. Importá bonos primero para detectar opciones disponibles.</p>
+          ) : null}
+
+          {createProduccionOpen ? (
+            <div
+              role="presentation"
+              style={{
+                position: "fixed",
+                inset: 0,
+                zIndex: 1000,
+                background: "rgba(15, 43, 39, 0.45)",
+                display: "flex",
+                alignItems: "flex-start",
+                justifyContent: "center",
+                padding: "max(16px, 4vh) 16px",
+                overflowY: "auto",
+              }}
+              onClick={closeCreateProduccion}
+            >
+              <div
+                role="dialog"
+                aria-modal="true"
+                aria-labelledby="create-produccion-title"
+                onClick={(e) => e.stopPropagation()}
+                style={{
+                  background: "#fff",
+                  borderRadius: uiTheme.radius.md,
+                  maxWidth: 520,
+                  width: "100%",
+                  marginBottom: 24,
+                  padding: 22,
+                  boxShadow: uiTheme.shadow.md,
+                  border: `1px solid ${uiTheme.colors.border}`,
+                }}
+              >
+                <h2 id="create-produccion-title" style={{ marginTop: 0, marginBottom: 12, fontSize: "1.1rem" }}>
+                  Nueva producción
+                </h2>
+                <div style={{ display: "grid", gap: 10 }}>
+                  <label style={{ display: "grid", gap: 4 }}>
+                    <span style={{ fontSize: 12, color: uiTheme.colors.textMuted }}>Opción de bono</span>
+                    <select
+                      value={produccionOpcionId}
+                      onChange={(e) => setProduccionOpcionId(e.target.value)}
+                      style={uiStyles.formControl}
+                      disabled={createProduccionSaving}
+                    >
+                      <option value="">Seleccionar…</option>
+                      {bonoOpciones.map((o) => (
+                        <option key={o.id} value={o.id}>
+                          {o.label}
+                        </option>
+                      ))}
+                    </select>
+                  </label>
+                  <label style={{ display: "grid", gap: 4 }}>
+                    <span style={{ fontSize: 12, color: uiTheme.colors.textMuted }}>Valor unitario (entero ≥ 0)</span>
+                    <input
+                      type="number"
+                      step="1"
+                      min="0"
+                      value={produccionValor}
+                      onChange={(e) => setProduccionValor(e.target.value)}
+                      placeholder="Valor unitario"
+                      style={uiStyles.formControl}
+                      disabled={createProduccionSaving}
+                    />
+                  </label>
+                  {!bonoOpciones.length ? (
+                    <p style={uiStyles.helpText}>No hay opciones sin tarifa. Importá bonos para detectar opciones.</p>
+                  ) : null}
+                  <div style={{ display: "flex", gap: 8, justifyContent: "flex-end", marginTop: 8 }}>
+                    <button type="button" style={uiStyles.buttonSecondary} onClick={closeCreateProduccion} disabled={createProduccionSaving}>
+                      Cancelar
+                    </button>
+                    <button type="button" style={uiStyles.buttonPrimary} onClick={createProduccion} disabled={createProduccionSaving}>
+                      {createProduccionSaving ? "Guardando…" : "Cargar"}
+                    </button>
+                  </div>
+                </div>
+              </div>
+            </div>
+          ) : null}
+
+          {editProduccion ? (
+            <div
+              role="presentation"
+              style={{
+                position: "fixed",
+                inset: 0,
+                zIndex: 1000,
+                background: "rgba(15, 43, 39, 0.45)",
+                display: "flex",
+                alignItems: "flex-start",
+                justifyContent: "center",
+                padding: "max(16px, 4vh) 16px",
+                overflowY: "auto",
+              }}
+              onClick={closeEditProduccion}
+            >
+              <div
+                role="dialog"
+                aria-modal="true"
+                aria-labelledby="edit-produccion-title"
+                onClick={(e) => e.stopPropagation()}
+                style={{
+                  background: "#fff",
+                  borderRadius: uiTheme.radius.md,
+                  maxWidth: 520,
+                  width: "100%",
+                  marginBottom: 24,
+                  padding: 22,
+                  boxShadow: uiTheme.shadow.md,
+                  border: `1px solid ${uiTheme.colors.border}`,
+                }}
+              >
+                <h2 id="edit-produccion-title" style={{ marginTop: 0, marginBottom: 12, fontSize: "1.1rem" }}>
+                  Editar tarifa
+                </h2>
+                <p style={uiStyles.helpText}>{editProduccion.label}</p>
+                <label style={{ display: "grid", gap: 4 }}>
+                  <span style={{ fontSize: 12, color: uiTheme.colors.textMuted }}>Valor unitario (entero ≥ 0)</span>
+                  <input
+                    type="number"
+                    step="1"
+                    min="0"
+                    value={editProduccionValor}
+                    onChange={(e) => setEditProduccionValor(e.target.value)}
+                    style={uiStyles.formControl}
+                    disabled={editProduccionSaving}
+                  />
+                </label>
+                <div style={{ display: "flex", gap: 8, justifyContent: "flex-end", marginTop: 16 }}>
+                  <button type="button" style={uiStyles.buttonSecondary} onClick={closeEditProduccion} disabled={editProduccionSaving}>
+                    Cancelar
+                  </button>
+                  <button type="button" style={uiStyles.buttonPrimary} onClick={saveEditProduccion} disabled={editProduccionSaving}>
+                    {editProduccionSaving ? "Guardando…" : "Guardar"}
+                  </button>
+                </div>
+              </div>
+            </div>
+          ) : null}
+
+          {deleteProduccion ? (
+            <div
+              role="presentation"
+              style={{
+                position: "fixed",
+                inset: 0,
+                zIndex: 1000,
+                background: "rgba(15, 43, 39, 0.45)",
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "center",
+                padding: 16,
+              }}
+              onClick={closeDeleteProduccion}
+            >
+              <div
+                role="dialog"
+                aria-modal="true"
+                onClick={(e) => e.stopPropagation()}
+                style={{
+                  background: "#fff",
+                  borderRadius: uiTheme.radius.md,
+                  maxWidth: 440,
+                  width: "100%",
+                  padding: 22,
+                  boxShadow: uiTheme.shadow.md,
+                  border: `1px solid ${uiTheme.colors.border}`,
+                }}
+              >
+                <h2 style={{ marginTop: 0 }}>Eliminar tarifa</h2>
+                <p style={uiStyles.helpText}>
+                  ¿Eliminar tarifa de <strong>{deleteProduccion.label}</strong> (${deleteProduccion.valor_unitario})?
+                </p>
+                <div style={{ display: "flex", gap: 8, justifyContent: "flex-end" }}>
+                  <button type="button" style={uiStyles.buttonSecondary} onClick={closeDeleteProduccion} disabled={deleteProduccionSaving}>
+                    Cancelar
+                  </button>
+                  <button type="button" style={uiStyles.buttonDanger} onClick={confirmDeleteProduccion} disabled={deleteProduccionSaving}>
+                    {deleteProduccionSaving ? "Eliminando…" : "Eliminar"}
                   </button>
                 </div>
               </div>

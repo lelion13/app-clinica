@@ -133,6 +133,7 @@ def test_has_special_bono_service_exact_match_only():
 
 def test_build_capital_rows_promotes_special_bonus_only(monkeypatch):
     monkeypatch.setattr(capital_humano, "build_grid_rows", lambda *a, **k: [])
+    monkeypatch.setattr(capital_humano, "load_tarifas_by_opcion_key", lambda *a, **k: {})
     monkeypatch.setattr(
         bonos,
         "load_bonos_snapshot",
@@ -170,7 +171,72 @@ def test_build_capital_rows_promotes_special_bonus_only(monkeypatch):
     rows = capital_humano.build_capital_humano_rows(DB(), periodo_id=1, include_bonos=True)
     assert len(rows) == 1
     assert rows[0].professional_name == "Prof CAP"
+    assert rows[0].monto_bonos == 0
     assert rows[0].monto_total == 0
+
+
+def test_build_capital_rows_includes_bonos_in_total(monkeypatch):
+    monkeypatch.setattr(capital_humano, "build_grid_rows", lambda *a, **k: [])
+    monkeypatch.setattr(
+        bonos,
+        "load_bonos_snapshot",
+        lambda *a, **k: (
+            [],
+            {1: {"CMG|CAP|LUNES_VIERNES|DIA": 2}},
+        ),
+    )
+    monkeypatch.setattr(
+        capital_humano,
+        "load_tarifas_by_opcion_key",
+        lambda *a, **k: {"CMG|CAP|LUNES_VIERNES|DIA": 500},
+    )
+
+    prof = SimpleNamespace(id=1, full_name="Prof CAP", legajo="1", codprof="001", deleted_at=None)
+
+    class _ScalarResult:
+        def __init__(self, items):
+            self._items = items
+
+        def scalars(self):
+            return self
+
+        def all(self):
+            return self._items
+
+    class DB:
+        def __init__(self):
+            self._calls = 0
+
+        def execute(self, _stmt):
+            self._calls += 1
+            if self._calls == 1:
+                return _ScalarResult([])
+            return _ScalarResult([prof])
+
+    rows = capital_humano.build_capital_humano_rows(DB(), periodo_id=1, include_bonos=True)
+    assert rows[0].monto_bonos == 1000
+    assert rows[0].bonos_subtotales["CMG|CAP|LUNES_VIERNES|DIA"] == 1000
+    assert rows[0].monto_total == 1000
+
+
+def test_expand_bono_columns_marks_missing_tarifa():
+    from app.schemas.novedades import BonoColumnaResponse
+
+    base = [
+        BonoColumnaResponse(
+            key="A|B|C|D",
+            label="A · B · C · D",
+            centro="A",
+            servicio="B",
+            semana="C",
+            horario="D",
+        )
+    ]
+    cols, missing = capital_humano._expand_bono_columns(base, {})
+    assert len(cols) == 2
+    assert cols[0].kind == "cantidad"
+    assert cols[1].kind == "subtotal"
+    assert missing == ["A|B|C|D"]
 
 
 def test_list_solo_bonos_excludes_promoted_special(monkeypatch):
