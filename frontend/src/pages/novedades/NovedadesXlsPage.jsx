@@ -68,6 +68,7 @@ export function NovedadesXlsPage() {
   const [info, setInfo] = useState("");
   const [rows, setRows] = useState([]);
   const [bonoColumns, setBonoColumns] = useState([]);
+  const [opcionesSinTarifa, setOpcionesSinTarifa] = useState([]);
   const [periodos, setPeriodos] = useState([]);
   const [periodoId, setPeriodoId] = useState("");
   const [q, setQ] = useState("");
@@ -113,6 +114,7 @@ export function NovedadesXlsPage() {
       ]);
       setRows(Array.isArray(grid?.rows) ? grid.rows : []);
       setBonoColumns(Array.isArray(grid?.columns) ? grid.columns : []);
+      setOpcionesSinTarifa(Array.isArray(grid?.opciones_sin_tarifa) ? grid.opciones_sin_tarifa : []);
       setPeriodos(p);
     } catch (err) {
       setError(err.message || "Error al cargar Capital Humano");
@@ -300,24 +302,46 @@ export function NovedadesXlsPage() {
       if (sortKey === "legajo" || sortKey === "professional_name") {
         cmp = compareText(a[sortKey], b[sortKey]);
       } else if (String(sortKey).startsWith("bono:")) {
-        const key = sortKey.slice(5);
-        cmp = compareNumber(a.bonos?.[key], b.bonos?.[key]);
+        const colKey = sortKey.slice(5);
+        const col = bonoColumns.find((c) => c.key === colKey);
+        const opcionKey = col?.opcion_key || colKey;
+        if (col?.kind === "subtotal") {
+          cmp = compareNumber(a.bonos_subtotales?.[opcionKey], b.bonos_subtotales?.[opcionKey]);
+        } else {
+          cmp = compareNumber(a.bonos?.[opcionKey], b.bonos?.[opcionKey]);
+        }
       } else {
         cmp = compareNumber(a[sortKey], b[sortKey]);
       }
       return sortDir === "asc" ? cmp : -cmp;
     });
     return sorted;
-  }, [rows, filterText, sortKey, sortDir]);
+  }, [rows, filterText, sortKey, sortDir, bonoColumns]);
 
   return (
     <section style={uiStyles.pageSection}>
       <h1 style={uiStyles.sectionTitle}>Capital Humano</h1>
       <p style={uiStyles.helpText}>
-        Un registro por profesional: legajo, nombre y monto total (cargas ± ajustes). Importá bonos del período
-        (columnas a la derecha). Con período cerrado no se puede reimportar. Los profesionales solo con bonos de
-        servicios especiales (DEA/DEP/CAP/CAI) se incorporan a la grilla; el resto queda en modal aparte.
+        Un registro por profesional: legajo, nombre y monto total (cargas ± ajustes + bonos valorizados). Importá bonos
+        del período (cantidad y subtotal por opción). Con período cerrado no se puede reimportar. Los profesionales solo
+        con bonos de servicios especiales (DEA/DEP/CAP/CAI) se incorporan a la grilla; el resto queda en modal aparte.
+        Configurá tarifas en Parametrización → Producción.
       </p>
+      {opcionesSinTarifa.length ? (
+        <p
+          style={{
+            ...uiStyles.helpText,
+            padding: "10px 12px",
+            background: "#fff8e6",
+            border: `1px solid ${uiTheme.colors.border}`,
+            borderRadius: uiTheme.radius.sm,
+            marginBottom: 12,
+          }}
+        >
+          Hay opciones de bonos sin tarifa en Producción. Los subtotales se muestran en 0 hasta que cargues el valor
+          unitario ({opcionesSinTarifa.length} opción{opcionesSinTarifa.length === 1 ? "" : "es"}).
+        </p>
+      ) : null}
       <AlertModal open={Boolean(error)} title="Atención" message={error} onClose={() => setError("")} />
       <AlertModal open={Boolean(info)} title="Listo" message={info} onClose={() => setInfo("")} />
 
@@ -445,7 +469,11 @@ export function NovedadesXlsPage() {
                 <td style={tdStyle}>{formatMoney(row.monto_total)}</td>
                 {bonoColumns.map((col) => (
                   <td key={col.key} style={{ ...tdStyle, fontVariantNumeric: "tabular-nums" }}>
-                    {row.bonos?.[col.key] != null ? row.bonos[col.key] : "—"}
+                    {col.kind === "subtotal"
+                      ? formatMoney(row.bonos_subtotales?.[col.opcion_key || col.key] ?? 0)
+                      : row.bonos?.[col.opcion_key || col.key] != null
+                        ? row.bonos[col.opcion_key || col.key]
+                        : "—"}
                   </td>
                 ))}
                 <td style={{ ...tdStyle, whiteSpace: "nowrap" }}>

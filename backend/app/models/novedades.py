@@ -145,6 +145,17 @@ class NovedadesBonoOpcion(AuditMixin, Base):
     horario: Mapped[str] = mapped_column(String(80), nullable=False)
 
 
+class NovedadesProduccionTarifa(AuditMixin, Base):
+    """Tarifa unitaria por opción de bono importado (valorización Capital Humano)."""
+
+    __tablename__ = "novedades_produccion_tarifa"
+    __table_args__ = (UniqueConstraint("opcion_id", name="uq_novedades_produccion_tarifa_opcion"),)
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    opcion_id: Mapped[int] = mapped_column(ForeignKey("novedades_bono_opcion.id"), nullable=False)
+    valor_unitario: Mapped[int] = mapped_column(Integer, nullable=False)
+
+
 class NovedadesBonoCantidad(AuditMixin, Base):
     """Cantidad de bonos por profesional, período y opción."""
 

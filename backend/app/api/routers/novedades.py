@@ -16,6 +16,7 @@ from app.schemas.novedades import (
     AjusteCapitalResponse,
     BonosImportRequest,
     BonosImportResponse,
+    BonoOpcionResponse,
     CapitalHumanoGridResponse,
     GridRowResponse,
     SoloBonoRowResponse,
@@ -38,6 +39,9 @@ from app.schemas.novedades import (
     ProfesionalDirectoryItem,
     ProfesionalServicioCreateRequest,
     ProfesionalServicioResponse,
+    ProduccionTarifaCreateRequest,
+    ProduccionTarifaResponse,
+    ProduccionTarifaUpdateRequest,
     ServicioCreateRequest,
     ServicioResponse,
     ServicioUpdateRequest,
@@ -48,6 +52,7 @@ from app.services.novedades import bonos_import as bonos_import_service
 from app.services.novedades import capital_humano as capital_humano_service
 from app.services.novedades import export_xls
 from app.services.novedades import masters as masters_service
+from app.services.novedades import produccion_tarifas as produccion_tarifas_service
 from app.services.novedades import prof_sync as prof_sync_service
 from app.services.novedades import purge as purge_service
 from app.services.novedades import tiene_produccion as tiene_produccion_service
@@ -321,6 +326,53 @@ def feriados_delete(
     user: User = Depends(require_admin_or_rrhh),
 ) -> None:
     masters_service.delete_feriado(db, feriado_id, actor_id=user.id)
+
+
+@router.get("/produccion-tarifas", response_model=list[ProduccionTarifaResponse])
+def produccion_tarifas_list(
+    db: Session = Depends(get_db),
+    user: User = Depends(require_admin_or_rrhh),
+) -> list[ProduccionTarifaResponse]:
+    _ = user
+    return produccion_tarifas_service.list_tarifas(db)
+
+
+@router.post("/produccion-tarifas", response_model=ProduccionTarifaResponse, status_code=status.HTTP_201_CREATED)
+def produccion_tarifas_create(
+    payload: ProduccionTarifaCreateRequest,
+    db: Session = Depends(get_db),
+    user: User = Depends(require_admin_or_rrhh),
+) -> ProduccionTarifaResponse:
+    return produccion_tarifas_service.create_tarifa(db, payload, actor_id=user.id)
+
+
+@router.put("/produccion-tarifas/{tarifa_id}", response_model=ProduccionTarifaResponse)
+def produccion_tarifas_update(
+    tarifa_id: int,
+    payload: ProduccionTarifaUpdateRequest,
+    db: Session = Depends(get_db),
+    user: User = Depends(require_admin_or_rrhh),
+) -> ProduccionTarifaResponse:
+    return produccion_tarifas_service.update_tarifa(db, tarifa_id, payload, actor_id=user.id)
+
+
+@router.delete("/produccion-tarifas/{tarifa_id}", status_code=status.HTTP_204_NO_CONTENT)
+def produccion_tarifas_delete(
+    tarifa_id: int,
+    db: Session = Depends(get_db),
+    user: User = Depends(require_admin_or_rrhh),
+) -> None:
+    produccion_tarifas_service.delete_tarifa(db, tarifa_id, actor_id=user.id)
+
+
+@router.get("/bono-opciones", response_model=list[BonoOpcionResponse])
+def bono_opciones_list(
+    sin_tarifa: bool = Query(default=False),
+    db: Session = Depends(get_db),
+    user: User = Depends(require_admin_or_rrhh),
+) -> list[BonoOpcionResponse]:
+    _ = user
+    return produccion_tarifas_service.list_bono_opciones(db, sin_tarifa=sin_tarifa)
 
 
 @router.get("/periodos", response_model=list[PeriodoResponse])
