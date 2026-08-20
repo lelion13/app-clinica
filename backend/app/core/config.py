@@ -1,7 +1,42 @@
 import json
+from typing import Annotated
 
-from pydantic import Field
+from pydantic import BeforeValidator, Field
 from pydantic_settings import BaseSettings, SettingsConfigDict
+
+
+def _empty_str_to_none(value):
+    if value is None:
+        return None
+    if isinstance(value, str) and not value.strip():
+        return None
+    return value
+
+
+def _optional_bool(value):
+    value = _empty_str_to_none(value)
+    if value is None:
+        return False
+    if isinstance(value, bool):
+        return value
+    if isinstance(value, str):
+        lowered = value.strip().lower()
+        if lowered in {"1", "true", "t", "yes", "y", "on"}:
+            return True
+        if lowered in {"0", "false", "f", "no", "n", "off"}:
+            return False
+    return value
+
+
+def _optional_int(value, default: int):
+    value = _empty_str_to_none(value)
+    if value is None:
+        return default
+    return value
+
+
+OptionalBool = Annotated[bool, BeforeValidator(_optional_bool)]
+SmtpPort = Annotated[int, BeforeValidator(lambda v: _optional_int(v, 587))]
 
 
 class Settings(BaseSettings):
@@ -86,12 +121,13 @@ class Settings(BaseSettings):
     # Public web origin for password-reset links (no trailing slash).
     app_public_url: str = Field(default="http://localhost:5173", validation_alias="APP_PUBLIC_URL")
     smtp_host: str = Field(default="", validation_alias="SMTP_HOST")
-    smtp_port: int = Field(default=587, validation_alias="SMTP_PORT")
+    smtp_port: SmtpPort = Field(default=587, validation_alias="SMTP_PORT")
     smtp_user: str = Field(default="", validation_alias="SMTP_USER")
     smtp_pass: str = Field(default="", validation_alias="SMTP_PASS")
     smtp_from: str = Field(default="", validation_alias="SMTP_FROM")
     # false = STARTTLS (typical 587); true = implicit TLS/SSL (typical 465).
-    smtp_secure: bool = Field(default=False, validation_alias="SMTP_SECURE")
+    # Empty env value is treated as false (avoids crash on SMTP_SECURE=).
+    smtp_secure: OptionalBool = Field(default=False, validation_alias="SMTP_SECURE")
     password_reset_ttl_minutes: int = Field(default=60, validation_alias="PASSWORD_RESET_TTL_MINUTES")
     password_reset_cooldown_seconds: int = Field(
         default=60, validation_alias="PASSWORD_RESET_COOLDOWN_SECONDS"
