@@ -53,12 +53,13 @@
   - Detalle unificado: cargas + producción (cantidad/subtotal) + historial de ajustes
   - Solo bonos + elegibilidad DEA/DEP/CAP/CAI sin cambio; Excel/concepto liquidación → change posterior
   - Actualizar disabled si período closed; al entrar muestra datos persistidos
-- Cambio `capital-humano-profesionales-especialistas` (rev `0022_especialista_asignacion_valor`):
+- Cambio `capital-humano-profesionales-especialistas` (rev `0022_especialista_valor`):
   - Env `NOVEDADES_PROF_ESPECIALISTAS_URL` (+ timeout opcional); Bearer = `NOVEDADES_PROF_SYNC_TOKEN`
   - Sync **Parametrización** (`?include_especialistas=1`): marca `es_especialista`; modal/aviso de códigos sin match; si falla API especialistas no toca flags
   - Mis profesionales sync **sin** especialistas
   - Carga de **módulo**: si especialista, valor persistido = catálogo × 1.20 (columna `valor` en asignación); novedades sin plus
   - Capital Humano Detalle indica especialista
+  - Nota: `alembic_version.version_num` es VARCHAR(32); revision ids deben ser ≤32 chars
 - Cambio `distribucion-ocupacion`:
   - Menú Distribución → **Ocupación** (`/ocupacion`); convive con Ocupación semanal
   - Tabla `ocupacion_horario_activo` (rev `0013_ocupacion_serial`): PK serial local; `payload` JSONB = cada fila del endpoint tal cual

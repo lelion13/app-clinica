@@ -2,7 +2,7 @@
 
 ## 1. Datos / config
 
-- [x] 1.1 Alembic: `novedades_profesional.es_especialista` + `novedades_asignacion_modulo.valor` (persistir plus)
+- [x] 1.1 Alembic: `0022_especialista_valor` (≤32 chars) — `es_especialista` + `asignacion.valor` (idempotente)
 - [x] 1.2 Model + schemas (sync response unmatched/warning; CH `es_especialista`)
 - [x] 1.3 Config: `NOVEDADES_PROF_ESPECIALISTAS_URL` (+ timeout); token reutilizado
 - [x] 1.4 `.env.example` / `.env.prod.example`
