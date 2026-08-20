@@ -14,6 +14,7 @@ from app.models import (
     ConsultingRoom,
     Location,
     OcupacionHorarioActivo,
+    PasswordResetToken,
     Professional,
     RoomOperatingHour,
     RoomWeeklyAssignment,
@@ -21,7 +22,7 @@ from app.models import (
 )
 from app.models.base import Base
 
-_ = OcupacionHorarioActivo
+_ = (OcupacionHorarioActivo, PasswordResetToken)
 
 
 config = context.config

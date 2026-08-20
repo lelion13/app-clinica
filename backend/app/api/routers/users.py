@@ -4,7 +4,7 @@ from sqlalchemy.orm import Session
 from app.api.deps import require_admin
 from app.db.session import get_db
 from app.models.user import User
-from app.schemas.user import UserCreateRequest, UserResponse, UserUpdateRequest
+from app.schemas.user import UserCreateRequest, UserCreateResponse, UserResponse, UserUpdateRequest
 from app.services.user_service import create_user, delete_user, list_users, update_user
 
 router = APIRouter()
@@ -32,14 +32,19 @@ def users_list(
     return [_to_response(item) for item in users]
 
 
-@router.post("", response_model=UserResponse, status_code=status.HTTP_201_CREATED)
+@router.post("", response_model=UserCreateResponse, status_code=status.HTTP_201_CREATED)
 def users_create(
     payload: UserCreateRequest,
     db: Session = Depends(get_db),
     admin: User = Depends(require_admin),
-) -> UserResponse:
-    user = create_user(db, payload, actor_id=admin.id)
-    return _to_response(user)
+) -> UserCreateResponse:
+    user, welcome_sent, warning = create_user(db, payload, actor_id=admin.id)
+    base = _to_response(user)
+    return UserCreateResponse(
+        **base.model_dump(),
+        welcome_email_sent=welcome_sent,
+        welcome_email_warning=warning,
+    )
 
 
 @router.patch("/{user_id}", response_model=UserResponse)

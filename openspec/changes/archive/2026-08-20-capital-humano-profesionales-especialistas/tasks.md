@@ -30,3 +30,4 @@
 - [x] 5.1 Tests: match/unmatched, fail parcial, módulo ×1.20
 - [x] 5.2 Runbook
 - [x] 5.3 Marcar tasks al cerrar apply
+- [x] 5.4 Archivar + merge spec estable (2026-08-20); documentar F1 alembic ≤32
