@@ -92,6 +92,8 @@ export async function apiUploadWithRefresh(path, formData) {
     }
   }
 }
+
+export async function apiDownloadWithRefresh(path) {
   const doFetch = async () => {
     const response = await fetch(`${API_BASE_URL}${path}`, {
       credentials: "include",
