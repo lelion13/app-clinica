@@ -158,6 +158,11 @@ class ProfesionalDirectoryItem(BaseModel):
     is_active: bool
 
 
+class NovedadesProfEspecialistaUnmatched(BaseModel):
+    profesional: str
+    descripcion: str
+
+
 class NovedadesProfSyncResponse(BaseModel):
     created: int
     updated: int
@@ -165,6 +170,9 @@ class NovedadesProfSyncResponse(BaseModel):
     skipped: int
     errors: list[str]
     synced_at: datetime
+    especialistas_matched: int = 0
+    especialistas_unmatched: list[NovedadesProfEspecialistaUnmatched] = Field(default_factory=list)
+    especialistas_warning: str | None = None
 
 
 class NovedadesTransaccionalPurgeResponse(BaseModel):
@@ -293,6 +301,7 @@ class CapitalHumanoRowResponse(BaseModel):
     monto_ajustes: Decimal
     monto_bonos: int = 0
     monto_total: Decimal
+    es_especialista: bool = False
     bonos: dict[str, int] = Field(default_factory=dict)
     bonos_subtotales: dict[str, int] = Field(default_factory=dict)
 

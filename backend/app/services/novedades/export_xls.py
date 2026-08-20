@@ -132,6 +132,7 @@ def _asignacion_row(db: Session, item: NovedadesAsignacionModulo) -> GridRowResp
     modulo = db.execute(select(NovedadesModulo).where(NovedadesModulo.id == item.modulo_id)).scalar_one_or_none()
     if not modulo:
         return None
+    valor = Decimal(item.valor) if getattr(item, "valor", None) is not None else Decimal(modulo.valor)
     return GridRowResponse(
         tipo="modulo_asignado",
         id=item.id,
@@ -143,7 +144,7 @@ def _asignacion_row(db: Session, item: NovedadesAsignacionModulo) -> GridRowResp
         professional_name=professional.full_name,
         concepto=modulo.descripcion,
         horas=None,
-        valor=Decimal(modulo.valor),
+        valor=valor,
         valor_hora=None,
         cargado_por=actor.name if actor else None,
         fecha_realizacion=item.fecha_realizacion,

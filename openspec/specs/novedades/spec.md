@@ -519,17 +519,44 @@ Parametrización MUST offer **Limpiar cargas** to `admin`/`rrhh` only. After man
 
 ### Requirement: Pantalla Capital Humano
 
-The former **Generación archivo XLS** nav entry MUST be labeled **Capital Humano** and remain restricted to `admin`/`rrhh`. The page MUST show **one row per professional** with columns: legajo, name, monto cargas, monto ajustes, monto total, plus dynamic bonos columns when a period snapshot exists. Rows MUST appear when the professional has cargas and/or adjustments in the selected period, **or** when promoted by the special-service bonos rule (`DEA|DEP|CAP|CAI`). The Capital Humano UI MUST NOT show a service selector (operates as all services from the UI); backend MAY still accept optional `servicio_id`. Filters: period (required for bonos flows) and text search (legajo/name).
+The former **Generación archivo XLS** nav entry MUST be labeled **Capital Humano** and remain restricted to `admin`/`rrhh`. The page MUST present a **period selector** that defaults to the **open** period when one exists, and an **Actualizar** button.
 
-Total cargas MUST be the sum of module + novedad valores in the filtered period. **`monto_total` MUST be** `monto_cargas + monto_ajustes + monto_bonos` (valorized bonos; missing tariff counts as 0). Adjustments MUST be allowed when the period is **closed**.
+**Actualizar** MUST run the bonos import for the selected period (same persistence rules as Importar bonos: replace when open; reject when closed) and then refresh the grid. There MUST NOT be a separate **Importar bonos** button. **Solo bonos** MUST remain.
 
-Each row MUST offer **Detalle**, which opens a modal with the grid of that professional’s carga items (módulos/novedades) in the current filter scope. The page MUST also support Importar bonos, Solo bonos modal, and XLS downloads per related requirements.
+On entry, the grid MUST show **already persisted** data for the selected period. **Actualizar** MUST be disabled when the selected period is **closed** (persisted data still visible).
 
-#### Scenario: Agregación por profesional
+The main grid MUST show **one row per professional** with fixed columns: legajo, name, total cargas (modules/novedades), ajustes, total producción (valorized imported bonos), total general (`cargas + ajustes + producción`), plus actions. Dynamic per-option bonos columns MUST NOT appear on the main grid. The Capital Humano UI MUST NOT show a service selector. Text filter (legajo/name) and banner for options missing Producción tariffs MUST remain.
 
-- GIVEN profesional P con dos cargas (100 y 50), un ajuste −10 y monto_bonos 0 en el período
-- WHEN admin abre Capital Humano filtrado por ese período
-- THEN MUST ver una fila con monto_cargas 150, monto_ajustes −10, monto_total 140
+Row eligibility MUST remain: professionals with cargas and/or adjustments, or bonos-only with option `servicio` in `DEA|DEP|CAP|CAI`. Others with only non-special bonos MUST appear only in Solo bonos.
+
+Grouping/ordering by `concepto_liquidacion` is out of scope for the on-screen grid (Excel change later). XLS downloads MAY remain available pending a later redesign.
+
+#### Scenario: Default período abierto
+
+- GIVEN existe un período open
+- WHEN admin entra a Capital Humano
+- THEN el selector MUST tener ese período seleccionado
+- AND la grilla MUST cargar datos persistidos de ese período
+
+#### Scenario: Actualizar importa bonos
+
+- GIVEN período open seleccionado
+- WHEN pulsa Actualizar
+- THEN MUST ejecutarse el import de bonos del período
+- AND MUST refrescarse la grilla
+
+#### Scenario: Actualizar en closed
+
+- GIVEN período closed seleccionado
+- WHEN visualiza la toolbar
+- THEN Actualizar MUST estar disabled
+
+#### Scenario: Columnas fijas
+
+- GIVEN profesionales en grilla con bonos valorizados
+- WHEN se lista Capital Humano
+- THEN MUST ver Total cargas, Ajustes, Total producción, Total general
+- AND MUST NOT ver columnas dinámicas por opción de bono en la grilla principal
 
 #### Scenario: UI sin filtro por servicio
 
@@ -544,22 +571,26 @@ Each row MUST offer **Detalle**, which opens a modal with the grid of that profe
 - WHEN intenta `GET /novedades/capital-humano`
 - THEN MUST recibir 403
 
-#### Scenario: Detalle por profesional
+### Requirement: Detalle unificado Capital Humano
 
-- GIVEN profesional P con cargas en el filtro actual
-- WHEN admin pulsa **Detalle** en la fila de P
-- THEN MUST abrirse un modal con la grilla de ítems (módulos/novedades) de P en ese alcance
+The **Detalle** action MUST open a modal showing, for the selected professional and period: (1) carga items (módulos/novedades), (2) producción/bonos breakdown (quantities and subtotales), and (3) adjustment history. Adding a new adjustment MUST remain available from the main grid (**Agregar importe**) and MAY omit create-from-Detalle.
+
+#### Scenario: Detalle completo
+
+- GIVEN profesional con cargas, bonos y ajustes en el período
+- WHEN admin abre Detalle
+- THEN MUST ver las tres secciones (cargas, producción, historial de ajustes)
 
 ### Requirement: Ajustes de Capital Humano
 
-The system MUST persist create-only signed adjustments (`novedades_ajuste_capital`) with non-zero `importe` and required non-blank `comentario`. UI MUST open a modal from the ajustes column showing history and a create form. Edit/delete of adjustments MUST NOT be offered unless a later change adds them. Scope of listed/created adjustments MUST match the current period filter and optional service filter.
+The system MUST persist create-only signed adjustments (`novedades_ajuste_capital`) with non-zero `importe` and required non-blank `comentario`. Creating an adjustment MUST be available from the **main grid** action without requiring opening Detalle. The Detalle modal MUST show the adjustment **history** for that professional/period. Edit/delete of adjustments MUST NOT be offered unless a later change adds them.
 
-#### Scenario: Alta con comentario
+#### Scenario: Alta desde grilla
 
-- GIVEN período seleccionado y profesional en grilla
-- WHEN admin crea ajuste importe −25 con comentario "descuento guardia"
+- GIVEN profesional en grilla y período seleccionado
+- WHEN admin agrega un ajuste desde la acción de grilla
 - THEN MUST persistirse
-- AND la grilla MUST reflejar el nuevo monto_ajustes / monto_total
+- AND montos de la fila MUST actualizarse
 
 #### Scenario: Importe cero rechazado
 
@@ -585,20 +616,17 @@ Capital Humano MUST offer the aggregated Capital Humano XLS (`GET /novedades/exp
 
 ### Requirement: Importar bonos resumen en Capital Humano
 
-Capital Humano MUST offer **Importar bonos** to `admin`/`rrhh` only. The user MUST select a **single period** before import. The backend MUST call the configured external resumen API with `fecha_desde` = period `fecha_inicio` and `fecha_hasta` = period `fecha_fin`, using the same Bearer token as Novedades professional sync (`NOVEDADES_BONOS_RESUMEN_URL` + `NOVEDADES_PROF_SYNC_TOKEN`). Results MUST be persisted per period. Match MUST be by API `profesional` → catalog `CODPROF` (string/trim). Each dynamic column MUST be the full option `centro|servicio|semana|horario`. Duplicate rows for the same professional+option MUST sum `cantidad`. Unknown CODPROF MUST be ignored and counted in the summary. On success the UI MUST show a summary modal (received / matched / solo-bonos / columns / ignored) and refresh the grid.
+Capital Humano MUST support importing bonos for `admin`/`rrhh` via the **Actualizar** button (no separate Importar bonos control). The user MUST select a **single period** before import. The backend MUST call the configured external resumen API with `fecha_desde` = period `fecha_inicio` and `fecha_hasta` = period `fecha_fin`, using the same Bearer token as Novedades professional sync (`NOVEDADES_BONOS_RESUMEN_URL` + `NOVEDADES_PROF_SYNC_TOKEN`). Results MUST be persisted per period. Match MUST be by API `profesional` → catalog `CODPROF` (string/trim). Each option MUST be the full key `centro|servicio|semana|horario`. Duplicate rows for the same professional+option MUST sum `cantidad`. Unknown CODPROF MUST be ignored and counted in the summary. On success the UI MUST show a summary modal and refresh the grid.
 
 While the period is **open**, re-import MUST **replace** the period’s bonos quantity snapshot. While the period is **closed**, import MUST be rejected (frozen). If the period lacks valid start/end dates, the API MUST return 422 without calling the external service. If the external call fails, the system MUST NOT modify the existing snapshot and MUST surface an error modal.
 
 After a successful import, orphan option cleanup MAY run as defined in Requirement “Limpieza de opciones de bono huérfanas”.
 
-#### Scenario: Import con período abierto
+#### Scenario: Entry point Actualizar
 
-- GIVEN período open con fechas válidas
-- AND admin selecciona ese período
-- WHEN pulsa Importar bonos
-- THEN el backend MUST llamar el API con esas fechas
-- AND MUST persistir cantidades matcheadas por CODPROF
-- AND la grilla MUST mostrar columnas dinámicas a la derecha
+- GIVEN período open
+- WHEN admin pulsa Actualizar
+- THEN MUST ejecutarse el import de bonos del período
 
 #### Scenario: Re-import reemplaza
 
@@ -609,7 +637,7 @@ After a successful import, orphan option cleanup MAY run as defined in Requireme
 #### Scenario: Período cerrado congela
 
 - GIVEN período closed con snapshot
-- WHEN se intenta Importar bonos
+- WHEN se intenta Actualizar / import
 - THEN MUST rechazarse
 - AND el snapshot MUST permanecer intacto
 
