@@ -174,7 +174,9 @@ def list_modulos(db: Session, servicio_id: int | None = None) -> list[NovedadesM
     )
 
 
-def create_modulo(db: Session, payload: ModuloCreateRequest, actor_id: int) -> NovedadesModulo:
+def create_modulo(
+    db: Session, payload: ModuloCreateRequest, actor_id: int, *, commit: bool = True
+) -> NovedadesModulo:
     servicio_ids = _validate_servicio_ids(db, payload.servicio_ids)
     now = datetime.utcnow()
     item = NovedadesModulo(
@@ -192,8 +194,9 @@ def create_modulo(db: Session, payload: ModuloCreateRequest, actor_id: int) -> N
     db.add(item)
     db.flush()
     _set_modulo_servicios(db, item.id, servicio_ids, actor_id)
-    db.commit()
-    db.refresh(item)
+    if commit:
+        db.commit()
+        db.refresh(item)
     return item
 
 

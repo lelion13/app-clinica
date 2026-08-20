@@ -106,17 +106,21 @@
 
 ## Usuarios, SMTP y reset de contraseña
 - Pantalla **Usuarios** (solo `admin`): grilla + modal alta/edición; desactivar con `is_active` (sin eliminar en UI). Usuario inactivo no puede login ni “olvidé mi contraseña”.
-- Al crear usuario se intenta mail de bienvenida; si falla SMTP el usuario igual se crea y la UI avisa.
-- Login → **Olvidé mi contraseña**: respuesta genérica siempre; mail con link solo si el email pertenece a un usuario **activo**.
+- Errores de alta se muestran **dentro del modal** (no cierran el diálogo).
+- Al crear usuario se intenta mail de bienvenida; si falla SMTP el usuario igual se crea y la UI avisa. Desde **Modificar** se puede **reenviar** el mail de bienvenida (`POST /users/{id}/resend-welcome`, solo activo).
+- Todos los mails cierran con firma: `Departamento de Tecnologia y Modernizacion.`
+- Login → **Olvidé mi contraseña**: respuesta genérica siempre; mail con link solo si el email pertenece a un usuario **activo**. El link “Crear admin inicial” no se muestra en login (`/setup` sigue por URL).
 - Link: `{APP_PUBLIC_URL}/reset-password?token=...` (token 1h, un solo uso, hash en DB).
 - Variables en `.env.prod` (ver `.env.prod.example`):
   - `APP_PUBLIC_URL` (ej. `https://clinica.lionapp.cloud`)
   - `SMTP_HOST`, `SMTP_PORT`, `SMTP_USER`, `SMTP_PASS`, `SMTP_FROM`, `SMTP_SECURE`
   - `SMTP_SECURE=false` → STARTTLS (típico puerto 587); `true` → TLS implícito (típico 465)
 - Migración: `0023_password_reset` (`alembic upgrade head` tras deploy).
+- Archive SDD: `openspec/changes/archive/2026-08-20-usuarios-abm-email-reset/`
 
 ## Flujo Novedades (resumen)
 1. Parametrización: servicios (**valor hora** + **concepto liquidación** opcional), módulos, **Producción** (tarifas bonos), jefes↔servicios, profesionales↔servicios, período abierto, feriados.
+   - Tab **Módulos**: **Plantilla de importación** descarga Excel con columnas `descripcion`, `comentario`, `valor`, `produccion`, `sadofe`, `servicio` (desplegable de servicios activos + Sí/No). **Carga masiva** importa todo-o-nada; errores en modal (fila + motivo). Valor vacío → 0; descripción duplicada o servicio inexistente = error (no se crea ninguno).
 2. Mis profesionales: asociar/quitar profesionales al servicio (typeahead); desasociar no borra cargas históricas.
 3. Carga: módulo solo / novedad solo / ambos + **fecha de realización** (calendario; sin días si el período aún no empezó). Valor novedad = horas × valor hora **del servicio** (negativo si tipo Horas a descontar). Combo de módulos filtrado Semana/SADOFE según fecha y feriados. Errores en modal OK.
 4. Listado inferior (Carga): grilla unificada con F. realización y F. carga; editar fecha si período abierto; **anular** con modal.

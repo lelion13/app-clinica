@@ -21,7 +21,7 @@ La pantalla Usuarios MUST mostrar botón **Nuevo usuario** y una grilla de usuar
 
 ### Requirement: Modal crear usuario
 
-El modal de alta MUST pedir nombre y apellido, email (login), contraseña y rol; MUST tener Cancelar y Crear. Esc y Cancelar MUST limpiar el formulario y cerrar el modal.
+El modal de alta MUST pedir nombre y apellido, email (login), contraseña y rol; MUST tener Cancelar y Crear. Esc y Cancelar MUST limpiar el formulario y cerrar el modal. Si la creación falla, el modal MUST permanecer abierto y mostrar el mensaje de error dentro del modal.
 
 #### Scenario: Crear OK
 
@@ -38,9 +38,16 @@ El modal de alta MUST pedir nombre y apellido, email (login), contraseña y rol;
 - THEN el modal se cierra sin persistir
 - AND los campos quedan limpios al reabrir
 
+#### Scenario: Error de creación en modal
+
+- GIVEN admin intenta crear un usuario inválido o duplicado
+- WHEN el backend responde error
+- THEN el modal permanece abierto
+- AND muestra el mensaje de error en el modal
+
 ### Requirement: Editar y desactivar usuario
 
-Editar MUST permitir nombre, email, rol, activo/inactivo y contraseña opcional. La UI MUST NOT ofrecer eliminar; desactivar se hace vía `is_active=false`.
+Editar MUST permitir nombre, email, rol, activo/inactivo y contraseña opcional. La UI MUST NOT ofrecer eliminar; desactivar se hace vía `is_active=false`. El modal de editar MUST ofrecer reenviar el correo de bienvenida (solo si el usuario está activo).
 
 #### Scenario: Desactivar
 
@@ -49,9 +56,16 @@ Editar MUST permitir nombre, email, rol, activo/inactivo y contraseña opcional.
 - THEN el usuario queda inactivo
 - AND no puede iniciar sesión
 
+#### Scenario: Reenviar bienvenida
+
+- GIVEN admin en modal modificar de un usuario activo
+- WHEN pulsa reenviar mail de bienvenida
+- THEN se intenta enviar el correo de acceso
+- AND el modal muestra éxito o error sin cerrarse
+
 ### Requirement: Email de bienvenida
 
-Al crear un usuario el sistema MUST intentar enviar un correo a su casilla indicando que ya tiene acceso. Si el envío falla, el usuario MUST crearse igual y la UI MUST avisar del fallo de mail.
+Al crear un usuario el sistema MUST intentar enviar un correo a su casilla indicando que ya tiene acceso. Si el envío falla, el usuario MUST crearse igual y la UI MUST avisar del fallo de mail. Todos los correos del sistema MUST cerrar con la firma `Departamento de Tecnologia y Modernizacion.`
 
 #### Scenario: Mail OK
 
@@ -66,9 +80,15 @@ Al crear un usuario el sistema MUST intentar enviar un correo a su casilla indic
 - THEN el usuario existe
 - AND la UI muestra aviso de que el mail no se envió
 
+#### Scenario: Firma
+
+- GIVEN cualquier correo enviado por la app (bienvenida o reset)
+- WHEN se genera el cuerpo
+- THEN incluye la firma Departamento de Tecnologia y Modernizacion.
+
 ### Requirement: Olvidé mi contraseña
 
-El login MUST ofrecer olvido de contraseña. Al enviar un email, la respuesta MUST ser genérica (se envió el correo) aunque el email no exista. Si existe un usuario **activo** con ese email, MUST enviar un link de reset. Usuario inexistente o **inactivo** MUST NOT recibir mail ni revelar existencia.
+El login MUST ofrecer olvido de contraseña. Al enviar un email, la respuesta MUST ser genérica (se envió el correo) aunque el email no exista. Si existe un usuario **activo** con ese email, MUST enviar un link de reset. Usuario inexistente o **inactivo** MUST NOT recibir mail ni revelar existencia. El login MUST NOT mostrar el enlace de setup/admin inicial (la ruta `/setup` MAY seguir existiendo).
 
 #### Scenario: Email inexistente
 

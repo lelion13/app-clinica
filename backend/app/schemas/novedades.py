@@ -389,3 +389,13 @@ class AjusteCapitalResponse(BaseModel):
     created_at: datetime
     created_by: int | None = None
     created_by_name: str | None = None
+
+
+class ModuloImportRowError(BaseModel):
+    row: int
+    reason: str
+
+
+class ModuloImportResponse(BaseModel):
+    created: int
+    errors: list[ModuloImportRowError] = Field(default_factory=list)

@@ -16,7 +16,9 @@ async function parseError(response) {
     try {
       const data = JSON.parse(raw);
       if (typeof data.detail === "string") message = data.detail;
-      else if (typeof data.message === "string") message = data.message;
+      else if (data.detail && typeof data.detail === "object" && typeof data.detail.message === "string") {
+        message = data.detail.message;
+      } else if (typeof data.message === "string") message = data.message;
       detail = data.detail ?? null;
     } catch {
       message = raw;
@@ -62,7 +64,34 @@ export async function apiRequestWithRefresh(path, options = {}) {
   }
 }
 
-export async function apiDownloadWithRefresh(path) {
+export async function apiUploadWithRefresh(path, formData) {
+  const doFetch = async () => {
+    const response = await fetch(`${API_BASE_URL}${path}`, {
+      method: "POST",
+      credentials: "include",
+      body: formData,
+    });
+    if (!response.ok) {
+      throw await parseError(response);
+    }
+    if (response.status === 204) return null;
+    return response.json();
+  };
+
+  try {
+    return await doFetch();
+  } catch (error) {
+    if (error.status !== 401) {
+      throw error;
+    }
+    try {
+      await apiRequest("/auth/refresh", { method: "POST" });
+      return doFetch();
+    } catch {
+      throw error;
+    }
+  }
+}
   const doFetch = async () => {
     const response = await fetch(`${API_BASE_URL}${path}`, {
       credentials: "include",

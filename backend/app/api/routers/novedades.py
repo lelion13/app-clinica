@@ -1,4 +1,4 @@
-from fastapi import APIRouter, Depends, Query, status
+from fastapi import APIRouter, Depends, File, HTTPException, Query, UploadFile, status
 from fastapi.responses import Response
 from pydantic import BaseModel
 from sqlalchemy import select
@@ -26,6 +26,7 @@ from app.schemas.novedades import (
     FeriadoResponse,
     FeriadoUpdateRequest,
     ModuloCreateRequest,
+    ModuloImportResponse,
     ModuloResponse,
     ModuloServiciosUpdateRequest,
     ModuloUpdateRequest,
@@ -53,6 +54,7 @@ from app.services.novedades import bonos_import as bonos_import_service
 from app.services.novedades import capital_humano as capital_humano_service
 from app.services.novedades import export_xls
 from app.services.novedades import masters as masters_service
+from app.services.novedades import modulos_import as modulos_import_service
 from app.services.novedades import produccion_tarifas as produccion_tarifas_service
 from app.services.novedades import prof_sync as prof_sync_service
 from app.services.novedades import purge as purge_service
@@ -250,6 +252,32 @@ def modulos_create(
 ) -> ModuloResponse:
     item = masters_service.create_modulo(db, payload, actor_id=user.id)
     return _modulo_response(db, item)
+
+
+@router.get("/modulos/import/template")
+def modulos_import_template(
+    db: Session = Depends(get_db),
+    user: User = Depends(require_admin_or_rrhh),
+) -> Response:
+    _ = user
+    content = modulos_import_service.build_modulos_import_template(db)
+    return Response(
+        content=content,
+        media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+        headers={"Content-Disposition": 'attachment; filename="plantilla-modulos.xlsx"'},
+    )
+
+
+@router.post("/modulos/import", response_model=ModuloImportResponse)
+async def modulos_import(
+    file: UploadFile = File(...),
+    db: Session = Depends(get_db),
+    user: User = Depends(require_admin_or_rrhh),
+) -> ModuloImportResponse:
+    raw = await file.read()
+    if not raw:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Archivo vacío")
+    return modulos_import_service.import_modulos_from_xlsx(db, raw, actor_id=user.id)
 
 
 @router.put("/modulos/{modulo_id}", response_model=ModuloResponse)

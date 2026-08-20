@@ -21,3 +21,12 @@ Survey: **una pregunta a la vez**. Estado: **CLOSED**.
 | Q4 | SMTP_SECURE | **B** | `false` = STARTTLS (típicamente puerto 587); `true` = TLS implícito (465) |
 | Q5 | Fallo mail bienvenida | **A** | Crear usuario igual + aviso de que el mail falló |
 | Q6 | Eliminar / desactivar | **A** | Solo desactivar; usuario inactivo **no** puede restablecer contraseña |
+
+## Post-apply (2026-08-20)
+
+| # | Tema | Decisión |
+|---|------|----------|
+| P1 | Error al crear | Alerta **dentro del modal** con el mensaje del backend; no cerrar |
+| P2 | Firma de mails | Siempre `Departamento de Tecnologia y Modernizacion.` |
+| P3 | Reenvío bienvenida | Botón en modal Modificar → `POST /users/{id}/resend-welcome` (solo activo) |
+| P4 | Setup en login | Ocultar link “Crear admin inicial…”; `/setup` sigue disponible por URL |
