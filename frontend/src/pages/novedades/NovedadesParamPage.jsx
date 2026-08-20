@@ -3,7 +3,7 @@ import { useEffect, useState } from "react";
 import { ProfessionalCombobox } from "../../components/ProfessionalCombobox";
 import { BonoOpcionMultiCombobox } from "../../components/BonoOpcionMultiCombobox";
 import { AlertModal } from "../../components/AlertModal";
-import { apiRequestWithRefresh } from "../../services/api";
+import { apiDownloadWithRefresh, apiRequestWithRefresh, apiUploadWithRefresh } from "../../services/api";
 import { uiStyles, uiTheme } from "../../ui/theme";
 
 const tabs = [
@@ -72,6 +72,10 @@ export function NovedadesParamPage() {
   const [serviciosSaving, setServiciosSaving] = useState(false);
   const [deleteModulo, setDeleteModulo] = useState(null);
   const [deleteModuloSaving, setDeleteModuloSaving] = useState(false);
+  const [moduloImportErrors, setModuloImportErrors] = useState(null);
+  const [moduloImportMessage, setModuloImportMessage] = useState("");
+  const [moduloImporting, setModuloImporting] = useState(false);
+  const [moduloImportNotice, setModuloImportNotice] = useState("");
   const [createFeriadoOpen, setCreateFeriadoOpen] = useState(false);
   const [createFeriadoSaving, setCreateFeriadoSaving] = useState(false);
   const [feriadoFecha, setFeriadoFecha] = useState("");
@@ -272,6 +276,51 @@ export function NovedadesParamPage() {
     if (createModuloSaving) return;
     setCreateModuloOpen(false);
     resetCreateModuloForm();
+  };
+
+  const downloadModulosTemplate = async () => {
+    setError("");
+    setModuloImportNotice("");
+    try {
+      const { blob, filename } = await apiDownloadWithRefresh("/novedades/modulos/import/template");
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = filename || "plantilla-modulos.xlsx";
+      a.click();
+      URL.revokeObjectURL(url);
+    } catch (err) {
+      setError(err.message || "No se pudo descargar la plantilla");
+    }
+  };
+
+  const onModulosImportFile = async (event) => {
+    const file = event.target.files?.[0];
+    event.target.value = "";
+    if (!file) return;
+    setModuloImporting(true);
+    setError("");
+    setModuloImportNotice("");
+    setModuloImportErrors(null);
+    setModuloImportMessage("");
+    try {
+      const form = new FormData();
+      form.append("file", file);
+      const result = await apiUploadWithRefresh("/novedades/modulos/import", form);
+      setModuloImportNotice(`Se importaron ${result?.created ?? 0} módulo(s)`);
+      await load();
+    } catch (err) {
+      const detail = err.detail;
+      const errors = Array.isArray(detail?.errors) ? detail.errors : null;
+      if (errors?.length) {
+        setModuloImportMessage(detail.message || err.message || "No se importó ningún módulo");
+        setModuloImportErrors(errors);
+      } else {
+        setError(err.message || "Error al importar módulos");
+      }
+    } finally {
+      setModuloImporting(false);
+    }
   };
 
   const createModulo = async () => {
@@ -594,6 +643,7 @@ export function NovedadesParamPage() {
     if (
       !createServicioOpen && !editServicio && !deleteServicio
       && !createModuloOpen && !editModulo && !serviciosModulo && !deleteModulo
+      && !moduloImportErrors
       && !createFeriadoOpen && !editFeriado && !deleteFeriado
       && !createProduccionOpen && !editTarifa && !deleteTarifa
     ) return undefined;
@@ -612,6 +662,10 @@ export function NovedadesParamPage() {
       else if (serviciosModulo) closeServiciosModulo();
       else if (editModulo) closeEditModulo();
       else if (createModuloOpen) closeCreateModulo();
+      else if (moduloImportErrors) {
+        setModuloImportErrors(null);
+        setModuloImportMessage("");
+      }
     };
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
@@ -630,6 +684,7 @@ export function NovedadesParamPage() {
     serviciosSaving,
     deleteModulo,
     deleteModuloSaving,
+    moduloImportErrors,
     createFeriadoOpen,
     createFeriadoSaving,
     editFeriado,
@@ -1099,11 +1154,27 @@ export function NovedadesParamPage() {
 
       {tab === "modulos" ? (
         <>
-          <div style={{ marginBottom: 12 }}>
+          <div style={{ marginBottom: 12, display: "flex", gap: 8, flexWrap: "wrap", alignItems: "center" }}>
             <button type="button" style={uiStyles.buttonPrimary} onClick={openCreateModulo}>
               Nuevo módulo
             </button>
+            <button type="button" style={uiStyles.buttonSecondary} onClick={downloadModulosTemplate} disabled={moduloImporting}>
+              Plantilla de importación
+            </button>
+            <label style={{ ...uiStyles.buttonSecondary, display: "inline-flex", alignItems: "center", cursor: moduloImporting ? "wait" : "pointer" }}>
+              {moduloImporting ? "Importando…" : "Carga masiva"}
+              <input
+                type="file"
+                accept=".xlsx,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+                hidden
+                disabled={moduloImporting}
+                onChange={onModulosImportFile}
+              />
+            </label>
           </div>
+          {moduloImportNotice ? (
+            <p style={{ color: uiTheme.colors.primaryStrong, marginTop: 0 }}>{moduloImportNotice}</p>
+          ) : null}
           <ul style={uiStyles.listCard}>
             {modulos.map((item) => (
               <li key={item.id} style={{ padding: "8px 10px", borderBottom: `1px solid ${uiTheme.colors.border}` }}>
@@ -1461,6 +1532,73 @@ export function NovedadesParamPage() {
                   </button>
                   <button type="button" onClick={confirmDeleteModulo} style={uiStyles.buttonDanger} disabled={deleteModuloSaving}>
                     {deleteModuloSaving ? "Eliminando…" : "Eliminar"}
+                  </button>
+                </div>
+              </div>
+            </div>
+          ) : null}
+
+          {moduloImportErrors ? (
+            <div
+              role="presentation"
+              style={{
+                position: "fixed",
+                inset: 0,
+                zIndex: 1000,
+                background: "rgba(15, 43, 39, 0.45)",
+                display: "flex",
+                alignItems: "flex-start",
+                justifyContent: "center",
+                padding: "max(16px, 4vh) 16px",
+                overflowY: "auto",
+              }}
+              onClick={() => {
+                setModuloImportErrors(null);
+                setModuloImportMessage("");
+              }}
+            >
+              <div
+                role="dialog"
+                aria-modal="true"
+                aria-labelledby="modulo-import-errors-title"
+                onClick={(e) => e.stopPropagation()}
+                style={{
+                  background: "#fff",
+                  borderRadius: uiTheme.radius.md,
+                  maxWidth: 520,
+                  width: "100%",
+                  marginBottom: 24,
+                  padding: 22,
+                  boxShadow: uiTheme.shadow.md,
+                  border: `1px solid ${uiTheme.colors.border}`,
+                }}
+              >
+                <h2 id="modulo-import-errors-title" style={{ marginTop: 0, marginBottom: 10, fontSize: "1.1rem" }}>
+                  No se importó ningún módulo
+                </h2>
+                <p style={{ marginTop: 0, marginBottom: 12, color: uiTheme.colors.textMuted, fontSize: 14 }}>
+                  {moduloImportMessage || "Corregí los errores e intentá de nuevo."}
+                </p>
+                <ul style={{ ...uiStyles.listCard, maxHeight: 280, overflowY: "auto", marginBottom: 14 }}>
+                  {moduloImportErrors.map((item) => (
+                    <li
+                      key={`${item.row}-${item.reason}`}
+                      style={{ padding: "8px 10px", borderBottom: `1px solid ${uiTheme.colors.border}`, fontSize: 14 }}
+                    >
+                      <strong>Fila {item.row}:</strong> {item.reason}
+                    </li>
+                  ))}
+                </ul>
+                <div style={{ display: "flex", justifyContent: "flex-end" }}>
+                  <button
+                    type="button"
+                    style={uiStyles.buttonPrimary}
+                    onClick={() => {
+                      setModuloImportErrors(null);
+                      setModuloImportMessage("");
+                    }}
+                  >
+                    Entendido
                   </button>
                 </div>
               </div>
