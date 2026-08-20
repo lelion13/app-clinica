@@ -123,6 +123,7 @@ def build_capital_humano_rows(
                 monto_ajustes=monto_ajustes,
                 monto_bonos=monto_bonos,
                 monto_total=monto_total,
+                es_especialista=bool(getattr(prof, "es_especialista", False)),
                 bonos=prof_bonos,
                 bonos_subtotales=bonos_subtotales,
             )

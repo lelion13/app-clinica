@@ -165,7 +165,7 @@ def _asignacion_response(db: Session, item) -> AsignacionResponse:
         professional_codprof=professional.codprof if professional else None,
         modulo_id=item.modulo_id,
         modulo_descripcion=modulo.descripcion if modulo else None,
-        modulo_valor=modulo.valor if modulo else None,
+        modulo_valor=getattr(item, "valor", None) if getattr(item, "valor", None) is not None else (modulo.valor if modulo else None),
         fecha_realizacion=item.fecha_realizacion,
         motivo_sin_produccion=item.motivo_sin_produccion,
         observacion_sin_produccion=item.observacion_sin_produccion,
@@ -534,10 +534,13 @@ def profesionales_directory(
 
 @router.post("/profesionales/sync", response_model=NovedadesProfSyncResponse)
 def profesionales_sync(
+    include_especialistas: bool = Query(default=False),
     db: Session = Depends(get_db),
     user: User = Depends(require_novedades_reader),
 ) -> NovedadesProfSyncResponse:
-    return prof_sync_service.sync_novedades_professionals(db, actor_id=user.id)
+    return prof_sync_service.sync_novedades_professionals(
+        db, actor_id=user.id, sync_especialistas=include_especialistas
+    )
 
 
 @router.post("/transaccional/purge", response_model=NovedadesTransaccionalPurgeResponse)

@@ -687,11 +687,28 @@ export function NovedadesParamPage() {
     setError("");
     setSyncing(true);
     try {
-      const summary = await apiRequestWithRefresh("/novedades/profesionales/sync", { method: "POST" });
-      setInfoMessage(
+      const summary = await apiRequestWithRefresh("/novedades/profesionales/sync?include_especialistas=1", {
+        method: "POST",
+      });
+      const unmatched = Array.isArray(summary.especialistas_unmatched) ? summary.especialistas_unmatched : [];
+      let msg =
         `Sincronización OK · creados ${summary.created} · actualizados ${summary.updated} · inactivados ${summary.inactivated}` +
-          (summary.errors?.length ? ` · avisos: ${summary.errors.slice(0, 3).join("; ")}` : "")
-      );
+        (summary.especialistas_matched != null
+          ? ` · especialistas ${summary.especialistas_matched}`
+          : "") +
+        (summary.errors?.length ? ` · avisos: ${summary.errors.slice(0, 3).join("; ")}` : "");
+      if (summary.especialistas_warning) {
+        msg += `\n\nEspecialistas: ${summary.especialistas_warning}`;
+      }
+      if (unmatched.length) {
+        const lines = unmatched
+          .slice(0, 40)
+          .map((u) => `· ${u.profesional} — ${u.descripcion || "—"}`)
+          .join("\n");
+        msg += `\n\nEspecialistas sin match en catálogo (${unmatched.length}):\n${lines}`;
+        if (unmatched.length > 40) msg += `\n… y ${unmatched.length - 40} más`;
+      }
+      setInfoMessage(msg);
       await load();
     } catch (err) {
       setError(err.message || "Error al sincronizar profesionales");

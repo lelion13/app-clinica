@@ -153,3 +153,89 @@ def test_purge_admin_counts(monkeypatch):
     assert result.deleted_asignaciones == 1
     assert result.deleted_novedades == 2
     assert result.deleted_profesional_servicios == 3
+
+
+def test_apply_especialistas_match_and_unmatched(monkeypatch):
+    known = SimpleNamespace(
+        codprof="1099",
+        full_name="A",
+        es_especialista=False,
+        deleted_at=None,
+        updated_at=None,
+        updated_by=None,
+    )
+    other = SimpleNamespace(
+        codprof="2000",
+        full_name="B",
+        es_especialista=True,
+        deleted_at=None,
+        updated_at=None,
+        updated_by=None,
+    )
+    db = SyncFakeDB([known, other])
+    monkeypatch.setattr(
+        prof_sync_service,
+        "_fetch_especialistas_rows",
+        lambda: [
+            {"profesional": "1099", "descripcion": "Dr A"},
+            {"profesional": "9999", "descripcion": "Ghost"},
+        ],
+    )
+    matched, unmatched, warning = prof_sync_service.apply_especialistas_flags(db, actor_id=1)
+    assert warning is None
+    assert matched == 1
+    assert known.es_especialista is True
+    assert other.es_especialista is False
+    assert len(unmatched) == 1
+    assert unmatched[0].profesional == "9999"
+    assert unmatched[0].descripcion == "Ghost"
+
+
+def test_apply_especialistas_fail_preserves_flags(monkeypatch):
+    row = SimpleNamespace(
+        codprof="1099",
+        es_especialista=True,
+        deleted_at=None,
+        updated_at=None,
+        updated_by=None,
+    )
+    db = SyncFakeDB([row])
+
+    def boom():
+        raise HTTPException(status_code=502, detail="especialistas down")
+
+    monkeypatch.setattr(prof_sync_service, "_fetch_especialistas_rows", boom)
+    matched, unmatched, warning = prof_sync_service.apply_especialistas_flags(db, actor_id=1)
+    assert matched == 0
+    assert unmatched == []
+    assert warning
+    assert row.es_especialista is True
+
+
+def test_sync_with_especialistas_param(monkeypatch):
+    row = SimpleNamespace(
+        codprof="001",
+        full_name="A",
+        codprov=None,
+        legajo=None,
+        is_active=True,
+        es_especialista=False,
+        deleted_at=None,
+        updated_at=None,
+        updated_by=None,
+    )
+    db = SyncFakeDB([row])
+    monkeypatch.setattr(
+        prof_sync_service,
+        "_fetch_remote_rows",
+        lambda: [{"CODPROF": "001", "NOMBRES": "A", "CODPROV": "1"}],
+    )
+    monkeypatch.setattr(
+        prof_sync_service,
+        "_fetch_especialistas_rows",
+        lambda: [{"profesional": "001", "descripcion": "A"}],
+    )
+    result = prof_sync_service.sync_novedades_professionals(db, actor_id=1, sync_especialistas=True)
+    assert row.es_especialista is True
+    assert result.especialistas_matched == 1
+    assert result.especialistas_warning is None

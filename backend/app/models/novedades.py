@@ -115,6 +115,7 @@ class NovedadesProfesional(AuditMixin, Base):
     codprov: Mapped[str | None] = mapped_column(String(40), nullable=True)
     legajo: Mapped[str | None] = mapped_column(String(40), nullable=True)
     is_active: Mapped[bool] = mapped_column(Boolean, nullable=False, default=True)
+    es_especialista: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
 
 
 class NovedadesAjusteCapital(AuditMixin, Base):
@@ -193,6 +194,7 @@ class NovedadesAsignacionModulo(AuditMixin, Base):
     professional_id: Mapped[int] = mapped_column(ForeignKey("novedades_profesional.id"), nullable=False)
     modulo_id: Mapped[int] = mapped_column(ForeignKey("novedades_modulo.id"), nullable=False)
     fecha_realizacion: Mapped[date] = mapped_column(Date, nullable=False)
+    valor: Mapped[Decimal] = mapped_column(Numeric(12, 2), nullable=False, default=Decimal("0"))
     motivo_sin_produccion: Mapped[str | None] = mapped_column(String(40), nullable=True)
     observacion_sin_produccion: Mapped[str | None] = mapped_column(String(500), nullable=True)
 

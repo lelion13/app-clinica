@@ -66,6 +66,14 @@ class Settings(BaseSettings):
     novedades_bonos_tiene_produccion_timeout: float = Field(
         default=30.0, validation_alias="NOVEDADES_BONOS_TIENE_PRODUCCION_TIMEOUT"
     )
+    novedades_prof_especialistas_url: str = Field(
+        default="",
+        validation_alias="NOVEDADES_PROF_ESPECIALISTAS_URL",
+    )
+    novedades_prof_especialistas_timeout: float = Field(
+        default=30.0,
+        validation_alias="NOVEDADES_PROF_ESPECIALISTAS_TIMEOUT",
+    )
     # Proxy HTTP horarios activos (Distribución → Ocupación). Token: NOVEDADES_PROF_SYNC_TOKEN.
     distribucion_horarios_activos_url: str = Field(
         default="",

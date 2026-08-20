@@ -604,6 +604,7 @@ export function NovedadesXlsPage() {
                 </h2>
                 <p style={{ ...uiStyles.helpText, marginTop: 0 }}>
                   Legajo: {detailRow.legajo || "—"}
+                  {detailRow.es_especialista ? " · Especialista (+20% en módulos)" : ""}
                   {periodoId ? ` · Período #${periodoId}` : ""}
                   {" · "}
                   Cargas {formatMoney(detailRow.monto_cargas)} · Producción {formatMoney(detailRow.monto_bonos ?? 0)} ·

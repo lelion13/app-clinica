@@ -1,4 +1,5 @@
 from datetime import datetime
+from decimal import Decimal
 
 from fastapi import HTTPException, status
 from sqlalchemy import select
@@ -253,15 +254,19 @@ def create_asignacion(db: Session, payload: AsignacionCreateRequest, user: User)
     periodo = require_periodo_open(db, payload.periodo_id)
     validate_fecha_realizacion(periodo, payload.fecha_realizacion)
     get_servicio_or_404(db, payload.servicio_id)
-    get_professional_or_404(db, payload.professional_id, require_active=True)
-    get_modulo_or_404(db, payload.modulo_id)
+    professional = get_professional_or_404(db, payload.professional_id, require_active=True)
+    modulo = get_modulo_or_404(db, payload.modulo_id)
     assert_can_load_servicio(db, user, payload.servicio_id)
     require_profesional_en_servicio(db, payload.professional_id, payload.servicio_id)
     from app.services.novedades.masters import require_modulo_en_servicio
+    from app.services.novedades.prof_sync import modulo_valor_para_profesional
 
     require_modulo_en_servicio(db, payload.modulo_id, payload.servicio_id)
     motivo, observacion = normalize_motivo_sin_produccion(
         payload.motivo_sin_produccion, payload.observacion_sin_produccion
+    )
+    valor = modulo_valor_para_profesional(
+        Decimal(modulo.valor), es_especialista=bool(professional.es_especialista)
     )
     now = datetime.utcnow()
     item = NovedadesAsignacionModulo(
@@ -270,6 +275,7 @@ def create_asignacion(db: Session, payload: AsignacionCreateRequest, user: User)
         professional_id=payload.professional_id,
         modulo_id=payload.modulo_id,
         fecha_realizacion=payload.fecha_realizacion,
+        valor=valor,
         motivo_sin_produccion=motivo,
         observacion_sin_produccion=observacion,
         created_at=now,
@@ -298,11 +304,16 @@ def update_asignacion(db: Session, item_id: int, payload: AsignacionUpdateReques
     if payload.modulo_id is None and payload.fecha_realizacion is None:
         raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail="Nada para actualizar")
     if payload.modulo_id is not None:
-        get_modulo_or_404(db, payload.modulo_id)
+        modulo = get_modulo_or_404(db, payload.modulo_id)
         from app.services.novedades.masters import require_modulo_en_servicio
+        from app.services.novedades.prof_sync import modulo_valor_para_profesional
 
         require_modulo_en_servicio(db, payload.modulo_id, item.servicio_id)
+        professional = get_professional_or_404(db, item.professional_id, require_active=False)
         item.modulo_id = payload.modulo_id
+        item.valor = modulo_valor_para_profesional(
+            Decimal(modulo.valor), es_especialista=bool(professional.es_especialista)
+        )
     if payload.fecha_realizacion is not None:
         validate_fecha_realizacion(periodo, payload.fecha_realizacion)
         item.fecha_realizacion = payload.fecha_realizacion
