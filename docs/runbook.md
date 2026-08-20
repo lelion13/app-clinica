@@ -47,6 +47,12 @@
   - Fechas del período → `fecha_desde` / `fecha_hasta`; match por `CODPROF`
   - Snapshot persistido; re-import solo con período **open**; cerrado = congelado
   - Columnas dinámicas + modal Solo bonos + 3er XLS con bonos
+- Cambio `capital-humano-grilla-actualizar`:
+  - Toolbar: período (default = **open**) + **Actualizar** (= import bonos + refresh); se quitó botón Importar bonos
+  - Grilla: columnas fijas Legajo · Profesional · Total cargas · Ajustes · Total producción · Total general (+ Detalle / Agregar importe)
+  - Detalle unificado: cargas + producción (cantidad/subtotal) + historial de ajustes
+  - Solo bonos + elegibilidad DEA/DEP/CAP/CAI sin cambio; Excel/concepto liquidación → change posterior
+  - Actualizar disabled si período closed; al entrar muestra datos persistidos
 - Cambio `distribucion-ocupacion`:
   - Menú Distribución → **Ocupación** (`/ocupacion`); convive con Ocupación semanal
   - Tabla `ocupacion_horario_activo` (rev `0013_ocupacion_serial`): PK serial local; `payload` JSONB = cada fila del endpoint tal cual
@@ -78,7 +84,7 @@
   - Profesionales con solo bonos se incorporan a grilla principal solo si tienen opción de bono con `servicio` exacto `DEA`, `DEP`, `CAP` o `CAI`
   - Esos profesionales dejan de verse en modal **Solo bonos**
 - Cambio `novedades-produccion-valor-bonos` (rev `0021_produccion_tarifa`):
-  - Param tab **Producción**: alta múltiple de opciones con el mismo `valor_unitario` (checkboxes + POST bulk)
+  - Param tab **Producción**: alta múltiple con el mismo `valor_unitario` (combobox searchable multi-select + POST bulk)
   - No confundir con flag **Producción** del módulo (skip check externo)
   - Capital Humano: columnas cantidad + subtotal por opción; `monto_total = cargas ± ajustes + bonos valorizados`
   - Opciones sin tarifa: cantidad visible, subtotal 0, banner aviso en CH

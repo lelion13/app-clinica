@@ -81,3 +81,14 @@ Capital Humano MUST offer a third download **XLS con bonos** (aggregated row per
 (Previously: grilla agregada, ajustes, Detalle, dos XLS.)
 
 In addition: Importar bonos (period-required), dynamic bonos columns from persisted snapshot, Solo bonos modal, and a third XLS-with-bonos download, per the ADDED requirements above.
+
+---
+
+## Archive note (2026-08-20)
+
+Requirements **Columnas de bonos**, **Modal solo bonos**, and **XLS con bonos** as written above describe the **original** intent of this change. The stable spec (`openspec/specs/novedades/spec.md`) holds the **final** behavior after:
+
+- `2026-08-20-capital-humano-bonos-servicios-especiales` (promoción DEA/DEP/CAP/CAI)
+- `2026-08-20-novedades-produccion-valor-bonos` (subtotales + cleanup huérfanas)
+
+Only **Importar bonos resumen** was missing from the stable spec and was merged at archive time.

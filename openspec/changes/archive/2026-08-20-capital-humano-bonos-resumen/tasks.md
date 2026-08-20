@@ -25,3 +25,4 @@
 
 - [x] 4.1 Runbook: env URL + token reutilizado + freeze al cerrar período
 - [x] 4.2 Marcar tasks al cerrar apply
+- [x] 4.3 Archivar change + merge Importar bonos a spec estable (2026-08-20)

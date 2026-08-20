@@ -63,6 +63,17 @@ function tipoLabel(tipo) {
   return "Novedad";
 }
 
+function bonoOptionLabels(bonoColumns) {
+  const map = new Map();
+  for (const col of bonoColumns || []) {
+    const key = col.opcion_key || col.key;
+    if (!map.has(key)) {
+      map.set(key, col.label?.replace(/\s*·\s*subtotal$/i, "") || key);
+    }
+  }
+  return map;
+}
+
 export function NovedadesXlsPage() {
   const [error, setError] = useState("");
   const [info, setInfo] = useState("");
@@ -71,33 +82,25 @@ export function NovedadesXlsPage() {
   const [opcionesSinTarifa, setOpcionesSinTarifa] = useState([]);
   const [periodos, setPeriodos] = useState([]);
   const [periodoId, setPeriodoId] = useState("");
-  const [q, setQ] = useState("");
+  const [bootstrapped, setBootstrapped] = useState(false);
   const [filterText, setFilterText] = useState("");
   const [sortKey, setSortKey] = useState("professional_name");
   const [sortDir, setSortDir] = useState("asc");
 
   const [modalRow, setModalRow] = useState(null);
-  const [ajustes, setAjustes] = useState([]);
   const [importe, setImporte] = useState("");
   const [comentario, setComentario] = useState("");
   const [saving, setSaving] = useState(false);
 
   const [detailRow, setDetailRow] = useState(null);
   const [detailItems, setDetailItems] = useState([]);
+  const [detailAjustes, setDetailAjustes] = useState([]);
   const [detailLoading, setDetailLoading] = useState(false);
 
-  const [importing, setImporting] = useState(false);
+  const [updating, setUpdating] = useState(false);
   const [soloOpen, setSoloOpen] = useState(false);
   const [soloRows, setSoloRows] = useState([]);
   const [soloLoading, setSoloLoading] = useState(false);
-
-  const queryString = () => {
-    const params = new URLSearchParams();
-    if (periodoId) params.set("periodo_id", periodoId);
-    if (q.trim()) params.set("q", q.trim());
-    const qs = params.toString();
-    return qs ? `?${qs}` : "";
-  };
 
   const selectedPeriodo = useMemo(
     () => periodos.find((p) => String(p.id) === String(periodoId)) || null,
@@ -105,32 +108,48 @@ export function NovedadesXlsPage() {
   );
   const periodoClosed = selectedPeriodo?.estado === "closed";
 
-  const load = async () => {
+  const optionLabels = useMemo(() => bonoOptionLabels(bonoColumns), [bonoColumns]);
+
+  const loadGrid = async (pid = periodoId) => {
     setError("");
     try {
-      const [grid, p] = await Promise.all([
-        apiRequestWithRefresh(`/novedades/capital-humano${queryString()}`),
-        apiRequestWithRefresh("/novedades/periodos"),
-      ]);
+      const params = new URLSearchParams();
+      if (pid) params.set("periodo_id", pid);
+      const qs = params.toString() ? `?${params}` : "";
+      const grid = await apiRequestWithRefresh(`/novedades/capital-humano${qs}`);
       setRows(Array.isArray(grid?.rows) ? grid.rows : []);
       setBonoColumns(Array.isArray(grid?.columns) ? grid.columns : []);
       setOpcionesSinTarifa(Array.isArray(grid?.opciones_sin_tarifa) ? grid.opciones_sin_tarifa : []);
-      setPeriodos(p);
     } catch (err) {
       setError(err.message || "Error al cargar Capital Humano");
     }
   };
 
-  const importBonos = async () => {
+  const bootstrap = async () => {
+    setError("");
+    try {
+      const p = await apiRequestWithRefresh("/novedades/periodos");
+      const list = Array.isArray(p) ? p : [];
+      setPeriodos(list);
+      const open = list.find((x) => x.estado === "open");
+      setPeriodoId(open ? String(open.id) : "");
+    } catch (err) {
+      setError(err.message || "Error al cargar períodos");
+    } finally {
+      setBootstrapped(true);
+    }
+  };
+
+  const actualizar = async () => {
     if (!periodoId) {
-      setError("Seleccioná un período antes de importar bonos");
+      setError("Seleccioná un período antes de actualizar");
       return;
     }
     if (periodoClosed) {
       setError("El período está cerrado: no se puede reimportar bonos");
       return;
     }
-    setImporting(true);
+    setUpdating(true);
     setError("");
     try {
       const summary = await apiRequestWithRefresh("/novedades/capital-humano/bonos/import", {
@@ -138,13 +157,13 @@ export function NovedadesXlsPage() {
         body: JSON.stringify({ periodo_id: Number(periodoId) }),
       });
       setInfo(
-        `Importación OK. Recibidas: ${summary.received} · Matcheadas: ${summary.matched} · Solo bonos: ${summary.solo_bonos} · Columnas: ${summary.columns} · Ignorados: ${summary.ignored}`
+        `Actualización OK. Recibidas: ${summary.received} · Matcheadas: ${summary.matched} · Solo bonos: ${summary.solo_bonos} · Columnas: ${summary.columns} · Ignorados: ${summary.ignored}`
       );
-      await load();
+      await loadGrid(periodoId);
     } catch (err) {
-      setError(err.message || "Error al importar bonos");
+      setError(err.message || "Error al actualizar bonos");
     } finally {
-      setImporting(false);
+      setUpdating(false);
     }
   };
 
@@ -169,13 +188,21 @@ export function NovedadesXlsPage() {
   };
 
   useEffect(() => {
-    load();
+    bootstrap();
   }, []);
+
+  useEffect(() => {
+    if (!bootstrapped) return;
+    loadGrid(periodoId);
+  }, [periodoId, bootstrapped]);
 
   const download = async (path, fallbackName) => {
     setError("");
     try {
-      const { blob, filename } = await apiDownloadWithRefresh(`${path}${queryString()}`);
+      const params = new URLSearchParams();
+      if (periodoId) params.set("periodo_id", periodoId);
+      const qs = params.toString() ? `?${params}` : "";
+      const { blob, filename } = await apiDownloadWithRefresh(`${path}${qs}`);
       const url = URL.createObjectURL(blob);
       const anchor = document.createElement("a");
       anchor.href = url;
@@ -187,46 +214,46 @@ export function NovedadesXlsPage() {
     }
   };
 
-  const openModal = async (row) => {
+  const openAgregarAjuste = (row) => {
     if (!periodoId) {
-      setError("Seleccioná un período para ver o cargar ajustes");
+      setError("Seleccioná un período para cargar ajustes");
       return;
     }
     setError("");
     setModalRow(row);
     setImporte("");
     setComentario("");
-    try {
-      const params = new URLSearchParams({
-        professional_id: String(row.professional_id),
-        periodo_id: periodoId,
-      });
-      const list = await apiRequestWithRefresh(`/novedades/capital-humano/ajustes?${params}`);
-      setAjustes(list);
-    } catch (err) {
-      setError(err.message || "Error al cargar ajustes");
-      setModalRow(null);
-    }
   };
 
   const closeModal = () => {
     if (saving) return;
     setModalRow(null);
-    setAjustes([]);
   };
 
   const openDetalle = async (row) => {
     setError("");
     setDetailRow(row);
     setDetailItems([]);
+    setDetailAjustes([]);
     setDetailLoading(true);
     try {
-      const params = new URLSearchParams({
+      const cargaParams = new URLSearchParams({
         professional_id: String(row.professional_id),
       });
-      if (periodoId) params.set("periodo_id", periodoId);
-      const list = await apiRequestWithRefresh(`/novedades/grilla?${params}`);
-      setDetailItems(list);
+      if (periodoId) cargaParams.set("periodo_id", periodoId);
+
+      const requests = [apiRequestWithRefresh(`/novedades/grilla?${cargaParams}`)];
+      if (periodoId) {
+        const ajParams = new URLSearchParams({
+          professional_id: String(row.professional_id),
+          periodo_id: periodoId,
+        });
+        requests.push(apiRequestWithRefresh(`/novedades/capital-humano/ajustes?${ajParams}`));
+      }
+
+      const [cargas, ajustesList] = await Promise.all(requests);
+      setDetailItems(Array.isArray(cargas) ? cargas : []);
+      setDetailAjustes(Array.isArray(ajustesList) ? ajustesList : []);
     } catch (err) {
       setError(err.message || "Error al cargar el detalle");
       setDetailRow(null);
@@ -238,6 +265,7 @@ export function NovedadesXlsPage() {
   const closeDetalle = () => {
     setDetailRow(null);
     setDetailItems([]);
+    setDetailAjustes([]);
   };
 
   const submitAjuste = async (event) => {
@@ -268,8 +296,8 @@ export function NovedadesXlsPage() {
       setInfo("Ajuste registrado");
       setImporte("");
       setComentario("");
-      await openModal(modalRow);
-      await load();
+      setModalRow(null);
+      await loadGrid(periodoId);
     } catch (err) {
       setError(err.message || "No se pudo guardar el ajuste");
     } finally {
@@ -301,31 +329,38 @@ export function NovedadesXlsPage() {
       let cmp = 0;
       if (sortKey === "legajo" || sortKey === "professional_name") {
         cmp = compareText(a[sortKey], b[sortKey]);
-      } else if (String(sortKey).startsWith("bono:")) {
-        const colKey = sortKey.slice(5);
-        const col = bonoColumns.find((c) => c.key === colKey);
-        const opcionKey = col?.opcion_key || colKey;
-        if (col?.kind === "subtotal") {
-          cmp = compareNumber(a.bonos_subtotales?.[opcionKey], b.bonos_subtotales?.[opcionKey]);
-        } else {
-          cmp = compareNumber(a.bonos?.[opcionKey], b.bonos?.[opcionKey]);
-        }
       } else {
         cmp = compareNumber(a[sortKey], b[sortKey]);
       }
       return sortDir === "asc" ? cmp : -cmp;
     });
     return sorted;
-  }, [rows, filterText, sortKey, sortDir, bonoColumns]);
+  }, [rows, filterText, sortKey, sortDir]);
+
+  const detailProduccionRows = useMemo(() => {
+    if (!detailRow) return [];
+    const bonos = detailRow.bonos || {};
+    const subtotales = detailRow.bonos_subtotales || {};
+    const keys = new Set([...Object.keys(bonos), ...Object.keys(subtotales)]);
+    return [...keys]
+      .sort((a, b) => compareText(optionLabels.get(a) || a, optionLabels.get(b) || b))
+      .map((key) => ({
+        key,
+        label: optionLabels.get(key) || key,
+        cantidad: bonos[key] ?? 0,
+        subtotal: subtotales[key] ?? 0,
+      }));
+  }, [detailRow, optionLabels]);
 
   return (
     <section style={uiStyles.pageSection}>
       <h1 style={uiStyles.sectionTitle}>Capital Humano</h1>
       <p style={uiStyles.helpText}>
-        Un registro por profesional: legajo, nombre y monto total (cargas ± ajustes + bonos valorizados). Importá bonos
-        del período (cantidad y subtotal por opción). Con período cerrado no se puede reimportar. Los profesionales solo
-        con bonos de servicios especiales (DEA/DEP/CAP/CAI) se incorporan a la grilla; el resto queda en modal aparte.
-        Configurá tarifas en Parametrización → Producción.
+        Seleccioná el período (por defecto el abierto) y pulsá <strong>Actualizar</strong> para importar bonos del
+        período. La grilla muestra totales por profesional: cargas de jefes, ajustes, producción (bonos valorizados) y
+        total general. En <strong>Detalle</strong> ves el desglose. Con período cerrado no se puede actualizar.
+        Profesionales solo-bonos especiales (DEA/DEP/CAP/CAI) entran a la grilla; el resto en Solo bonos. Tarifas en
+        Parametrización → Producción. Los Excel se rediseñarán en un change posterior.
       </p>
       {opcionesSinTarifa.length ? (
         <p
@@ -338,49 +373,47 @@ export function NovedadesXlsPage() {
             marginBottom: 12,
           }}
         >
-          Hay opciones de bonos sin tarifa en Producción. Los subtotales se muestran en 0 hasta que cargues el valor
-          unitario ({opcionesSinTarifa.length} opción{opcionesSinTarifa.length === 1 ? "" : "es"}).
+          Hay opciones de bonos sin tarifa en Producción. Total producción cuenta esos subtotales en 0 hasta que
+          cargues el valor unitario ({opcionesSinTarifa.length} opción
+          {opcionesSinTarifa.length === 1 ? "" : "es"}).
         </p>
       ) : null}
       <AlertModal open={Boolean(error)} title="Atención" message={error} onClose={() => setError("")} />
       <AlertModal open={Boolean(info)} title="Listo" message={info} onClose={() => setInfo("")} />
 
-      <div style={{ display: "flex", gap: 8, flexWrap: "wrap", marginBottom: 12 }}>
+      <div style={{ display: "flex", gap: 8, flexWrap: "wrap", marginBottom: 12, alignItems: "center" }}>
         <select value={periodoId} onChange={(e) => setPeriodoId(e.target.value)} style={uiStyles.formControl}>
-          <option value="">Todos los períodos</option>
+          <option value="">Seleccioná período…</option>
           {periodos.map((p) => (
             <option key={p.id} value={p.id}>
               #{p.id} {p.nombre || ""} ({p.estado})
             </option>
           ))}
         </select>
-        <input
-          value={q}
-          onChange={(e) => setQ(e.target.value)}
-          placeholder="Buscar en servidor (nombre/legajo)"
-          style={uiStyles.formControl}
-        />
-        <button type="button" style={uiStyles.buttonSecondary} onClick={load}>
-          Buscar
-        </button>
         <button
           type="button"
           style={uiStyles.buttonPrimary}
-          onClick={importBonos}
-          disabled={importing || !periodoId || periodoClosed}
+          onClick={actualizar}
+          disabled={updating || !periodoId || periodoClosed}
           title={
             !periodoId
               ? "Seleccioná un período"
               : periodoClosed
                 ? "Período cerrado: bonos congelados"
-                : "Importar resumen de bonos"
+                : "Importar bonos del período y refrescar"
           }
         >
-          {importing ? "Importando…" : "Importar bonos"}
+          {updating ? "Actualizando…" : "Actualizar"}
         </button>
         <button type="button" style={uiStyles.buttonSecondary} onClick={openSoloBonos} disabled={!periodoId}>
           Solo bonos
         </button>
+        <input
+          value={filterText}
+          onChange={(e) => setFilterText(e.target.value)}
+          placeholder="Filtrar grilla (legajo / nombre)…"
+          style={{ ...uiStyles.formControl, maxWidth: 280 }}
+        />
         <button
           type="button"
           style={uiStyles.buttonSecondary}
@@ -404,15 +437,6 @@ export function NovedadesXlsPage() {
         </button>
       </div>
 
-      <div style={{ marginBottom: 10 }}>
-        <input
-          value={filterText}
-          onChange={(e) => setFilterText(e.target.value)}
-          placeholder="Filtrar grilla…"
-          style={{ ...uiStyles.formControl, maxWidth: 320 }}
-        />
-      </div>
-
       <div style={{ overflowX: "auto" }}>
         <table style={{ width: "100%", borderCollapse: "collapse", fontSize: "0.9rem" }}>
           <thead>
@@ -424,25 +448,17 @@ export function NovedadesXlsPage() {
                 Profesional{sortMark("professional_name")}
               </th>
               <th style={thStyle} onClick={() => toggleSort("monto_cargas")}>
-                Cargas{sortMark("monto_cargas")}
+                Total cargas{sortMark("monto_cargas")}
               </th>
               <th style={thStyle} onClick={() => toggleSort("monto_ajustes")}>
                 Ajustes{sortMark("monto_ajustes")}
               </th>
-              <th style={thStyle} onClick={() => toggleSort("monto_total")}>
-                Monto total{sortMark("monto_total")}
+              <th style={thStyle} onClick={() => toggleSort("monto_bonos")}>
+                Total producción{sortMark("monto_bonos")}
               </th>
-              {bonoColumns.map((col) => (
-                <th
-                  key={col.key}
-                  style={{ ...thStyle, maxWidth: 140, whiteSpace: "normal", lineHeight: 1.25 }}
-                  onClick={() => toggleSort(`bono:${col.key}`)}
-                  title={col.label}
-                >
-                  {col.label}
-                  {sortMark(`bono:${col.key}`)}
-                </th>
-              ))}
+              <th style={thStyle} onClick={() => toggleSort("monto_total")}>
+                Total general{sortMark("monto_total")}
+              </th>
               <th style={{ ...thStyle, cursor: "default" }}>Acciones</th>
             </tr>
           </thead>
@@ -451,31 +467,12 @@ export function NovedadesXlsPage() {
               <tr key={row.professional_id}>
                 <td style={tdStyle}>{row.legajo || "—"}</td>
                 <td style={tdStyle}>{row.professional_name}</td>
-                <td style={tdStyle}>{formatMoney(row.monto_cargas)}</td>
-                <td style={tdStyle}>
-                  <button
-                    type="button"
-                    onClick={() => openModal(row)}
-                    style={{
-                      ...uiStyles.buttonSecondary,
-                      padding: "4px 10px",
-                      fontSize: 13,
-                    }}
-                    title="Ver historial y agregar ajuste"
-                  >
-                    {formatMoney(row.monto_ajustes)}
-                  </button>
+                <td style={{ ...tdStyle, fontVariantNumeric: "tabular-nums" }}>{formatMoney(row.monto_cargas)}</td>
+                <td style={{ ...tdStyle, fontVariantNumeric: "tabular-nums" }}>{formatMoney(row.monto_ajustes)}</td>
+                <td style={{ ...tdStyle, fontVariantNumeric: "tabular-nums" }}>
+                  {formatMoney(row.monto_bonos ?? 0)}
                 </td>
-                <td style={tdStyle}>{formatMoney(row.monto_total)}</td>
-                {bonoColumns.map((col) => (
-                  <td key={col.key} style={{ ...tdStyle, fontVariantNumeric: "tabular-nums" }}>
-                    {col.kind === "subtotal"
-                      ? formatMoney(row.bonos_subtotales?.[col.opcion_key || col.key] ?? 0)
-                      : row.bonos?.[col.opcion_key || col.key] != null
-                        ? row.bonos[col.opcion_key || col.key]
-                        : "—"}
-                  </td>
-                ))}
+                <td style={{ ...tdStyle, fontVariantNumeric: "tabular-nums" }}>{formatMoney(row.monto_total)}</td>
                 <td style={{ ...tdStyle, whiteSpace: "nowrap" }}>
                   <button
                     type="button"
@@ -484,7 +481,7 @@ export function NovedadesXlsPage() {
                   >
                     Detalle
                   </button>
-                  <button type="button" style={uiStyles.buttonPrimary} onClick={() => openModal(row)}>
+                  <button type="button" style={uiStyles.buttonPrimary} onClick={() => openAgregarAjuste(row)}>
                     Agregar importe
                   </button>
                 </td>
@@ -530,7 +527,8 @@ export function NovedadesXlsPage() {
               <div>
                 <h2 style={{ marginTop: 0, marginBottom: 8, fontSize: "1.1rem" }}>Solo bonos</h2>
                 <p style={{ ...uiStyles.helpText, marginTop: 0 }}>
-                  Profesionales del catálogo con bonos en el período y sin cargas/ajustes en Capital Humano.
+                  Profesionales del catálogo con bonos en el período y sin cargas/ajustes (ni servicios especiales) en
+                  la grilla.
                 </p>
               </div>
               <button type="button" style={uiStyles.buttonSecondary} onClick={() => setSoloOpen(false)}>
@@ -606,7 +604,10 @@ export function NovedadesXlsPage() {
                 </h2>
                 <p style={{ ...uiStyles.helpText, marginTop: 0 }}>
                   Legajo: {detailRow.legajo || "—"}
-                  {periodoId ? ` · Período #${periodoId}` : " · Todos los períodos"}
+                  {periodoId ? ` · Período #${periodoId}` : ""}
+                  {" · "}
+                  Cargas {formatMoney(detailRow.monto_cargas)} · Producción {formatMoney(detailRow.monto_bonos ?? 0)} ·
+                  Ajustes {formatMoney(detailRow.monto_ajustes)} · Total {formatMoney(detailRow.monto_total)}
                 </p>
               </div>
               <button type="button" style={uiStyles.buttonSecondary} onClick={closeDetalle}>
@@ -615,46 +616,108 @@ export function NovedadesXlsPage() {
             </div>
 
             {detailLoading ? (
-              <p style={uiStyles.helpText}>Cargando ítems…</p>
+              <p style={uiStyles.helpText}>Cargando…</p>
             ) : (
-              <div style={{ overflowX: "auto", maxHeight: "60vh" }}>
-                <table style={{ width: "100%", borderCollapse: "collapse", fontSize: "0.85rem", minWidth: 720 }}>
-                  <thead>
-                    <tr>
-                      <th style={{ ...thStyle, cursor: "default" }}>Tipo</th>
-                      <th style={{ ...thStyle, cursor: "default" }}>Servicio</th>
-                      <th style={{ ...thStyle, cursor: "default" }}>Concepto</th>
-                      <th style={{ ...thStyle, cursor: "default" }}>Horas</th>
-                      <th style={{ ...thStyle, cursor: "default" }}>Valor</th>
-                      <th style={{ ...thStyle, cursor: "default" }}>F. realización</th>
-                      <th style={{ ...thStyle, cursor: "default" }}>Período</th>
-                      <th style={{ ...thStyle, cursor: "default" }}>F. carga</th>
-                      <th style={{ ...thStyle, cursor: "default" }}>Cargado por</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {detailItems.map((item) => (
-                      <tr key={`${item.tipo}-${item.id}`}>
-                        <td style={tdStyle}>{tipoLabel(item.tipo)}</td>
-                        <td style={tdStyle}>{item.servicio_nombre || "—"}</td>
-                        <td style={tdStyle}>{item.concepto}</td>
-                        <td style={tdStyle}>{item.horas != null ? item.horas : "—"}</td>
-                        <td style={{ ...tdStyle, fontVariantNumeric: "tabular-nums" }}>
-                          {formatMoney(item.valor)}
-                        </td>
-                        <td style={tdStyle}>{formatDateOnly(item.fecha_realizacion)}</td>
-                        <td style={tdStyle}>{item.periodo_nombre || `#${item.periodo_id}`}</td>
-                        <td style={{ ...tdStyle, whiteSpace: "nowrap", fontSize: 12 }}>
-                          {formatDateTime(item.fecha_carga)}
-                        </td>
-                        <td style={tdStyle}>{item.cargado_por || "—"}</td>
-                      </tr>
+              <div style={{ display: "grid", gap: 20 }}>
+                <section>
+                  <h3 style={{ fontSize: "1rem", margin: "0 0 8px" }}>Cargas (módulos / novedades)</h3>
+                  <div style={{ overflowX: "auto", maxHeight: "36vh" }}>
+                    <table style={{ width: "100%", borderCollapse: "collapse", fontSize: "0.85rem", minWidth: 720 }}>
+                      <thead>
+                        <tr>
+                          <th style={{ ...thStyle, cursor: "default" }}>Tipo</th>
+                          <th style={{ ...thStyle, cursor: "default" }}>Servicio</th>
+                          <th style={{ ...thStyle, cursor: "default" }}>Concepto</th>
+                          <th style={{ ...thStyle, cursor: "default" }}>Horas</th>
+                          <th style={{ ...thStyle, cursor: "default" }}>Valor</th>
+                          <th style={{ ...thStyle, cursor: "default" }}>F. realización</th>
+                          <th style={{ ...thStyle, cursor: "default" }}>Período</th>
+                          <th style={{ ...thStyle, cursor: "default" }}>F. carga</th>
+                          <th style={{ ...thStyle, cursor: "default" }}>Cargado por</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {detailItems.map((item) => (
+                          <tr key={`${item.tipo}-${item.id}`}>
+                            <td style={tdStyle}>{tipoLabel(item.tipo)}</td>
+                            <td style={tdStyle}>{item.servicio_nombre || "—"}</td>
+                            <td style={tdStyle}>{item.concepto}</td>
+                            <td style={tdStyle}>{item.horas != null ? item.horas : "—"}</td>
+                            <td style={{ ...tdStyle, fontVariantNumeric: "tabular-nums" }}>
+                              {formatMoney(item.valor)}
+                            </td>
+                            <td style={tdStyle}>{formatDateOnly(item.fecha_realizacion)}</td>
+                            <td style={tdStyle}>{item.periodo_nombre || `#${item.periodo_id}`}</td>
+                            <td style={{ ...tdStyle, whiteSpace: "nowrap", fontSize: 12 }}>
+                              {formatDateTime(item.fecha_carga)}
+                            </td>
+                            <td style={tdStyle}>{item.cargado_por || "—"}</td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                    {!detailItems.length ? (
+                      <p style={uiStyles.helpText}>Sin cargas para este profesional en el período.</p>
+                    ) : null}
+                  </div>
+                </section>
+
+                <section>
+                  <h3 style={{ fontSize: "1rem", margin: "0 0 8px" }}>Producción (bonos importados)</h3>
+                  <div style={{ overflowX: "auto", maxHeight: "28vh" }}>
+                    <table style={{ width: "100%", borderCollapse: "collapse", fontSize: "0.85rem" }}>
+                      <thead>
+                        <tr>
+                          <th style={{ ...thStyle, cursor: "default" }}>Opción</th>
+                          <th style={{ ...thStyle, cursor: "default" }}>Cantidad</th>
+                          <th style={{ ...thStyle, cursor: "default" }}>Subtotal</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {detailProduccionRows.map((r) => (
+                          <tr key={r.key}>
+                            <td style={tdStyle}>{r.label}</td>
+                            <td style={{ ...tdStyle, fontVariantNumeric: "tabular-nums" }}>{r.cantidad}</td>
+                            <td style={{ ...tdStyle, fontVariantNumeric: "tabular-nums" }}>
+                              {formatMoney(r.subtotal)}
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                    {!detailProduccionRows.length ? (
+                      <p style={uiStyles.helpText}>Sin bonos de producción para este profesional.</p>
+                    ) : null}
+                  </div>
+                </section>
+
+                <section>
+                  <h3 style={{ fontSize: "1rem", margin: "0 0 8px" }}>Historial de ajustes</h3>
+                  <ul style={{ ...uiStyles.listCard, maxHeight: 200, overflowY: "auto", margin: 0 }}>
+                    {detailAjustes.map((a) => (
+                      <li
+                        key={a.id}
+                        style={{
+                          padding: "8px 10px",
+                          borderBottom: `1px solid ${uiTheme.colors.border}`,
+                          fontSize: 13,
+                        }}
+                      >
+                        <strong>{formatMoney(a.importe)}</strong> · {a.comentario}
+                        <div style={{ color: uiTheme.colors.textMuted, marginTop: 2 }}>
+                          {a.created_by_name || "—"} ·{" "}
+                          {a.created_at ? new Date(a.created_at).toLocaleString("es-AR") : ""}
+                        </div>
+                      </li>
                     ))}
-                  </tbody>
-                </table>
-                {!detailItems.length ? (
-                  <p style={uiStyles.helpText}>Sin cargas para este profesional en el filtro actual.</p>
-                ) : null}
+                    {!detailAjustes.length ? (
+                      <li style={{ padding: 10, color: uiTheme.colors.textMuted }}>Sin ajustes en este período.</li>
+                    ) : null}
+                  </ul>
+                  <p style={{ ...uiStyles.helpText, marginTop: 8, marginBottom: 0 }}>
+                    Para cargar un ajuste nuevo usá <strong>Agregar importe</strong> en la grilla.
+                  </p>
+                </section>
               </div>
             )}
           </div>
@@ -684,7 +747,7 @@ export function NovedadesXlsPage() {
             style={{
               background: "#fff",
               borderRadius: uiTheme.radius.md,
-              maxWidth: 520,
+              maxWidth: 480,
               width: "100%",
               padding: 22,
               boxShadow: uiTheme.shadow.md,
@@ -693,13 +756,13 @@ export function NovedadesXlsPage() {
             }}
           >
             <h2 style={{ marginTop: 0, marginBottom: 8, fontSize: "1.1rem" }}>
-              Ajustes · {modalRow.professional_name}
+              Agregar importe · {modalRow.professional_name}
             </h2>
             <p style={{ ...uiStyles.helpText, marginTop: 0 }}>
-              Legajo: {modalRow.legajo || "—"} · Período #{periodoId}
+              Legajo: {modalRow.legajo || "—"} · Período #{periodoId}. El historial se ve en Detalle.
             </p>
 
-            <form onSubmit={submitAjuste} style={{ display: "grid", gap: 10, marginBottom: 16 }}>
+            <form onSubmit={submitAjuste} style={{ display: "grid", gap: 10 }}>
               <label style={{ display: "grid", gap: 4 }}>
                 <span style={{ fontSize: 13, color: uiTheme.colors.textMuted }}>
                   Importe (positivo suma, negativo resta)
@@ -724,35 +787,13 @@ export function NovedadesXlsPage() {
               </label>
               <div style={{ display: "flex", gap: 8, justifyContent: "flex-end" }}>
                 <button type="button" style={uiStyles.buttonSecondary} onClick={closeModal} disabled={saving}>
-                  Cerrar
+                  Cancelar
                 </button>
                 <button type="submit" style={uiStyles.buttonPrimary} disabled={saving}>
                   {saving ? "Guardando…" : "Guardar ajuste"}
                 </button>
               </div>
             </form>
-
-            <h3 style={{ fontSize: "1rem", marginBottom: 8 }}>Historial</h3>
-            <ul style={{ ...uiStyles.listCard, maxHeight: 240, overflowY: "auto" }}>
-              {ajustes.map((a) => (
-                <li
-                  key={a.id}
-                  style={{
-                    padding: "8px 10px",
-                    borderBottom: `1px solid ${uiTheme.colors.border}`,
-                    fontSize: 13,
-                  }}
-                >
-                  <strong>{formatMoney(a.importe)}</strong> · {a.comentario}
-                  <div style={{ color: uiTheme.colors.textMuted, marginTop: 2 }}>
-                    {a.created_by_name || "—"} · {a.created_at ? new Date(a.created_at).toLocaleString("es-AR") : ""}
-                  </div>
-                </li>
-              ))}
-              {!ajustes.length ? (
-                <li style={{ padding: 10, color: uiTheme.colors.textMuted }}>Sin ajustes en este alcance.</li>
-              ) : null}
-            </ul>
           </div>
         </div>
       ) : null}

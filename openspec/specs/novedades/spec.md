@@ -45,6 +45,8 @@ The system MUST support roles `admin`, `operador`, `jefe_medico`, `rrhh`. Users 
 
 The system MUST provide ABM of **servicios** (id, nombre, activo, **valor_hora**, optional integer **concepto_liquidacion**) and **módulos** (id, descripción, comentario, valor ARS, **produccion** boolean, **sadofe** boolean) with **N:N** association to services. Admin and `rrhh` MUST manage them; `jefe_medico` MUST NOT.
 
+Parametrización tabs MUST include **Producción** (tarifas de valor unitario por opción de bono importado) between **Módulos** and **Jefes ↔ servicios**, managed by `admin`/`rrhh` only. This tab MUST NOT be confused with the module boolean `produccion` (external production-check skip).
+
 Servicios: `concepto_liquidacion` MUST be optional (empty or `0` → `NULL`); non-zero MUST be integer ≥ 1; negatives MUST be rejected (422); duplicates allowed. ABM MUST use modals like Módulos: grid, **Nuevo servicio** (always `activo=true`), edit modal (nombre, valor hora, concepto, **Activo** checkbox), confirm-delete modal; Escape cancels. No inline `valor_hora` edit. Grid shows `#id · nombre · activo · Concepto liquidación` (`NULL` → "—").
 
 Modules: **sadofe** boolean (default false; off = Semana; `produccion` remains independent).
@@ -92,6 +94,12 @@ Modules MUST support:
 - GIVEN servicio con `valor_hora = 1000`
 - WHEN se carga una novedad de 3 horas en ese servicio
 - THEN el valor calculado MUST ser 3000
+
+#### Scenario: Orden de tabs Param
+
+- GIVEN admin en Parametrización
+- WHEN visualiza tabs
+- THEN MUST ver **Producción** inmediatamente después de Módulos y antes de Jefes ↔ servicios
 
 ### Requirement: Asociación jefe↔servicio
 
@@ -511,17 +519,24 @@ Parametrización MUST offer **Limpiar cargas** to `admin`/`rrhh` only. After man
 
 ### Requirement: Pantalla Capital Humano
 
-The former **Generación archivo XLS** nav entry MUST be labeled **Capital Humano** and remain restricted to `admin`/`rrhh`. The page MUST show **one row per professional** with columns: legajo, name, monto cargas, monto ajustes, monto total. Rows MUST appear only when the professional has cargas and/or adjustments in the active filter scope (period ± optional service). Filter/sort MUST follow the same UX patterns as the Carga grid (period, service, text search including legajo/name).
+The former **Generación archivo XLS** nav entry MUST be labeled **Capital Humano** and remain restricted to `admin`/`rrhh`. The page MUST show **one row per professional** with columns: legajo, name, monto cargas, monto ajustes, monto total, plus dynamic bonos columns when a period snapshot exists. Rows MUST appear when the professional has cargas and/or adjustments in the selected period, **or** when promoted by the special-service bonos rule (`DEA|DEP|CAP|CAI`). The Capital Humano UI MUST NOT show a service selector (operates as all services from the UI); backend MAY still accept optional `servicio_id`. Filters: period (required for bonos flows) and text search (legajo/name).
 
-Total cargas MUST be the sum of module + novedad valores in the filtered period (and only that service when filtered). Total = cargas ± persisted adjustments. Adjustments MUST be allowed when the period is **closed**.
+Total cargas MUST be the sum of module + novedad valores in the filtered period. **`monto_total` MUST be** `monto_cargas + monto_ajustes + monto_bonos` (valorized bonos; missing tariff counts as 0). Adjustments MUST be allowed when the period is **closed**.
 
-Each row MUST offer **Detalle**, which opens a modal with the grid of that professional’s carga items (módulos/novedades) in the current filter scope.
+Each row MUST offer **Detalle**, which opens a modal with the grid of that professional’s carga items (módulos/novedades) in the current filter scope. The page MUST also support Importar bonos, Solo bonos modal, and XLS downloads per related requirements.
 
 #### Scenario: Agregación por profesional
 
-- GIVEN profesional P con dos cargas (100 y 50) y un ajuste −10 en período abierto o cerrado
+- GIVEN profesional P con dos cargas (100 y 50), un ajuste −10 y monto_bonos 0 en el período
 - WHEN admin abre Capital Humano filtrado por ese período
 - THEN MUST ver una fila con monto_cargas 150, monto_ajustes −10, monto_total 140
+
+#### Scenario: UI sin filtro por servicio
+
+- GIVEN usuario admin/rrhh en Capital Humano
+- WHEN visualiza filtros
+- THEN MUST ver selector de período y búsqueda de texto
+- AND MUST NOT ver selector de servicio
 
 #### Scenario: Solo admin/rrhh
 
@@ -554,10 +569,166 @@ The system MUST persist create-only signed adjustments (`novedades_ajuste_capita
 
 ### Requirement: Exportaciones XLS duales
 
-Capital Humano MUST offer **two** downloads: aggregated Capital Humano XLS (`GET /novedades/export-capital.xlsx`) and the detail XLS (`GET /novedades/export.xlsx`). Both MUST honor the same filters as the grid and require `admin`/`rrhh`.
+Capital Humano MUST offer the aggregated Capital Humano XLS (`GET /novedades/export-capital.xlsx`) and the detail XLS (`GET /novedades/export.xlsx`). Both MUST honor the same filters as the grid and require `admin`/`rrhh`. The aggregated XLS MUST reflect **`monto_total` including valorized bonos** for each professional row, consistent with the on-screen grid.
 
 #### Scenario: Export agregada
 
 - GIVEN filas visibles en Capital Humano
 - WHEN descarga export-capital
 - THEN el XLS MUST contener una fila por profesional con legajo, nombre y montos
+
+#### Scenario: XLS agregado con bonos en total
+
+- GIVEN profesional con cargas 100, ajustes 0, monto_bonos 25
+- WHEN descarga export-capital
+- THEN `monto_total` en el XLS MUST ser 125
+
+### Requirement: Importar bonos resumen en Capital Humano
+
+Capital Humano MUST offer **Importar bonos** to `admin`/`rrhh` only. The user MUST select a **single period** before import. The backend MUST call the configured external resumen API with `fecha_desde` = period `fecha_inicio` and `fecha_hasta` = period `fecha_fin`, using the same Bearer token as Novedades professional sync (`NOVEDADES_BONOS_RESUMEN_URL` + `NOVEDADES_PROF_SYNC_TOKEN`). Results MUST be persisted per period. Match MUST be by API `profesional` → catalog `CODPROF` (string/trim). Each dynamic column MUST be the full option `centro|servicio|semana|horario`. Duplicate rows for the same professional+option MUST sum `cantidad`. Unknown CODPROF MUST be ignored and counted in the summary. On success the UI MUST show a summary modal (received / matched / solo-bonos / columns / ignored) and refresh the grid.
+
+While the period is **open**, re-import MUST **replace** the period’s bonos quantity snapshot. While the period is **closed**, import MUST be rejected (frozen). If the period lacks valid start/end dates, the API MUST return 422 without calling the external service. If the external call fails, the system MUST NOT modify the existing snapshot and MUST surface an error modal.
+
+After a successful import, orphan option cleanup MAY run as defined in Requirement “Limpieza de opciones de bono huérfanas”.
+
+#### Scenario: Import con período abierto
+
+- GIVEN período open con fechas válidas
+- AND admin selecciona ese período
+- WHEN pulsa Importar bonos
+- THEN el backend MUST llamar el API con esas fechas
+- AND MUST persistir cantidades matcheadas por CODPROF
+- AND la grilla MUST mostrar columnas dinámicas a la derecha
+
+#### Scenario: Re-import reemplaza
+
+- GIVEN período open con snapshot previo
+- WHEN se importa de nuevo con éxito
+- THEN el snapshot de cantidades del período MUST ser reemplazado
+
+#### Scenario: Período cerrado congela
+
+- GIVEN período closed con snapshot
+- WHEN se intenta Importar bonos
+- THEN MUST rechazarse
+- AND el snapshot MUST permanecer intacto
+
+#### Scenario: Sin período
+
+- GIVEN Capital Humano sin período seleccionado
+- WHEN se intenta importar
+- THEN MUST NO ejecutarse (UI y/o 422)
+
+#### Scenario: API externo falla
+
+- GIVEN período open y snapshot existente
+- WHEN el GET externo falla
+- THEN MUST mostrarse error
+- AND el snapshot MUST no modificarse
+
+### Requirement: Columnas de bonos en grilla Capital Humano
+
+The main Capital Humano grid MUST remain one row per professional. In addition to professionals with cargas/ajustes, it MUST include professionals with bonos-only when, for the selected period, they have at least one bonos option whose `servicio` value is exactly one of: `DEA`, `DEP`, `CAP`, `CAI`.
+
+For each bonos option in the period snapshot, the grid MUST append a **cantidad** column and an adjacent **subtotal** column (cantidad × Producción `valor_unitario`, or 0 if no tariff). **`monto_total` MUST include valorized bonos**.
+
+#### Scenario: Solo bonos CAP entra a grilla
+
+- GIVEN profesional P con bonos en período y opción con `servicio = CAP`
+- AND P no tiene cargas ni ajustes
+- WHEN se lista Capital Humano
+- THEN P MUST aparecer en la grilla principal
+
+#### Scenario: Solo bonos servicio no especial no entra
+
+- GIVEN profesional Q con bonos en período y opciones sin `DEA|DEP|CAP|CAI`
+- AND Q no tiene cargas ni ajustes
+- WHEN se lista Capital Humano
+- THEN Q MUST NOT aparecer en la grilla principal
+
+#### Scenario: Total incluye bonos
+
+- GIVEN profesional con monto_cargas 100, monto_ajustes 0, monto_bonos 50
+- WHEN se muestra la grilla
+- THEN `monto_total` MUST ser 150
+
+### Requirement: Modal solo bonos
+
+The Solo bonos modal MUST list only professionals with bonos persisted for the period that are not present in the main grid after applying the special-service promotion rule.
+
+#### Scenario: Promovido excluido de Solo bonos
+
+- GIVEN profesional P con bonos-only y opción `servicio = DEA`
+- WHEN se abre modal Solo bonos
+- THEN P MUST NOT aparecer en el modal
+
+### Requirement: XLS con bonos
+
+Capital Humano MUST offer download **XLS con bonos** including, for each dynamic option, both **quantity** and **subtotal** columns, plus aggregated monetary columns consistent with the grid.
+
+#### Scenario: XLS con subtotales
+
+- GIVEN snapshot con opciones tarifadas y no tarifadas
+- WHEN admin descarga XLS con bonos
+- THEN MUST incluir columnas cantidad y subtotal por opción
+- AND subtotal sin tarifa MUST exportarse como 0
+
+### Requirement: Tarifas Producción (valor bonos)
+
+The system MUST provide an ABM of **Producción** tariffs in Parametrización for `admin` and `rrhh` only. Each tariff MUST reference exactly one `novedades_bono_opcion` (unique among non-deleted rows) and store integer `valor_unitario` ≥ 0.
+
+ABM MUST follow the Servicios pattern (grid, modals, Escape cancels). Create MUST support searchable multi-select of options without an active tariff and shared `valor_unitario` via bulk create. Options with an active tariff MUST NOT be selectable on create.
+
+#### Scenario: Alta tarifa admin
+
+- GIVEN `rrhh` en tab Producción
+- AND existe opción sin tarifa
+- WHEN selecciona esa opción, ingresa `valor_unitario = 1500` y confirma
+- THEN MUST persistirse una tarifa única para esa opción
+
+#### Scenario: Duplicado rechazado
+
+- GIVEN tarifa activa para opción O1
+- WHEN admin intenta crear otra tarifa para O1
+- THEN MUST rechazarse (422)
+
+#### Scenario: Jefe sin ABM Producción
+
+- GIVEN `jefe_medico` autenticado
+- WHEN intenta `POST /novedades/produccion-tarifas`
+- THEN MUST recibir 403
+
+### Requirement: Valorización de bonos en Capital Humano
+
+For the selected period’s bonos snapshot, Capital Humano MUST show **cantidad** and **subtotal** per option. Missing tariff → cantidad visible, subtotal **0**, banner `opciones_sin_tarifa`. Tariff lookup MUST use current Param catalog at read/export time (no re-import required after tariff changes). Per row, `monto_bonos` MUST be the sum of subtotals.
+
+#### Scenario: Subtotal con tarifa
+
+- GIVEN opción O con cantidad 3 para profesional P
+- AND tarifa `valor_unitario = 1000` para O
+- WHEN admin lista Capital Humano del período
+- THEN MUST ver cantidad 3 y subtotal 3000 para O en la fila de P
+
+#### Scenario: Sin tarifa
+
+- GIVEN opción O2 importada sin tarifa en Producción
+- WHEN se lista Capital Humano
+- THEN cantidad de O2 MUST mostrarse
+- AND subtotal MUST ser 0
+- AND MUST mostrarse banner de opciones sin tarifa
+
+### Requirement: Limpieza de opciones de bono huérfanas
+
+On successful Importar bonos, the system MUST soft-delete `novedades_bono_opcion` rows that meet all of: (1) not in the current import; (2) no active Producción tariff; (3) no `novedades_bono_cantidad` in any period.
+
+#### Scenario: Limpia huérfana sin tarifa
+
+- GIVEN opción ausente del import, sin tarifa y sin cantidades en ningún período
+- WHEN termina Importar bonos
+- THEN esa opción MUST soft-deletarse
+
+#### Scenario: Conserva con tarifa
+
+- GIVEN opción ausente del import pero con tarifa Producción activa
+- WHEN termina Importar bonos
+- THEN la opción MUST permanecer

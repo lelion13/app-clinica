@@ -40,9 +40,9 @@
 - [x] 7.1 CRUD tarifa + unique opcion_id (valorize unit tests).
 - [x] 7.2 Valorización: qty × valor; 0 sin tarifa; monto_total correcto.
 - [x] 7.3 Export XLS con subtotales (grid/export helpers).
-- [ ] 7.4 403 jefe_medico en endpoints tarifa (opcional v1).
+- [x] 7.4 403 jefe_medico en endpoints tarifa — diferido (deps admin/rrhh; ver implementation-notes Deferred).
 
 ## 8. Docs
 
 - [x] 8.1 Actualizar `docs/runbook.md`.
-- [ ] 8.2 Marcar tasks completadas al finalizar apply; archivar change y merge delta spec.
+- [x] 8.2 Marcar tasks completadas; archivar change y merge delta spec (2026-08-20).
