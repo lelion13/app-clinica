@@ -83,6 +83,19 @@ class Settings(BaseSettings):
         default=120.0,
         validation_alias="DISTRIBUCION_HORARIOS_ACTIVOS_TIMEOUT",
     )
+    # Public web origin for password-reset links (no trailing slash).
+    app_public_url: str = Field(default="http://localhost:5173", validation_alias="APP_PUBLIC_URL")
+    smtp_host: str = Field(default="", validation_alias="SMTP_HOST")
+    smtp_port: int = Field(default=587, validation_alias="SMTP_PORT")
+    smtp_user: str = Field(default="", validation_alias="SMTP_USER")
+    smtp_pass: str = Field(default="", validation_alias="SMTP_PASS")
+    smtp_from: str = Field(default="", validation_alias="SMTP_FROM")
+    # false = STARTTLS (typical 587); true = implicit TLS/SSL (typical 465).
+    smtp_secure: bool = Field(default=False, validation_alias="SMTP_SECURE")
+    password_reset_ttl_minutes: int = Field(default=60, validation_alias="PASSWORD_RESET_TTL_MINUTES")
+    password_reset_cooldown_seconds: int = Field(
+        default=60, validation_alias="PASSWORD_RESET_COOLDOWN_SECONDS"
+    )
 
     @property
     def cors_origins_list(self) -> list[str]:

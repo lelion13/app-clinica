@@ -7,6 +7,7 @@ from sqlalchemy.orm import Session
 from app.core.security import hash_password
 from app.models.user import User, UserRole
 from app.schemas.user import UserCreateRequest, UserUpdateRequest
+from app.services.email_service import send_welcome_email
 
 
 def _parse_role(role: str) -> UserRole:
@@ -20,7 +21,7 @@ def list_users(db: Session) -> list[User]:
     return list(db.execute(select(User).where(User.deleted_at.is_(None)).order_by(User.id)).scalars().all())
 
 
-def create_user(db: Session, payload: UserCreateRequest, actor_id: int) -> User:
+def create_user(db: Session, payload: UserCreateRequest, actor_id: int) -> tuple[User, bool, str | None]:
     existing = db.execute(
         select(User).where(User.email == payload.email.lower().strip(), User.deleted_at.is_(None))
     ).scalar_one_or_none()
@@ -43,7 +44,15 @@ def create_user(db: Session, payload: UserCreateRequest, actor_id: int) -> User:
     db.add(user)
     db.commit()
     db.refresh(user)
-    return user
+
+    welcome_sent = False
+    warning: str | None = None
+    try:
+        send_welcome_email(to_email=user.email, name=user.name)
+        welcome_sent = True
+    except Exception:
+        warning = "Usuario creado, pero no se pudo enviar el correo de bienvenida"
+    return user, welcome_sent, warning
 
 
 def update_user(db: Session, user_id: int, payload: UserUpdateRequest, actor_id: int) -> User:
@@ -53,10 +62,24 @@ def update_user(db: Session, user_id: int, payload: UserUpdateRequest, actor_id:
 
     if payload.name is not None:
         user.name = payload.name.strip()
+    if payload.email is not None:
+        new_email = payload.email.lower().strip()
+        conflict = db.execute(
+            select(User).where(
+                User.email == new_email,
+                User.deleted_at.is_(None),
+                User.id != user_id,
+            )
+        ).scalar_one_or_none()
+        if conflict:
+            raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="El email ya existe")
+        user.email = new_email
     if payload.role is not None:
         user.role = _parse_role(payload.role)
     if payload.is_active is not None:
         user.is_active = payload.is_active
+    if payload.password is not None and payload.password.strip():
+        user.password_hash = hash_password(payload.password)
     user.updated_at = datetime.utcnow()
     user.updated_by = actor_id
 

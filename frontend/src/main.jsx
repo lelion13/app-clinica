@@ -11,6 +11,7 @@ import { EstadisticasPage } from "./pages/EstadisticasPage";
 import { IndicadoresOcupacionPage } from "./pages/IndicadoresOcupacionPage";
 import { LocationsPage } from "./pages/LocationsPage";
 import { LoginPage } from "./pages/LoginPage";
+import { ResetPasswordPage } from "./pages/ResetPasswordPage";
 import { ProfessionalsPage } from "./pages/ProfessionalsPage";
 import { RoomHoursPage } from "./pages/RoomHoursPage";
 import { SetupPage } from "./pages/SetupPage";
@@ -28,6 +29,7 @@ function AppRouter() {
   return (
     <Routes>
       <Route path="/login" element={<LoginPage />} />
+      <Route path="/reset-password" element={<ResetPasswordPage />} />
       <Route path="/setup" element={<SetupPage />} />
       <Route
         path="/"

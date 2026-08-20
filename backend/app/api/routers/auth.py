@@ -1,4 +1,4 @@
-from fastapi import APIRouter, Cookie, Depends, HTTPException, Response, status
+from fastapi import APIRouter, Cookie, Depends, HTTPException, Request, Response, status
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
@@ -6,8 +6,9 @@ from app.api.deps import current_user
 from app.core.config import settings
 from app.db.session import get_db
 from app.models.user import User
-from app.schemas.auth import LoginRequest, MeResponse
+from app.schemas.auth import ForgotPasswordRequest, LoginRequest, MeResponse, ResetPasswordRequest
 from app.services.auth_service import authenticate_user, decode_token, issue_tokens
+from app.services.password_reset_service import request_password_reset, reset_password_with_token
 
 router = APIRouter()
 
@@ -31,11 +32,34 @@ def _set_auth_cookies(response: Response, access_token: str, refresh_token: str)
     )
 
 
+def _client_key(request: Request) -> str:
+    forwarded = request.headers.get("x-forwarded-for")
+    if forwarded:
+        return forwarded.split(",")[0].strip() or "unknown"
+    if request.client and request.client.host:
+        return request.client.host
+    return "unknown"
+
+
 @router.post("/login", status_code=status.HTTP_204_NO_CONTENT)
 def login(payload: LoginRequest, response: Response, db: Session = Depends(get_db)) -> None:
     user = authenticate_user(db, payload.email, payload.password)
     access_token, refresh_token = issue_tokens(user)
     _set_auth_cookies(response, access_token, refresh_token)
+
+
+@router.post("/forgot-password", status_code=status.HTTP_204_NO_CONTENT)
+def forgot_password(
+    payload: ForgotPasswordRequest,
+    request: Request,
+    db: Session = Depends(get_db),
+) -> None:
+    request_password_reset(db, email=payload.email, client_key=_client_key(request))
+
+
+@router.post("/reset-password", status_code=status.HTTP_204_NO_CONTENT)
+def reset_password(payload: ResetPasswordRequest, db: Session = Depends(get_db)) -> None:
+    reset_password_with_token(db, raw_token=payload.token, new_password=payload.password)
 
 
 @router.post("/refresh", status_code=status.HTTP_204_NO_CONTENT)
