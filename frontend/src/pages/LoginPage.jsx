@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { Link, useNavigate } from "react-router-dom";
+import { useNavigate } from "react-router-dom";
 
 import { useAuth } from "../auth/AuthContext";
 import { apiRequest } from "../services/api";
@@ -108,9 +108,6 @@ export function LoginPage() {
         >
           Olvidé mi contraseña
         </button>
-        <Link to="/setup" style={{ color: uiTheme.colors.primaryStrong }}>
-          Crear admin inicial (solo primer uso)
-        </Link>
         {error ? <p style={{ color: uiTheme.colors.danger }}>{error}</p> : null}
       </section>
 

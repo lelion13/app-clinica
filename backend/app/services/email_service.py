@@ -20,11 +20,13 @@ def send_email(*, to_email: str, subject: str, body_text: str) -> None:
     if not smtp_configured():
         raise EmailNotConfiguredError("SMTP no configurado")
 
+    signed_body = body_text.rstrip() + "\n\nDepartamento de Tecnologia y Modernizacion.\n"
+
     msg = EmailMessage()
     msg["Subject"] = subject
     msg["From"] = settings.smtp_from
     msg["To"] = to_email
-    msg.set_content(body_text)
+    msg.set_content(signed_body)
 
     context = ssl.create_default_context()
     if settings.smtp_secure:

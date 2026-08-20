@@ -96,3 +96,19 @@ def delete_user(db: Session, user_id: int, actor_id: int) -> None:
     user.updated_at = datetime.utcnow()
     user.updated_by = actor_id
     db.commit()
+
+
+def resend_welcome_email(db: Session, user_id: int) -> tuple[bool, str | None]:
+    user = db.execute(select(User).where(User.id == user_id, User.deleted_at.is_(None))).scalar_one_or_none()
+    if not user:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Usuario no encontrado")
+    if not user.is_active:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="No se puede enviar el correo a un usuario inactivo",
+        )
+    try:
+        send_welcome_email(to_email=user.email, name=user.name)
+        return True, None
+    except Exception:
+        return False, "No se pudo enviar el correo de bienvenida"

@@ -4,8 +4,14 @@ from sqlalchemy.orm import Session
 from app.api.deps import require_admin
 from app.db.session import get_db
 from app.models.user import User
-from app.schemas.user import UserCreateRequest, UserCreateResponse, UserResponse, UserUpdateRequest
-from app.services.user_service import create_user, delete_user, list_users, update_user
+from app.schemas.user import (
+    UserCreateRequest,
+    UserCreateResponse,
+    UserResponse,
+    UserUpdateRequest,
+    WelcomeEmailResponse,
+)
+from app.services.user_service import create_user, delete_user, list_users, resend_welcome_email, update_user
 
 router = APIRouter()
 
@@ -56,6 +62,17 @@ def users_update(
 ) -> UserResponse:
     user = update_user(db, user_id, payload, actor_id=admin.id)
     return _to_response(user)
+
+
+@router.post("/{user_id}/resend-welcome", response_model=WelcomeEmailResponse)
+def users_resend_welcome(
+    user_id: int,
+    db: Session = Depends(get_db),
+    admin: User = Depends(require_admin),
+) -> WelcomeEmailResponse:
+    _ = admin
+    sent, warning = resend_welcome_email(db, user_id)
+    return WelcomeEmailResponse(welcome_email_sent=sent, welcome_email_warning=warning)
 
 
 @router.delete("/{user_id}", status_code=status.HTTP_204_NO_CONTENT)

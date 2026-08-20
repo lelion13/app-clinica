@@ -32,3 +32,8 @@ class UserResponse(BaseModel):
 class UserCreateResponse(UserResponse):
     welcome_email_sent: bool = True
     welcome_email_warning: str | None = None
+
+
+class WelcomeEmailResponse(BaseModel):
+    welcome_email_sent: bool
+    welcome_email_warning: str | None = None
