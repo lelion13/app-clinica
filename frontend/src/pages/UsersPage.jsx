@@ -82,9 +82,13 @@ export function UsersPage() {
   const [createOpen, setCreateOpen] = useState(false);
   const [createForm, setCreateForm] = useState(emptyCreate);
   const [createSaving, setCreateSaving] = useState(false);
+  const [createModalError, setCreateModalError] = useState("");
   const [editUser, setEditUser] = useState(null);
   const [editForm, setEditForm] = useState(emptyEdit);
   const [editSaving, setEditSaving] = useState(false);
+  const [editModalError, setEditModalError] = useState("");
+  const [editModalNotice, setEditModalNotice] = useState("");
+  const [resendSaving, setResendSaving] = useState(false);
 
   const load = async () => {
     setError("");
@@ -99,17 +103,23 @@ export function UsersPage() {
     setCreateOpen(false);
     setCreateForm(emptyCreate());
     setCreateSaving(false);
+    setCreateModalError("");
   };
 
   const closeEdit = () => {
     setEditUser(null);
     setEditForm(emptyEdit());
     setEditSaving(false);
+    setEditModalError("");
+    setEditModalNotice("");
+    setResendSaving(false);
   };
 
   const openEdit = (user) => {
     setNotice("");
     setError("");
+    setEditModalError("");
+    setEditModalNotice("");
     setEditUser(user);
     setEditForm({
       name: user.name || "",
@@ -123,7 +133,7 @@ export function UsersPage() {
   const submitCreate = async (event) => {
     event.preventDefault();
     setCreateSaving(true);
-    setError("");
+    setCreateModalError("");
     setNotice("");
     try {
       const created = await apiRequestWithRefresh("/users", {
@@ -146,7 +156,7 @@ export function UsersPage() {
       }
       await load();
     } catch (err) {
-      setError(err.message || "No se pudo crear el usuario");
+      setCreateModalError(err.message || "No se pudo crear el usuario");
     } finally {
       setCreateSaving(false);
     }
@@ -156,7 +166,8 @@ export function UsersPage() {
     event.preventDefault();
     if (!editUser) return;
     setEditSaving(true);
-    setError("");
+    setEditModalError("");
+    setEditModalNotice("");
     setNotice("");
     try {
       const body = {
@@ -176,9 +187,30 @@ export function UsersPage() {
       setNotice("Usuario actualizado");
       await load();
     } catch (err) {
-      setError(err.message || "No se pudo actualizar el usuario");
+      setEditModalError(err.message || "No se pudo actualizar el usuario");
     } finally {
       setEditSaving(false);
+    }
+  };
+
+  const resendWelcome = async () => {
+    if (!editUser) return;
+    setResendSaving(true);
+    setEditModalError("");
+    setEditModalNotice("");
+    try {
+      const result = await apiRequestWithRefresh(`/users/${editUser.id}/resend-welcome`, {
+        method: "POST",
+      });
+      if (result?.welcome_email_sent) {
+        setEditModalNotice("Correo de bienvenida reenviado");
+      } else {
+        setEditModalError(result?.welcome_email_warning || "No se pudo enviar el correo de bienvenida");
+      }
+    } catch (err) {
+      setEditModalError(err.message || "No se pudo enviar el correo de bienvenida");
+    } finally {
+      setResendSaving(false);
     }
   };
 
@@ -192,6 +224,7 @@ export function UsersPage() {
           onClick={() => {
             setError("");
             setNotice("");
+            setCreateModalError("");
             setCreateForm(emptyCreate());
             setCreateOpen(true);
           }}
@@ -243,6 +276,11 @@ export function UsersPage() {
       {createOpen ? (
         <ModalShell titleId="user-create-title" title="Nuevo usuario" onClose={closeCreate}>
           <form onSubmit={submitCreate} style={{ display: "grid", gap: 10 }}>
+            {createModalError ? (
+              <p role="alert" style={{ color: uiTheme.colors.danger, margin: 0, fontSize: 14 }}>
+                {createModalError}
+              </p>
+            ) : null}
             <label style={{ display: "grid", gap: 4 }}>
               <span style={{ fontSize: 13, color: uiTheme.colors.textMuted }}>Nombre y apellido</span>
               <input
@@ -302,6 +340,14 @@ export function UsersPage() {
       {editUser ? (
         <ModalShell titleId="user-edit-title" title="Modificar usuario" onClose={closeEdit}>
           <form onSubmit={submitEdit} style={{ display: "grid", gap: 10 }}>
+            {editModalError ? (
+              <p role="alert" style={{ color: uiTheme.colors.danger, margin: 0, fontSize: 14 }}>
+                {editModalError}
+              </p>
+            ) : null}
+            {editModalNotice ? (
+              <p style={{ color: uiTheme.colors.primaryStrong, margin: 0, fontSize: 14 }}>{editModalNotice}</p>
+            ) : null}
             <label style={{ display: "grid", gap: 4 }}>
               <span style={{ fontSize: 13, color: uiTheme.colors.textMuted }}>Nombre y apellido</span>
               <input
@@ -356,11 +402,20 @@ export function UsersPage() {
                 placeholder="Dejar vacío para no cambiar"
               />
             </label>
+            <button
+              type="button"
+              style={{ ...uiStyles.buttonSecondary, justifySelf: "start" }}
+              onClick={resendWelcome}
+              disabled={resendSaving || editSaving || !editForm.is_active}
+              title={!editForm.is_active ? "Activá el usuario para reenviar el correo" : undefined}
+            >
+              {resendSaving ? "Enviando..." : "Reenviar mail de bienvenida"}
+            </button>
             <div style={{ display: "flex", gap: 8, justifyContent: "flex-end", marginTop: 6 }}>
-              <button type="button" style={uiStyles.buttonSecondary} onClick={closeEdit} disabled={editSaving}>
+              <button type="button" style={uiStyles.buttonSecondary} onClick={closeEdit} disabled={editSaving || resendSaving}>
                 Cancelar
               </button>
-              <button type="submit" style={uiStyles.buttonPrimary} disabled={editSaving}>
+              <button type="submit" style={uiStyles.buttonPrimary} disabled={editSaving || resendSaving}>
                 {editSaving ? "Guardando..." : "Guardar"}
               </button>
             </div>
