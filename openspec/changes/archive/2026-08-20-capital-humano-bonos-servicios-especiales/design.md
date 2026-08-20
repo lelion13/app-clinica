@@ -55,4 +55,4 @@ No migration required.
 
 ## Open Questions
 
-- [ ] La valorización monetaria de bonos se tratará en un change separado.
+- [x] La valorización monetaria de bonos se trató en `novedades-produccion-valor-bonos` (modifica `monto_total`).

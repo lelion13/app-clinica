@@ -134,5 +134,11 @@ class CapitalHumanoGridResponse:
 
 ## Open Questions
 
-- [ ] ¿Archivar `capital-humano-bonos-servicios-especiales` en paralelo o después de este change?
+- [x] Archivar `capital-humano-bonos-servicios-especiales` el mismo día (2026-08-20), antes en el merge de specs.
 - [ ] v2: listado “opciones sin tarifa” también en tab Producción (fuera de scope v1).
+
+## Post-design API addenda
+
+| Method | Path | Roles | Description |
+|--------|------|-------|-------------|
+| POST | `/novedades/produccion-tarifas/bulk` | admin, rrhh | Alta múltiple: `opcion_ids[]`, `valor_unitario` |

@@ -10,7 +10,7 @@ Each tariff MUST reference exactly one `novedades_bono_opcion` (unique among non
 
 ABM MUST follow the Servicios pattern: grid listing, **Nueva producción** button, create/edit/delete via modals, delete confirmation modal, Escape cancels.
 
-Create MUST offer a selector of bonus options already present in `novedades_bono_opcion` (from prior imports) plus `valor_unitario`. Options that already have an active tariff MUST NOT be selectable on create.
+Create MUST allow selecting **one or more** bonus options that already exist in `novedades_bono_opcion` and share the same `valor_unitario`, via searchable multi-select (filter-as-you-type) and `POST /novedades/produccion-tarifas/bulk`. Single-create `POST /novedades/produccion-tarifas` MAY remain. Options that already have an active tariff MUST NOT be selectable on create.
 
 #### Scenario: Alta tarifa admin
 
@@ -18,6 +18,12 @@ Create MUST offer a selector of bonus options already present in `novedades_bono
 - AND existe opción `CMG|CAP|LUNES_VIERNES|DIA` sin tarifa
 - WHEN selecciona esa opción, ingresa `valor_unitario = 1500` y confirma
 - THEN MUST persistirse una tarifa única para esa opción
+
+#### Scenario: Alta múltiple mismo valor
+
+- GIVEN dos opciones O1 y O2 sin tarifa
+- WHEN admin las selecciona en el combobox, ingresa valor 2000 y confirma bulk
+- THEN MUST persistirse una tarifa por opción con `valor_unitario = 2000`
 
 #### Scenario: Duplicado rechazado
 
@@ -30,6 +36,23 @@ Create MUST offer a selector of bonus options already present in `novedades_bono
 - GIVEN `jefe_medico` autenticado
 - WHEN intenta `POST /novedades/produccion-tarifas`
 - THEN MUST recibir 403
+
+### Requirement: Limpieza de opciones de bono huérfanas
+
+On successful **Importar bonos**, after replacing the period snapshot, the system MUST soft-delete `novedades_bono_opcion` rows that meet **all** of: (1) option key not present in the current import payload; (2) no active Producción tariff; (3) no `novedades_bono_cantidad` in **any** period. Options with tariff or historical quantities MUST be retained.
+
+#### Scenario: Limpia huérfana sin tarifa
+
+- GIVEN opción `…|DOMINGO|…` sin tarifa y sin cantidades en ningún período
+- AND el nuevo import no la incluye
+- WHEN termina Importar bonos
+- THEN esa opción MUST soft-deletarse
+
+#### Scenario: Conserva con tarifa
+
+- GIVEN opción ausente del import pero con tarifa Producción activa
+- WHEN termina Importar bonos
+- THEN la opción MUST permanecer
 
 ### Requirement: Valorización de bonos en Capital Humano
 
