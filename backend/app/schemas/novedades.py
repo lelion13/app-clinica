@@ -293,6 +293,21 @@ class BonoColumnaResponse(BaseModel):
     opcion_key: str | None = None
 
 
+class PracticaDetalleItem(BaseModel):
+    centro: str
+    servicio: str
+    cantidad: int
+    valor_unitario: int
+    subtotal: int
+
+
+class InternacionDetalleItem(BaseModel):
+    sucursal: str
+    cantidad: int
+    valor_unitario: int
+    subtotal: int
+
+
 class CapitalHumanoRowResponse(BaseModel):
     professional_id: int
     legajo: str | None = None
@@ -300,10 +315,14 @@ class CapitalHumanoRowResponse(BaseModel):
     monto_cargas: Decimal
     monto_ajustes: Decimal
     monto_bonos: int = 0
+    monto_practicas: int = 0
+    monto_internaciones: int = 0
     monto_total: Decimal
     es_especialista: bool = False
     bonos: dict[str, int] = Field(default_factory=dict)
     bonos_subtotales: dict[str, int] = Field(default_factory=dict)
+    practicas: list[PracticaDetalleItem] = Field(default_factory=list)
+    internaciones: list[InternacionDetalleItem] = Field(default_factory=list)
 
 
 class CapitalHumanoGridResponse(BaseModel):
@@ -360,6 +379,10 @@ class BonosImportResponse(BaseModel):
     solo_bonos: int
     columns: int
     ignored: int
+    practicas_received: int = 0
+    practicas_matched: int = 0
+    internaciones_received: int = 0
+    internaciones_matched: int = 0
 
 
 class SoloBonoRowResponse(BaseModel):

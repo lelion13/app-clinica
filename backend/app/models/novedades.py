@@ -177,6 +177,48 @@ class NovedadesBonoCantidad(AuditMixin, Base):
     cantidad: Mapped[int] = mapped_column(Integer, nullable=False)
 
 
+class NovedadesPracticaCantidad(AuditMixin, Base):
+    """Cantidad de prácticas traumatológicas por profesional, período, centro y servicio."""
+
+    __tablename__ = "novedades_practica_cantidad"
+    __table_args__ = (
+        UniqueConstraint(
+            "periodo_id",
+            "professional_id",
+            "centro",
+            "servicio",
+            name="uq_novedades_practica_cantidad_scope",
+        ),
+    )
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    periodo_id: Mapped[int] = mapped_column(ForeignKey("novedades_periodo.id"), nullable=False)
+    professional_id: Mapped[int] = mapped_column(ForeignKey("novedades_profesional.id"), nullable=False)
+    centro: Mapped[str] = mapped_column(String(80), nullable=False)
+    servicio: Mapped[str] = mapped_column(String(80), nullable=False)
+    cantidad: Mapped[int] = mapped_column(Integer, nullable=False)
+
+
+class NovedadesInternacionCantidad(AuditMixin, Base):
+    """Cantidad de internaciones por profesional, período y sucursal."""
+
+    __tablename__ = "novedades_internacion_cantidad"
+    __table_args__ = (
+        UniqueConstraint(
+            "periodo_id",
+            "professional_id",
+            "sucursal",
+            name="uq_novedades_internacion_cantidad_scope",
+        ),
+    )
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    periodo_id: Mapped[int] = mapped_column(ForeignKey("novedades_periodo.id"), nullable=False)
+    professional_id: Mapped[int] = mapped_column(ForeignKey("novedades_profesional.id"), nullable=False)
+    sucursal: Mapped[str] = mapped_column(String(80), nullable=False)
+    cantidad: Mapped[int] = mapped_column(Integer, nullable=False)
+
+
 class NovedadesProfesionalServicio(AuditMixin, Base):
     __tablename__ = "novedades_profesional_servicio"
 

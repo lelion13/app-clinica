@@ -12,7 +12,49 @@ from app.schemas.novedades import (
     ProduccionTarifaResponse,
     ProduccionTarifaUpdateRequest,
 )
-from app.services.novedades.bonos_import import opcion_key, opcion_label
+from app.services.novedades.bonos_import import (
+    INTERNACION_KEY,
+    PRACTICA_KEY,
+    opcion_key,
+    opcion_label,
+)
+
+PRACTICA_OPCION = ("GLOBAL", "PRACTICA_TRAUMATOLOGICA", "—", "—")
+INTERNACION_OPCION = ("GLOBAL", "INTERNACIONES", "—", "—")
+
+
+def ensure_special_produccion_opciones(db: Session, actor_id: int | None = None) -> None:
+    now = datetime.utcnow()
+    for centro, servicio, semana, horario in (PRACTICA_OPCION, INTERNACION_OPCION):
+        existing = db.execute(
+            select(NovedadesBonoOpcion).where(
+                NovedadesBonoOpcion.centro == centro,
+                NovedadesBonoOpcion.servicio == servicio,
+                NovedadesBonoOpcion.semana == semana,
+                NovedadesBonoOpcion.horario == horario,
+            )
+        ).scalar_one_or_none()
+        if not existing:
+            db.add(
+                NovedadesBonoOpcion(
+                    centro=centro,
+                    servicio=servicio,
+                    semana=semana,
+                    horario=horario,
+                    created_at=now,
+                    updated_at=now,
+                    created_by=actor_id,
+                    updated_by=actor_id,
+                    deleted_at=None,
+                )
+            )
+            db.commit()
+        elif existing.deleted_at is not None:
+            existing.deleted_at = None
+            existing.updated_at = now
+            if actor_id:
+                existing.updated_by = actor_id
+            db.commit()
 
 
 def _opcion_response(opcion: NovedadesBonoOpcion) -> BonoOpcionResponse:
@@ -46,6 +88,7 @@ def _tarifa_response(tarifa: NovedadesProduccionTarifa, opcion: NovedadesBonoOpc
 
 
 def load_tarifas_by_opcion_key(db: Session) -> dict[str, int]:
+    ensure_special_produccion_opciones(db)
     rows = list(
         db.execute(
             select(NovedadesProduccionTarifa, NovedadesBonoOpcion)
@@ -73,7 +116,49 @@ def valorize_bonos(bonos: dict[str, int] | None, tarifas: dict[str, int]) -> tup
     return subtotales, total
 
 
+def valorize_practicas(
+    practicas_list: list[dict],
+    tarifas: dict[str, int],
+) -> tuple[list[dict], int]:
+    unit_tariff = int(tarifas.get(PRACTICA_KEY, 0))
+    result = []
+    total = 0
+    for p in practicas_list:
+        cant = int(p.get("cantidad", 0))
+        subtotal = cant * unit_tariff
+        total += subtotal
+        result.append({
+            "centro": p.get("centro", ""),
+            "servicio": p.get("servicio", ""),
+            "cantidad": cant,
+            "valor_unitario": unit_tariff,
+            "subtotal": subtotal,
+        })
+    return result, total
+
+
+def valorize_internaciones(
+    internaciones_list: list[dict],
+    tarifas: dict[str, int],
+) -> tuple[list[dict], int]:
+    unit_tariff = int(tarifas.get(INTERNACION_KEY, 0))
+    result = []
+    total = 0
+    for item in internaciones_list:
+        cant = int(item.get("cantidad", 0))
+        subtotal = cant * unit_tariff
+        total += subtotal
+        result.append({
+            "sucursal": item.get("sucursal", ""),
+            "cantidad": cant,
+            "valor_unitario": unit_tariff,
+            "subtotal": subtotal,
+        })
+    return result, total
+
+
 def list_tarifas(db: Session) -> list[ProduccionTarifaResponse]:
+    ensure_special_produccion_opciones(db)
     rows = list(
         db.execute(
             select(NovedadesProduccionTarifa, NovedadesBonoOpcion)
@@ -91,6 +176,7 @@ def list_tarifas(db: Session) -> list[ProduccionTarifaResponse]:
 
 
 def list_bono_opciones(db: Session, *, sin_tarifa: bool = False) -> list[BonoOpcionResponse]:
+    ensure_special_produccion_opciones(db)
     opciones = list(
         db.execute(
             select(NovedadesBonoOpcion)
