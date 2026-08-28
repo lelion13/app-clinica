@@ -414,26 +414,26 @@ export function NovedadesCargaPage() {
 
         <form onSubmit={submitCarga}>
           <h2 style={{ margin: "12px 0 8px", fontSize: "1rem" }}>Contexto</h2>
-          <div style={{ display: "grid", gap: 8, gridTemplateColumns: "repeat(auto-fill, minmax(180px, 1fr))", marginBottom: 8, alignItems: "end" }}>
-            <label style={{ display: "grid", gap: 4 }}>
+          <div style={{ display: "grid", gap: 12, gridTemplateColumns: "repeat(auto-fit, minmax(200px, 1fr))", marginBottom: 12, alignItems: "end" }}>
+            <label style={{ display: "grid", gap: 4, minWidth: 0 }}>
               <span style={{ fontSize: 12, color: uiTheme.colors.textMuted }}>Período</span>
-              <select value={periodoId} onChange={(e) => setPeriodoId(e.target.value)} style={uiStyles.formControl} required>
+              <select value={periodoId} onChange={(e) => setPeriodoId(e.target.value)} style={{ ...uiStyles.formControl, width: "100%", minWidth: 0 }} required>
                 <option value="">Elegí período</option>
                 {periodos.map((p) => (
                   <option key={p.id} value={p.id}>#{p.id} {p.nombre || ""} ({p.estado})</option>
                 ))}
               </select>
             </label>
-            <label style={{ display: "grid", gap: 4 }}>
+            <label style={{ display: "grid", gap: 4, minWidth: 0 }}>
               <span style={{ fontSize: 12, color: uiTheme.colors.textMuted }}>Servicio</span>
-              <select value={servicioId} onChange={(e) => setServicioId(e.target.value)} style={uiStyles.formControl} required>
+              <select value={servicioId} onChange={(e) => setServicioId(e.target.value)} style={{ ...uiStyles.formControl, width: "100%", minWidth: 0 }} required>
                 <option value="">Elegí servicio</option>
                 {servicios.map((s) => (
                   <option key={s.id} value={s.id}>{s.nombre}</option>
                 ))}
               </select>
             </label>
-            <label style={{ display: "grid", gap: 4 }}>
+            <label style={{ display: "grid", gap: 4, minWidth: 0 }}>
               <span style={{ fontSize: 12, color: uiTheme.colors.textMuted }}>Fecha realización</span>
               <input
                 type="date"
@@ -443,7 +443,7 @@ export function NovedadesCargaPage() {
                 onChange={(e) => setFechaRealizacion(e.target.value)}
                 required={fechaBounds.valid}
                 disabled={!fechaBounds.valid}
-                style={uiStyles.formControl}
+                style={{ ...uiStyles.formControl, width: "100%", minWidth: 0 }}
               />
             </label>
           </div>
