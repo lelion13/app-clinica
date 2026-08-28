@@ -97,6 +97,13 @@
   - Opciones sin tarifa: cantidad visible, subtotal 0, banner aviso en CH
   - XLS con bonos incluye subtotales; XLS agregado refleja total con bonos
   - Tras **Importar bonos**: soft-delete de opciones que no vienen en ese import, **sin tarifa en Producción** y **sin cantidades en ningún período** (limpia DOMINGO/SABADO huérfanos al pasar a SADOFE)
+- Cambio `novedades-practicas-produccion` (rev `0024_practicas_internaciones`):
+  - Consulta multi-API atómica en el botón **Actualizar** de Capital Humano (`/bonos/resumen`, `NOVEDADES_BONOS_PRACTICAS_URL`, `NOVEDADES_BONOS_INTERNACIONES_URL`).
+  - Mismo token (`NOVEDADES_PROF_SYNC_TOKEN`) y rango `fecha_desde`/`fecha_fin` del período abierto.
+  - Snapshot de prácticas traumatológicas (`novedades_practica_cantidad`: centro, servicio, cantidad) e internaciones (`novedades_internacion_cantidad`: sucursal, cantidad).
+  - Valorización desde **Producción** mediante opciones de catálogo "Práctica traumatológica" e "Internaciones".
+  - Regla de elegibilidad: las prácticas contabilizan si el profesional tiene módulos asignados en el período o si el servicio es DEA, DEP, CAP o CAI. Las internaciones contabilizan si el profesional califica en módulos o servicios especiales.
+  - Detalle modal en Capital Humano desglosa tablas individuales de Bonos, Prácticas traumatológicas e Internaciones.
 
 ## Roles (panel)
 - `admin`: distribución + novedades (todo) + usuarios

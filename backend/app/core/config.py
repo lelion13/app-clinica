@@ -94,6 +94,20 @@ class Settings(BaseSettings):
     novedades_bonos_resumen_timeout: float = Field(
         default=60.0, validation_alias="NOVEDADES_BONOS_RESUMEN_TIMEOUT"
     )
+    novedades_bonos_practicas_url: str = Field(
+        default="",
+        validation_alias="NOVEDADES_BONOS_PRACTICAS_URL",
+    )
+    novedades_bonos_practicas_timeout: float = Field(
+        default=60.0, validation_alias="NOVEDADES_BONOS_PRACTICAS_TIMEOUT"
+    )
+    novedades_bonos_internaciones_url: str = Field(
+        default="",
+        validation_alias="NOVEDADES_BONOS_INTERNACIONES_URL",
+    )
+    novedades_bonos_internaciones_timeout: float = Field(
+        default=60.0, validation_alias="NOVEDADES_BONOS_INTERNACIONES_TIMEOUT"
+    )
     novedades_bonos_tiene_produccion_url: str = Field(
         default="https://api.cpmgsa.com.ar:8001/bonos/tiene-produccion",
         validation_alias="NOVEDADES_BONOS_TIENE_PRODUCCION_URL",

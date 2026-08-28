@@ -20,7 +20,12 @@ from app.schemas.novedades import (
 )
 from app.services.novedades.export_xls import build_grid_rows
 from app.services.novedades.helpers import get_professional_or_404, get_servicio_or_404
-from app.services.novedades.produccion_tarifas import load_tarifas_by_opcion_key, valorize_bonos
+from app.services.novedades.produccion_tarifas import (
+    load_tarifas_by_opcion_key,
+    valorize_bonos,
+    valorize_internaciones,
+    valorize_practicas,
+)
 
 SPECIAL_BONO_SERVICIOS = {"DEA", "DEP", "CAP", "CAI"}
 
@@ -49,10 +54,13 @@ def build_capital_humano_rows(
 ) -> list[CapitalHumanoRowResponse]:
     detail = build_grid_rows(db, periodo_id=periodo_id, servicio_id=servicio_id, q=None, concepto_q=None)
     cargas_by_prof: dict[int, Decimal] = {}
+    has_modulos_by_prof: set[int] = set()
     for row in detail:
         cargas_by_prof[row.professional_id] = cargas_by_prof.get(row.professional_id, Decimal("0")) + (
             row.valor or Decimal("0")
         )
+        if getattr(row, "tipo", None) == "modulo_asignado":
+            has_modulos_by_prof.add(row.professional_id)
 
     ajustes_q = select(NovedadesAjusteCapital).where(NovedadesAjusteCapital.deleted_at.is_(None))
     if periodo_id is not None:
@@ -72,12 +80,26 @@ def build_capital_humano_rows(
     prof_ids = set(cargas_by_prof) | set(ajustes_by_prof)
 
     bonos_by_prof: dict[int, dict[str, int]] = {}
+    practicas_by_prof: dict[int, list[dict]] = {}
+    internaciones_by_prof: dict[int, list[dict]] = {}
     if include_bonos:
-        from app.services.novedades.bonos_import import load_bonos_snapshot
+        from app.services.novedades.bonos_import import (
+            load_bonos_snapshot,
+            load_internaciones_snapshot,
+            load_practicas_snapshot,
+        )
 
         _, bonos_by_prof = load_bonos_snapshot(db, periodo_id=periodo_id)
-        # Promote bonus-only professionals for DEA/DEP/CAP/CAI.
+        practicas_by_prof = load_practicas_snapshot(db, periodo_id=periodo_id)
+        internaciones_by_prof = load_internaciones_snapshot(db, periodo_id=periodo_id)
+
+        # Promote bonus-only and special-practica-only professionals for DEA/DEP/CAP/CAI.
         prof_ids |= {pid for pid, bonos in bonos_by_prof.items() if has_special_bono_service(bonos)}
+        prof_ids |= {
+            pid
+            for pid, practicas in practicas_by_prof.items()
+            if any(p.get("servicio") in SPECIAL_BONO_SERVICIOS for p in practicas)
+        }
 
     if tarifas is None and include_bonos:
         tarifas = load_tarifas_by_opcion_key(db)
@@ -101,6 +123,8 @@ def build_capital_humano_rows(
 
     needle = (q or "").strip().lower()
     rows: list[CapitalHumanoRowResponse] = []
+    from app.schemas.novedades import InternacionDetalleItem, PracticaDetalleItem
+
     for pid in prof_ids:
         prof = professionals.get(pid)
         if not prof:
@@ -111,9 +135,29 @@ def build_capital_humano_rows(
                 continue
         monto_cargas = cargas_by_prof.get(pid, Decimal("0"))
         monto_ajustes = ajustes_by_prof.get(pid, Decimal("0"))
+        has_modulo = pid in has_modulos_by_prof
+
         prof_bonos = bonos_by_prof.get(pid, {})
         bonos_subtotales, monto_bonos = valorize_bonos(prof_bonos, tarifas)
-        monto_total = monto_cargas + monto_ajustes + Decimal(monto_bonos)
+
+        raw_practicas = practicas_by_prof.get(pid, [])
+        eligible_practicas = [
+            p for p in raw_practicas if has_modulo or p.get("servicio") in SPECIAL_BONO_SERVICIOS
+        ]
+        practicas_items, monto_practicas = valorize_practicas(eligible_practicas, tarifas)
+
+        raw_internaciones = internaciones_by_prof.get(pid, [])
+        qualifies_internacion = (
+            has_modulo
+            or has_special_bono_service(prof_bonos)
+            or any(p.get("servicio") in SPECIAL_BONO_SERVICIOS for p in raw_practicas)
+        )
+        eligible_internaciones = raw_internaciones if qualifies_internacion else []
+        internaciones_items, monto_internaciones = valorize_internaciones(eligible_internaciones, tarifas)
+
+        total_produccion = monto_bonos + monto_practicas + monto_internaciones
+        monto_total = monto_cargas + monto_ajustes + Decimal(total_produccion)
+
         rows.append(
             CapitalHumanoRowResponse(
                 professional_id=pid,
@@ -121,11 +165,15 @@ def build_capital_humano_rows(
                 professional_name=prof.full_name,
                 monto_cargas=monto_cargas,
                 monto_ajustes=monto_ajustes,
-                monto_bonos=monto_bonos,
+                monto_bonos=total_produccion,
+                monto_practicas=monto_practicas,
+                monto_internaciones=monto_internaciones,
                 monto_total=monto_total,
                 es_especialista=bool(getattr(prof, "es_especialista", False)),
                 bonos=prof_bonos,
                 bonos_subtotales=bonos_subtotales,
+                practicas=[PracticaDetalleItem(**p) for p in practicas_items],
+                internaciones=[InternacionDetalleItem(**i) for i in internaciones_items],
             )
         )
     rows.sort(key=lambda r: (r.professional_name or "").lower())

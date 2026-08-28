@@ -422,3 +422,53 @@ def test_list_solo_bonos_excludes_promoted_special(monkeypatch):
     rows = bonos.list_solo_bonos(DB(), periodo_id=1)
     assert len(rows) == 1
     assert rows[0].professional_id == 2
+
+
+def test_normalize_remote_practica():
+    assert bonos._normalize_remote_practica(
+        {"centro": "CMG", "servicio": "GUA", "profesional": "206", "cantidad": 100}
+    ) == ("CMG", "GUA", "206", 100)
+    assert bonos._normalize_remote_practica({"centro": "CMG", "servicio": "GUA"}) is None
+    assert bonos._normalize_remote_practica({"centro": "CMG", "servicio": "GUA", "profesional": "206", "cantidad": -5}) is None
+
+
+def test_normalize_remote_internacion():
+    assert bonos._normalize_remote_internacion(
+        {"profesional": "032", "sucursal": "CMG", "cantidad_internaciones": 42}
+    ) == ("CMG", "032", 42)
+    assert bonos._normalize_remote_internacion(
+        {"profesional": "032", "centro": "CMG", "cantidad": 10}
+    ) == ("CMG", "032", 10)
+    assert bonos._normalize_remote_internacion({"profesional": "032"}) is None
+
+
+def test_valorize_practicas_and_internaciones():
+    from app.services.novedades.produccion_tarifas import (
+        INTERNACION_KEY,
+        PRACTICA_KEY,
+        valorize_internaciones,
+        valorize_practicas,
+    )
+
+    tarifas = {
+        PRACTICA_KEY: 5000,
+        INTERNACION_KEY: 8000,
+    }
+
+    practicas_list = [
+        {"centro": "CMG", "servicio": "GUA", "cantidad": 3},
+        {"centro": "CMG", "servicio": "TRAUMA", "cantidad": 2},
+    ]
+    items, total_p = valorize_practicas(practicas_list, tarifas)
+    assert total_p == (3 * 5000) + (2 * 5000)
+    assert len(items) == 2
+    assert items[0]["subtotal"] == 15000
+
+    internaciones_list = [
+        {"sucursal": "CMG", "cantidad": 4},
+    ]
+    items_i, total_i = valorize_internaciones(internaciones_list, tarifas)
+    assert total_i == 4 * 8000
+    assert len(items_i) == 1
+    assert items_i[0]["subtotal"] == 32000
+

@@ -10,7 +10,9 @@ from app.core.config import settings
 from app.models.novedades import (
     NovedadesBonoCantidad,
     NovedadesBonoOpcion,
+    NovedadesInternacionCantidad,
     NovedadesPeriodo,
+    NovedadesPracticaCantidad,
     NovedadesProfesional,
     PeriodoEstado,
 )
@@ -21,12 +23,19 @@ from app.schemas.novedades import (
     SoloBonoRowResponse,
 )
 
+PRACTICA_KEY = "GLOBAL|PRACTICA_TRAUMATOLOGICA|—|—"
+INTERNACION_KEY = "GLOBAL|INTERNACIONES|—|—"
+
 
 def opcion_key(centro: str, servicio: str, semana: str, horario: str) -> str:
     return f"{centro}|{servicio}|{semana}|{horario}"
 
 
 def opcion_label(centro: str, servicio: str, semana: str, horario: str) -> str:
+    if centro == "GLOBAL" and servicio == "PRACTICA_TRAUMATOLOGICA":
+        return "Práctica traumatológica"
+    if centro == "GLOBAL" and servicio == "INTERNACIONES":
+        return "Internaciones"
     return f"{centro} · {servicio} · {semana} · {horario}"
 
 
@@ -103,6 +112,114 @@ def _fetch_remote_bonos(fecha_desde: str, fecha_hasta: str) -> list[dict]:
     )
 
 
+def _normalize_remote_practica(raw: dict) -> tuple[str, str, str, int] | None:
+    centro = _as_str(raw.get("centro"))
+    servicio = _as_str(raw.get("servicio"))
+    profesional = _as_str(raw.get("profesional"))
+    cantidad = _as_int(raw.get("cantidad"))
+    if not all([centro, servicio, profesional]) or cantidad is None or cantidad <= 0:
+        return None
+    return (
+        centro[:80],
+        servicio[:80],
+        profesional[:40],
+        cantidad,
+    )
+
+
+def _fetch_remote_practicas(fecha_desde: str, fecha_hasta: str) -> list[dict]:
+    url = (settings.novedades_bonos_practicas_url or "").strip()
+    token = (settings.novedades_prof_sync_token or "").strip()
+    if not url:
+        return []
+    if not token:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail="Token de sync no configurado para API de prácticas (NOVEDADES_PROF_SYNC_TOKEN)",
+        )
+    try:
+        with httpx.Client(timeout=settings.novedades_bonos_practicas_timeout) as client:
+            response = client.get(
+                url,
+                params={"fecha_desde": fecha_desde, "fecha_hasta": fecha_hasta},
+                headers={"Authorization": f"Bearer {token}", "Accept": "application/json"},
+            )
+            response.raise_for_status()
+            payload = response.json()
+    except HTTPException:
+        raise
+    except Exception as exc:
+        raise HTTPException(
+            status_code=status.HTTP_502_BAD_GATEWAY,
+            detail=f"Error al consultar API de prácticas: {exc}",
+        ) from exc
+
+    if isinstance(payload, list):
+        return [row for row in payload if isinstance(row, dict)]
+    if isinstance(payload, dict):
+        for key in ("items", "data", "results", "practicas"):
+            inner = payload.get(key)
+            if isinstance(inner, list):
+                return [row for row in inner if isinstance(row, dict)]
+    raise HTTPException(
+        status_code=status.HTTP_502_BAD_GATEWAY,
+        detail="Respuesta externa de prácticas con formato no reconocido",
+    )
+
+
+def _normalize_remote_internacion(raw: dict) -> tuple[str, str, int] | None:
+    profesional = _as_str(raw.get("profesional"))
+    sucursal = _as_str(raw.get("sucursal") or raw.get("centro"))
+    cantidad = _as_int(raw.get("cantidad_internaciones") if "cantidad_internaciones" in raw else raw.get("cantidad"))
+    if not all([profesional, sucursal]) or cantidad is None or cantidad <= 0:
+        return None
+    return (
+        sucursal[:80],
+        profesional[:40],
+        cantidad,
+    )
+
+
+def _fetch_remote_internaciones(fecha_desde: str, fecha_hasta: str) -> list[dict]:
+    url = (settings.novedades_bonos_internaciones_url or "").strip()
+    token = (settings.novedades_prof_sync_token or "").strip()
+    if not url:
+        return []
+    if not token:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail="Token de sync no configurado para API de internaciones (NOVEDADES_PROF_SYNC_TOKEN)",
+        )
+    try:
+        with httpx.Client(timeout=settings.novedades_bonos_internaciones_timeout) as client:
+            response = client.get(
+                url,
+                params={"fecha_desde": fecha_desde, "fecha_hasta": fecha_hasta},
+                headers={"Authorization": f"Bearer {token}", "Accept": "application/json"},
+            )
+            response.raise_for_status()
+            payload = response.json()
+    except HTTPException:
+        raise
+    except Exception as exc:
+        raise HTTPException(
+            status_code=status.HTTP_502_BAD_GATEWAY,
+            detail=f"Error al consultar API de internaciones: {exc}",
+        ) from exc
+
+    if isinstance(payload, list):
+        return [row for row in payload if isinstance(row, dict)]
+    if isinstance(payload, dict):
+        for key in ("items", "data", "results", "internaciones"):
+            inner = payload.get(key)
+            if isinstance(inner, list):
+                return [row for row in inner if isinstance(row, dict)]
+    raise HTTPException(
+        status_code=status.HTTP_502_BAD_GATEWAY,
+        detail="Respuesta externa de internaciones con formato no reconocido",
+    )
+
+
 def _get_or_create_opcion(
     db: Session,
     *,
@@ -176,6 +293,8 @@ def cleanup_unused_opciones(
     )
     removed = 0
     for opcion in opciones:
+        if opcion.centro == "GLOBAL":
+            continue
         key = opcion_key(opcion.centro, opcion.servicio, opcion.semana, opcion.horario)
         if key in option_keys_from_import:
             continue
@@ -209,8 +328,10 @@ def import_bonos_for_periodo(db: Session, periodo_id: int, user: User) -> BonosI
 
     fecha_desde = periodo.fecha_inicio.isoformat()
     fecha_hasta = periodo.fecha_fin.isoformat()
-    # Fetch BEFORE mutating snapshot (Q8).
+    # Fetch all remote APIs BEFORE mutating snapshot (atomic fail-closed).
     remote_rows = _fetch_remote_bonos(fecha_desde, fecha_hasta)
+    remote_practicas = _fetch_remote_practicas(fecha_desde, fecha_hasta)
+    remote_internaciones = _fetch_remote_internaciones(fecha_desde, fecha_hasta)
 
     professionals = {
         p.codprof: p
@@ -219,6 +340,7 @@ def import_bonos_for_periodo(db: Session, periodo_id: int, user: User) -> BonosI
         .all()
     }
 
+    # 1. Bonos
     aggregated: dict[tuple[int, str, str, str, str], int] = defaultdict(int)
     received = 0
     ignored = 0
@@ -235,9 +357,44 @@ def import_bonos_for_periodo(db: Session, periodo_id: int, user: User) -> BonosI
             continue
         aggregated[(prof.id, centro, servicio, semana, horario)] += cantidad
 
+    # 2. Prácticas
+    practicas_aggregated: dict[tuple[int, str, str], int] = defaultdict(int)
+    practicas_received = 0
+    practicas_matched_profs: set[int] = set()
+    for raw in remote_practicas:
+        normalized_practica = _normalize_remote_practica(raw)
+        if not normalized_practica:
+            continue
+        practicas_received += 1
+        centro, servicio, codprof, cantidad = normalized_practica
+        prof = professionals.get(codprof)
+        if not prof:
+            continue
+        practicas_aggregated[(prof.id, centro, servicio)] += cantidad
+        practicas_matched_profs.add(prof.id)
+
+    # 3. Internaciones
+    internaciones_aggregated: dict[tuple[int, str], int] = defaultdict(int)
+    internaciones_received = 0
+    internaciones_matched_profs: set[int] = set()
+    for raw in remote_internaciones:
+        normalized_internacion = _normalize_remote_internacion(raw)
+        if not normalized_internacion:
+            continue
+        internaciones_received += 1
+        sucursal, codprof, cantidad = normalized_internacion
+        prof = professionals.get(codprof)
+        if not prof:
+            continue
+        internaciones_aggregated[(prof.id, sucursal)] += cantidad
+        internaciones_matched_profs.add(prof.id)
+
     now = datetime.utcnow()
     db.execute(delete(NovedadesBonoCantidad).where(NovedadesBonoCantidad.periodo_id == periodo_id))
+    db.execute(delete(NovedadesPracticaCantidad).where(NovedadesPracticaCantidad.periodo_id == periodo_id))
+    db.execute(delete(NovedadesInternacionCantidad).where(NovedadesInternacionCantidad.periodo_id == periodo_id))
 
+    # Persist Bonos
     opcion_cache: dict[tuple[str, str, str, str], NovedadesBonoOpcion] = {}
     matched_prof_ids: set[int] = set()
     option_keys: set[str] = set()
@@ -268,6 +425,42 @@ def import_bonos_for_periodo(db: Session, periodo_id: int, user: User) -> BonosI
         matched_prof_ids.add(professional_id)
         option_keys.add(opcion_key(centro, servicio, semana, horario))
 
+    # Persist Prácticas
+    for (professional_id, centro, servicio), cantidad in practicas_aggregated.items():
+        db.add(
+            NovedadesPracticaCantidad(
+                periodo_id=periodo_id,
+                professional_id=professional_id,
+                centro=centro,
+                servicio=servicio,
+                cantidad=cantidad,
+                created_at=now,
+                updated_at=now,
+                created_by=user.id,
+                updated_by=user.id,
+                deleted_at=None,
+            )
+        )
+
+    # Persist Internaciones
+    for (professional_id, sucursal), cantidad in internaciones_aggregated.items():
+        db.add(
+            NovedadesInternacionCantidad(
+                periodo_id=periodo_id,
+                professional_id=professional_id,
+                sucursal=sucursal,
+                cantidad=cantidad,
+                created_at=now,
+                updated_at=now,
+                created_by=user.id,
+                updated_by=user.id,
+                deleted_at=None,
+            )
+        )
+
+    from app.services.novedades.produccion_tarifas import ensure_special_produccion_opciones
+    ensure_special_produccion_opciones(db, actor_id=user.id)
+
     cleanup_unused_opciones(db, option_keys_from_import=option_keys, actor_id=user.id, now=now)
     db.commit()
 
@@ -283,6 +476,10 @@ def import_bonos_for_periodo(db: Session, periodo_id: int, user: User) -> BonosI
         solo_bonos=solo_bonos,
         columns=len(option_keys),
         ignored=ignored,
+        practicas_received=practicas_received,
+        practicas_matched=len(practicas_matched_profs),
+        internaciones_received=internaciones_received,
+        internaciones_matched=len(internaciones_matched_profs),
     )
 
 
@@ -373,3 +570,51 @@ def list_solo_bonos(
         )
     result.sort(key=lambda r: (r.professional_name or "").lower())
     return result
+
+
+def load_practicas_snapshot(
+    db: Session, *, periodo_id: int | None
+) -> dict[int, list[dict]]:
+    if periodo_id is None:
+        return {}
+    rows = list(
+        db.execute(
+            select(NovedadesPracticaCantidad).where(
+                NovedadesPracticaCantidad.periodo_id == periodo_id,
+                NovedadesPracticaCantidad.deleted_at.is_(None),
+            )
+        ).scalars().all()
+    )
+    result: dict[int, list[dict]] = defaultdict(list)
+    for row in rows:
+        if hasattr(row, "professional_id"):
+            result[row.professional_id].append({
+                "centro": getattr(row, "centro", ""),
+                "servicio": getattr(row, "servicio", ""),
+                "cantidad": int(getattr(row, "cantidad", 0)),
+            })
+    return dict(result)
+
+
+def load_internaciones_snapshot(
+    db: Session, *, periodo_id: int | None
+) -> dict[int, list[dict]]:
+    if periodo_id is None:
+        return {}
+    rows = list(
+        db.execute(
+            select(NovedadesInternacionCantidad).where(
+                NovedadesInternacionCantidad.periodo_id == periodo_id,
+                NovedadesInternacionCantidad.deleted_at.is_(None),
+            )
+        ).scalars().all()
+    )
+    result: dict[int, list[dict]] = defaultdict(list)
+    for row in rows:
+        if hasattr(row, "professional_id"):
+            result[row.professional_id].append({
+                "sucursal": getattr(row, "sucursal", ""),
+                "cantidad": int(getattr(row, "cantidad", 0)),
+            })
+    return dict(result)
+

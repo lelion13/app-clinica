@@ -157,7 +157,7 @@ export function NovedadesXlsPage() {
         body: JSON.stringify({ periodo_id: Number(periodoId) }),
       });
       setInfo(
-        `Actualización OK. Recibidas: ${summary.received} · Matcheadas: ${summary.matched} · Solo bonos: ${summary.solo_bonos} · Columnas: ${summary.columns} · Ignorados: ${summary.ignored}`
+        `Actualización OK · Bonos (recibidas: ${summary.received}, matcheadas: ${summary.matched}) · Prácticas (recibidas: ${summary.practicas_received || 0}, matcheadas: ${summary.practicas_matched || 0}) · Internaciones (recibidas: ${summary.internaciones_received || 0}, matcheadas: ${summary.internaciones_matched || 0}) · Solo bonos: ${summary.solo_bonos}`
       );
       await loadGrid(periodoId);
     } catch (err) {
@@ -691,6 +691,72 @@ export function NovedadesXlsPage() {
                     ) : null}
                   </div>
                 </section>
+
+                {detailRow.practicas && detailRow.practicas.length > 0 ? (
+                  <section>
+                    <h3 style={{ fontSize: "1rem", margin: "0 0 8px" }}>Prácticas (traumatología)</h3>
+                    <div style={{ overflowX: "auto", maxHeight: "28vh" }}>
+                      <table style={{ width: "100%", borderCollapse: "collapse", fontSize: "0.85rem" }}>
+                        <thead>
+                          <tr>
+                            <th style={{ ...thStyle, cursor: "default" }}>Centro</th>
+                            <th style={{ ...thStyle, cursor: "default" }}>Servicio</th>
+                            <th style={{ ...thStyle, cursor: "default" }}>Cantidad</th>
+                            <th style={{ ...thStyle, cursor: "default" }}>Tarifa unitaria</th>
+                            <th style={{ ...thStyle, cursor: "default" }}>Subtotal</th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {detailRow.practicas.map((p, idx) => (
+                            <tr key={`${p.centro}-${p.servicio}-${idx}`}>
+                              <td style={tdStyle}>{p.centro}</td>
+                              <td style={tdStyle}>{p.servicio}</td>
+                              <td style={{ ...tdStyle, fontVariantNumeric: "tabular-nums" }}>{p.cantidad}</td>
+                              <td style={{ ...tdStyle, fontVariantNumeric: "tabular-nums" }}>
+                                {formatMoney(p.valor_unitario)}
+                              </td>
+                              <td style={{ ...tdStyle, fontVariantNumeric: "tabular-nums" }}>
+                                {formatMoney(p.subtotal)}
+                              </td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
+                  </section>
+                ) : null}
+
+                {detailRow.internaciones && detailRow.internaciones.length > 0 ? (
+                  <section>
+                    <h3 style={{ fontSize: "1rem", margin: "0 0 8px" }}>Internaciones</h3>
+                    <div style={{ overflowX: "auto", maxHeight: "28vh" }}>
+                      <table style={{ width: "100%", borderCollapse: "collapse", fontSize: "0.85rem" }}>
+                        <thead>
+                          <tr>
+                            <th style={{ ...thStyle, cursor: "default" }}>Sucursal</th>
+                            <th style={{ ...thStyle, cursor: "default" }}>Cantidad</th>
+                            <th style={{ ...thStyle, cursor: "default" }}>Tarifa unitaria</th>
+                            <th style={{ ...thStyle, cursor: "default" }}>Subtotal</th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {detailRow.internaciones.map((item, idx) => (
+                            <tr key={`${item.sucursal}-${idx}`}>
+                              <td style={tdStyle}>{item.sucursal}</td>
+                              <td style={{ ...tdStyle, fontVariantNumeric: "tabular-nums" }}>{item.cantidad}</td>
+                              <td style={{ ...tdStyle, fontVariantNumeric: "tabular-nums" }}>
+                                {formatMoney(item.valor_unitario)}
+                              </td>
+                              <td style={{ ...tdStyle, fontVariantNumeric: "tabular-nums" }}>
+                                {formatMoney(item.subtotal)}
+                              </td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
+                  </section>
+                ) : null}
 
                 <section>
                   <h3 style={{ fontSize: "1rem", margin: "0 0 8px" }}>Historial de ajustes</h3>

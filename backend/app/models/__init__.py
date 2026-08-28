@@ -12,6 +12,8 @@ from app.models.novedades import (
     NovedadesNovedad,
     NovedadesPeriodo,
     NovedadesFeriado,
+    NovedadesInternacionCantidad,
+    NovedadesPracticaCantidad,
     NovedadesProfesionalServicio,
     NovedadesServicio,
 )
