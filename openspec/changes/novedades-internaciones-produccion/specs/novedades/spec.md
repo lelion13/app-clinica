@@ -41,29 +41,33 @@ Tariffs MUST be integers ≥ 0, editable by `admin`/`rrhh` only.
 - WHEN asigna valor unitario a la práctica traumatológica y a las internaciones
 - THEN Capital Humano valoriza las cantidades correspondientes con esos valores unitarios
 
-### Requirement: Valorización y regla de elegibilidad de Prácticas e Internaciones
+### Requirement: Valorización y regla de elegibilidad de Producción (Bonos, Prácticas e Internaciones)
 
-In Capital Humano, imported prácticas and internaciones MUST be valorized as `cantidad × valor_unitario`.
+In Capital Humano, imported bonos, prácticas and internaciones MUST be valorized as `cantidad × valor_unitario`.
 
-**Eligibility rule:** The valorized prácticas and internaciones amounts MUST ONLY be added to the professional's total if:
-1. The professional has at least one **módulo asignado** in the period, OR
-2. The professional or the item's service belongs to `{DEA, DEP, CAP, CAI}`.
+**Eligibility rules:**
+1. If the professional has at least one **módulo asignado** in the period: ALL bonos, prácticas, and internaciones are counted and valorized in their total.
+2. If the professional does NOT have any **módulo asignado** in the period:
+   - Bonos: ONLY options belonging to `{DEA, DEP, CAP, CAI}` are counted and valorized (bonos of other services like `GUA` are omitted from the valorized total and from the professional's table in Capital Humano).
+   - Prácticas: ONLY items belonging to `{DEA, DEP, CAP, CAI}` are counted and valorized.
+   - Internaciones: Counted and valorized if the professional has at least one eligible bono or práctica in `{DEA, DEP, CAP, CAI}`.
 
-If the professional has only novedades (horas extras) and no special service association, prácticas and internaciones MUST NOT be valorized into their total.
+If the professional has only novedades (horas extras) and no special service association, bonos, prácticas and internaciones MUST NOT be valorized into their total.
 
 The valorized amounts MUST be added to **Total producción** and **Total general** in the Capital Humano grid, and MUST be clearly itemized in the **Detalle** modal (secciones separadas para Cargas, Bonos, Prácticas, Internaciones y Ajustes) and in XLS exports.
 
-#### Scenario: Profesional con módulo contabiliza ambas
-- GIVEN profesional con 1 módulo asignado en el período, 10 prácticas y 2 internaciones
+#### Scenario: Profesional con módulo contabiliza todos los servicios
+- GIVEN profesional con 1 módulo asignado en el período, bonos en GUA y CAP, 10 prácticas y 2 internaciones
 - WHEN se calcula la fila de Capital Humano
-- THEN su Total producción incluye el monto de bonos + prácticas valorizadas + internaciones valorizadas
+- THEN su Total producción incluye todos los bonos (GUA y CAP) + prácticas valorizadas + internaciones valorizadas
+
+#### Scenario: Profesional sin módulos solo contabiliza servicios especiales
+- GIVEN profesional sin módulos asignados, con 1 bono en CAP, 193 bonos en GUA y 3 internaciones
+- WHEN se calcula la fila de Capital Humano
+- THEN solo se valoriza el bono de CAP ($6.000) y las 3 internaciones ($15.000)
+- AND los 193 bonos de GUA no se contabilizan ni valorizan en la grilla principal de Capital Humano
 
 #### Scenario: Profesional sin módulos ni servicio especial
 - GIVEN profesional solo con horas extras y sin servicios especiales
 - WHEN se calcula la fila de Capital Humano
 - THEN prácticas e internaciones no suman a su Total producción
-
-#### Scenario: Servicio especial contabiliza sin módulos
-- GIVEN profesional sin módulos pero con registros en servicio especial `CAP`
-- WHEN se calcula Capital Humano
-- THEN las prácticas e internaciones se contabilizan y el profesional aparece en la grilla principal
