@@ -43,6 +43,17 @@ def has_special_bono_service(bonos: dict[str, int] | None) -> bool:
     return False
 
 
+def _is_special_bono_key(key: str) -> bool:
+    parts = str(key).split("|")
+    return len(parts) >= 2 and parts[1] in SPECIAL_BONO_SERVICIOS
+
+
+def _filter_eligible_bonos(bonos: dict[str, int], has_modulo: bool) -> dict[str, int]:
+    if has_modulo:
+        return bonos
+    return {k: v for k, v in bonos.items() if _is_special_bono_key(k)}
+
+
 def build_capital_humano_rows(
     db: Session,
     *,
@@ -137,8 +148,9 @@ def build_capital_humano_rows(
         monto_ajustes = ajustes_by_prof.get(pid, Decimal("0"))
         has_modulo = pid in has_modulos_by_prof
 
-        prof_bonos = bonos_by_prof.get(pid, {})
-        bonos_subtotales, monto_bonos = valorize_bonos(prof_bonos, tarifas)
+        raw_bonos = bonos_by_prof.get(pid, {})
+        eligible_bonos = _filter_eligible_bonos(raw_bonos, has_modulo)
+        bonos_subtotales, monto_bonos = valorize_bonos(eligible_bonos, tarifas)
 
         raw_practicas = practicas_by_prof.get(pid, [])
         eligible_practicas = [
@@ -149,8 +161,8 @@ def build_capital_humano_rows(
         raw_internaciones = internaciones_by_prof.get(pid, [])
         qualifies_internacion = (
             has_modulo
-            or has_special_bono_service(prof_bonos)
-            or any(p.get("servicio") in SPECIAL_BONO_SERVICIOS for p in raw_practicas)
+            or bool(eligible_bonos)
+            or bool(eligible_practicas)
         )
         eligible_internaciones = raw_internaciones if qualifies_internacion else []
         internaciones_items, monto_internaciones = valorize_internaciones(eligible_internaciones, tarifas)
@@ -170,7 +182,7 @@ def build_capital_humano_rows(
                 monto_internaciones=monto_internaciones,
                 monto_total=monto_total,
                 es_especialista=bool(getattr(prof, "es_especialista", False)),
-                bonos=prof_bonos,
+                bonos=eligible_bonos,
                 bonos_subtotales=bonos_subtotales,
                 practicas=[PracticaDetalleItem(**p) for p in practicas_items],
                 internaciones=[InternacionDetalleItem(**i) for i in internaciones_items],

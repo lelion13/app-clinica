@@ -472,3 +472,75 @@ def test_valorize_practicas_and_internaciones():
     assert len(items_i) == 1
     assert items_i[0]["subtotal"] == 32000
 
+
+def test_build_capital_rows_filters_non_special_bonos_when_no_modules(monkeypatch):
+    monkeypatch.setattr(capital_humano, "build_grid_rows", lambda *a, **k: [])
+    monkeypatch.setattr(
+        bonos,
+        "load_bonos_snapshot",
+        lambda *a, **k: (
+            [],
+            {
+                1: {
+                    "CMG|CAP|LUNES_VIERNES|DIA": 1,
+                    "CMG|GUA|LUNES_VIERNES|DIA": 193,
+                }
+            },
+        ),
+    )
+    monkeypatch.setattr(
+        bonos,
+        "load_practicas_snapshot",
+        lambda *a, **k: {},
+    )
+    monkeypatch.setattr(
+        bonos,
+        "load_internaciones_snapshot",
+        lambda *a, **k: {1: [{"sucursal": "CMG", "cantidad": 3}]},
+    )
+    monkeypatch.setattr(
+        capital_humano,
+        "load_tarifas_by_opcion_key",
+        lambda *a, **k: {
+            "CMG|CAP|LUNES_VIERNES|DIA": 6000,
+            "CMG|GUA|LUNES_VIERNES|DIA": 3200,
+            "GLOBAL|INTERNACIONES|—|—": 5000,
+        },
+    )
+
+    prof = SimpleNamespace(id=1, full_name="BELTRAMEA VERONICA", legajo="3904", codprof="3904", deleted_at=None)
+
+    class _ScalarResult:
+        def __init__(self, items):
+            self._items = items
+
+        def scalars(self):
+            return self
+
+        def all(self):
+            return self._items
+
+    class DB:
+        def __init__(self):
+            self._calls = 0
+
+        def execute(self, _stmt):
+            self._calls += 1
+            if self._calls == 1:
+                return _ScalarResult([])
+            return _ScalarResult([prof])
+
+    rows = capital_humano.build_capital_humano_rows(DB(), periodo_id=1, include_bonos=True)
+    assert len(rows) == 1
+    row = rows[0]
+    # Only CAP should be in bonos (1 * 6000 = 6000)
+    assert "CMG|CAP|LUNES_VIERNES|DIA" in row.bonos
+    assert "CMG|GUA|LUNES_VIERNES|DIA" not in row.bonos
+    assert row.bonos["CMG|CAP|LUNES_VIERNES|DIA"] == 1
+    # Internaciones: 3 * 5000 = 15000
+    assert row.monto_internaciones == 15000
+    # Total producción: 6000 + 15000 = 21000 (monto_cargas=0, monto_ajustes=0)
+    assert row.monto_bonos == 21000
+    assert row.monto_total == 21000
+
+
