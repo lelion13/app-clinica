@@ -17,7 +17,7 @@ The amounts are computed at calculation time (`build_capital_humano_rows`) using
 | **Snapshot storage** | Dedicated tables `novedades_practica_cantidad` and `novedades_internacion_cantidad` | Reusing `novedades_bono_cantidad` | Prácticas and internaciones have distinct payload dimensions (`centro+servicio` vs `sucursal`) |
 | **Tariff management** | Catalog options in `novedades_bono_opcion` + `novedades_produccion_tarifa` | Hardcoded values or new dedicated tariff tables | Reuses the entire existing Parametrización → Producción ABM UI and backend endpoints without duplicating code |
 | **Atomic Sync** | Fetch all 3 remote APIs before database writes; single commit | Independent syncs per button / partial commits | Prevents inconsistent state and ensures all production sources are aligned to the same period |
-| **Eligibility Rule** | `has_modulo_in_period OR servicio in {DEA,DEP,CAP,CAI}` | Apply to all professionals | Respects explicit business rule that practices and internaciones only apply if doctor has modules or special service |
+| **Eligibility Rule** | Con módulos: todos los bonos, prácticas e internaciones. Sin módulos: bonos especiales (`DEA,DEP,CAP,CAI`), prácticas e internaciones | Apply to all professionals indiscriminately | Respects explicit business rule that practices and internaciones apply while non-special bonos (e.g. GUA) are ignored for doctors without modules |
 
 ## Data Flow
 

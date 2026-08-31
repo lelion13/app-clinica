@@ -102,8 +102,11 @@
   - Mismo token (`NOVEDADES_PROF_SYNC_TOKEN`) y rango `fecha_desde`/`fecha_fin` del período abierto.
   - Snapshot de prácticas traumatológicas (`novedades_practica_cantidad`: centro, servicio, cantidad) e internaciones (`novedades_internacion_cantidad`: sucursal, cantidad).
   - Valorización desde **Producción** mediante opciones de catálogo "Práctica traumatológica" e "Internaciones".
-  - Regla de elegibilidad: las prácticas contabilizan si el profesional tiene módulos asignados en el período o si el servicio es DEA, DEP, CAP o CAI. Las internaciones contabilizan si el profesional califica en módulos o servicios especiales.
+  - Reglas de elegibilidad:
+    - Profesional CON módulos asignados: cuenta y valoriza todos los bonos (todos los servicios), todas las prácticas y todas las internaciones.
+    - Profesional SIN módulos asignados: cuenta y valoriza únicamente bonos de `DEA`, `DEP`, `CAP` o `CAI` (los de otros servicios como `GUA` no se computan); cuenta todas sus prácticas y todas sus internaciones.
   - Detalle modal en Capital Humano desglosa tablas individuales de Bonos, Prácticas traumatológicas e Internaciones.
+  - Carga de módulos: formulario con layout responsive y auto-fit para evitar superposición entre servicio y fecha de realización.
 
 ## Roles (panel)
 - `admin`: distribución + novedades (todo) + usuarios

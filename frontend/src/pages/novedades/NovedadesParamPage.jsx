@@ -93,6 +93,15 @@ export function NovedadesParamPage() {
   const [periodoNombre, setPeriodoNombre] = useState("");
   const [periodoInicio, setPeriodoInicio] = useState("");
   const [periodoFin, setPeriodoFin] = useState("");
+  const [createPeriodoOpen, setCreatePeriodoOpen] = useState(false);
+  const [createPeriodoSaving, setCreatePeriodoSaving] = useState(false);
+  const [editPeriodo, setEditPeriodo] = useState(null);
+  const [editPeriodoNombre, setEditPeriodoNombre] = useState("");
+  const [editPeriodoInicio, setEditPeriodoInicio] = useState("");
+  const [editPeriodoFin, setEditPeriodoFin] = useState("");
+  const [editPeriodoSaving, setEditPeriodoSaving] = useState(false);
+  const [deletePeriodo, setDeletePeriodo] = useState(null);
+  const [deletePeriodoSaving, setDeletePeriodoSaving] = useState(false);
   const [syncing, setSyncing] = useState(false);
   const [purging, setPurging] = useState(false);
   const [confirmPurge, setConfirmPurge] = useState(false);
@@ -721,21 +730,116 @@ export function NovedadesParamPage() {
     await load();
   };
 
-  const createPeriodo = async (event) => {
-    event.preventDefault();
-    await apiRequestWithRefresh("/novedades/periodos", {
-      method: "POST",
-      body: JSON.stringify({
-        nombre: periodoNombre || null,
-        fecha_inicio: periodoInicio,
-        fecha_fin: periodoFin,
-        open_now: true,
-      }),
-    });
+  const resetPeriodoForm = () => {
     setPeriodoNombre("");
     setPeriodoInicio("");
     setPeriodoFin("");
-    await load();
+  };
+
+  const openCreatePeriodo = () => {
+    resetPeriodoForm();
+    setCreatePeriodoOpen(true);
+  };
+
+  const closeCreatePeriodo = () => {
+    if (createPeriodoSaving) return;
+    setCreatePeriodoOpen(false);
+    resetPeriodoForm();
+  };
+
+  const createPeriodo = async () => {
+    if (!periodoInicio || !periodoFin) {
+      setError("Completá las fechas de inicio y fin del período");
+      return;
+    }
+    if (periodoFin < periodoInicio) {
+      setError("La fecha de fin no puede ser anterior a la fecha de inicio");
+      return;
+    }
+    setCreatePeriodoSaving(true);
+    setError("");
+    try {
+      await apiRequestWithRefresh("/novedades/periodos", {
+        method: "POST",
+        body: JSON.stringify({
+          nombre: periodoNombre.trim() || null,
+          fecha_inicio: periodoInicio,
+          fecha_fin: periodoFin,
+          open_now: true,
+        }),
+      });
+      setCreatePeriodoOpen(false);
+      resetPeriodoForm();
+      await load();
+    } catch (err) {
+      setError(err.message || "No se pudo abrir el período");
+    } finally {
+      setCreatePeriodoSaving(false);
+    }
+  };
+
+  const openEditPeriodo = (item) => {
+    setEditPeriodo(item);
+    setEditPeriodoNombre(item.nombre || "");
+    setEditPeriodoInicio(String(item.fecha_inicio || "").slice(0, 10));
+    setEditPeriodoFin(String(item.fecha_fin || "").slice(0, 10));
+  };
+
+  const closeEditPeriodo = () => {
+    if (editPeriodoSaving) return;
+    setEditPeriodo(null);
+  };
+
+  const saveEditPeriodo = async () => {
+    if (!editPeriodo) return;
+    if (!editPeriodoInicio || !editPeriodoFin) {
+      setError("Completá las fechas de inicio y fin del período");
+      return;
+    }
+    if (editPeriodoFin < editPeriodoInicio) {
+      setError("La fecha de fin no puede ser anterior a la fecha de inicio");
+      return;
+    }
+    setEditPeriodoSaving(true);
+    setError("");
+    try {
+      await apiRequestWithRefresh(`/novedades/periodos/${editPeriodo.id}`, {
+        method: "PUT",
+        body: JSON.stringify({
+          nombre: editPeriodoNombre.trim() || null,
+          fecha_inicio: editPeriodoInicio,
+          fecha_fin: editPeriodoFin,
+        }),
+      });
+      setEditPeriodo(null);
+      await load();
+    } catch (err) {
+      setError(err.message || "No se pudo actualizar el período");
+    } finally {
+      setEditPeriodoSaving(false);
+    }
+  };
+
+  const closeDeletePeriodo = () => {
+    if (deletePeriodoSaving) return;
+    setDeletePeriodo(null);
+  };
+
+  const confirmDeletePeriodo = async () => {
+    if (!deletePeriodo) return;
+    setDeletePeriodoSaving(true);
+    setError("");
+    try {
+      await apiRequestWithRefresh(`/novedades/periodos/${deletePeriodo.id}`, {
+        method: "DELETE",
+      });
+      setDeletePeriodo(null);
+      await load();
+    } catch (err) {
+      setError(err.message || "No se pudo eliminar el período");
+    } finally {
+      setDeletePeriodoSaving(false);
+    }
   };
 
   const runSync = async () => {
@@ -1893,28 +1997,289 @@ export function NovedadesParamPage() {
 
       {tab === "periodos" ? (
         <>
-          <form onSubmit={createPeriodo} style={{ display: "flex", gap: 8, flexWrap: "wrap", marginBottom: 12 }}>
-            <input value={periodoNombre} onChange={(e) => setPeriodoNombre(e.target.value)} placeholder="Nombre (opcional)" style={uiStyles.formControl} />
-            <input type="date" value={periodoInicio} onChange={(e) => setPeriodoInicio(e.target.value)} required style={uiStyles.formControl} />
-            <input type="date" value={periodoFin} onChange={(e) => setPeriodoFin(e.target.value)} required style={uiStyles.formControl} />
-            <button type="submit" style={uiStyles.buttonPrimary}>Abrir período</button>
-          </form>
+          <div style={{ marginBottom: 12 }}>
+            <button type="button" style={uiStyles.buttonPrimary} onClick={openCreatePeriodo}>
+              Nuevo período
+            </button>
+          </div>
           <ul style={uiStyles.listCard}>
             {periodos.map((item) => (
               <li key={item.id} style={{ padding: "8px 10px", borderBottom: `1px solid ${uiTheme.colors.border}` }}>
-                #{item.id} · {item.nombre || "Sin nombre"} · {item.fecha_inicio} → {item.fecha_fin} · <strong>{item.estado}</strong>{" "}
-                {item.estado === "open" ? (
-                  <button type="button" style={{ ...uiStyles.buttonSecondary, marginLeft: 8 }} onClick={async () => { await apiRequestWithRefresh(`/novedades/periodos/${item.id}/cerrar`, { method: "POST" }); await load(); }}>
-                    cerrar
-                  </button>
-                ) : (
-                  <button type="button" style={{ ...uiStyles.buttonSecondary, marginLeft: 8 }} onClick={async () => { await apiRequestWithRefresh(`/novedades/periodos/${item.id}/reabrir`, { method: "POST" }); await load(); }}>
-                    reabrir
-                  </button>
-                )}
+                <div style={{ display: "flex", gap: 8, flexWrap: "wrap", alignItems: "flex-start", justifyContent: "space-between" }}>
+                  <div style={{ flex: "1 1 240px" }}>
+                    #{item.id} · {item.nombre || "Sin nombre"} · {item.fecha_inicio} → {item.fecha_fin} ·{" "}
+                    <span
+                      style={{
+                        display: "inline-block",
+                        padding: "2px 8px",
+                        borderRadius: uiTheme.radius.sm,
+                        fontSize: "0.8rem",
+                        fontWeight: 600,
+                        background: item.estado === "open" ? "#e6f4ea" : "#f1f3f4",
+                        color: item.estado === "open" ? "#137333" : "#5f6368",
+                      }}
+                    >
+                      {item.estado === "open" ? "Abierto" : "Cerrado"}
+                    </span>
+                  </div>
+                  <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
+                    {item.estado === "open" ? (
+                      <button type="button" style={uiStyles.buttonSecondary} onClick={() => openEditPeriodo(item)}>
+                        editar
+                      </button>
+                    ) : null}
+                    {item.estado === "open" ? (
+                      <button
+                        type="button"
+                        style={uiStyles.buttonSecondary}
+                        onClick={async () => {
+                          await apiRequestWithRefresh(`/novedades/periodos/${item.id}/cerrar`, { method: "POST" });
+                          await load();
+                        }}
+                      >
+                        cerrar
+                      </button>
+                    ) : (
+                      <button
+                        type="button"
+                        style={uiStyles.buttonSecondary}
+                        onClick={async () => {
+                          await apiRequestWithRefresh(`/novedades/periodos/${item.id}/reabrir`, { method: "POST" });
+                          await load();
+                        }}
+                      >
+                        reabrir
+                      </button>
+                    )}
+                    <button type="button" style={uiStyles.buttonDanger} onClick={() => setDeletePeriodo(item)}>
+                      eliminar
+                    </button>
+                  </div>
+                </div>
               </li>
             ))}
           </ul>
+          {!periodos.length ? (
+            <p style={uiStyles.helpText}>Todavía no hay períodos cargados.</p>
+          ) : null}
+
+          {createPeriodoOpen ? (
+            <div
+              role="presentation"
+              style={{
+                position: "fixed",
+                inset: 0,
+                zIndex: 1000,
+                background: "rgba(15, 43, 39, 0.45)",
+                display: "flex",
+                alignItems: "flex-start",
+                justifyContent: "center",
+                padding: "max(16px, 4vh) 16px",
+                overflowY: "auto",
+              }}
+              onClick={closeCreatePeriodo}
+            >
+              <div
+                role="dialog"
+                aria-modal="true"
+                aria-labelledby="create-periodo-title"
+                onClick={(e) => e.stopPropagation()}
+                style={{
+                  background: "#fff",
+                  borderRadius: uiTheme.radius.md,
+                  maxWidth: 480,
+                  width: "100%",
+                  marginBottom: 24,
+                  padding: 22,
+                  boxShadow: uiTheme.shadow.md,
+                  border: `1px solid ${uiTheme.colors.border}`,
+                }}
+              >
+                <h2 id="create-periodo-title" style={{ marginTop: 0, marginBottom: 12, fontSize: "1.1rem" }}>
+                  Nuevo período
+                </h2>
+                <div style={{ display: "grid", gap: 10 }}>
+                  <label style={{ display: "grid", gap: 4 }}>
+                    <span style={{ fontSize: 12, color: uiTheme.colors.textMuted }}>Nombre (opcional)</span>
+                    <input
+                      value={periodoNombre}
+                      onChange={(e) => setPeriodoNombre(e.target.value)}
+                      placeholder="Ej. Agosto 2026"
+                      style={uiStyles.formControl}
+                      disabled={createPeriodoSaving}
+                    />
+                  </label>
+                  <label style={{ display: "grid", gap: 4 }}>
+                    <span style={{ fontSize: 12, color: uiTheme.colors.textMuted }}>Fecha inicio</span>
+                    <input
+                      type="date"
+                      value={periodoInicio}
+                      onChange={(e) => setPeriodoInicio(e.target.value)}
+                      required
+                      style={uiStyles.formControl}
+                      disabled={createPeriodoSaving}
+                    />
+                  </label>
+                  <label style={{ display: "grid", gap: 4 }}>
+                    <span style={{ fontSize: 12, color: uiTheme.colors.textMuted }}>Fecha fin</span>
+                    <input
+                      type="date"
+                      value={periodoFin}
+                      onChange={(e) => setPeriodoFin(e.target.value)}
+                      required
+                      style={uiStyles.formControl}
+                      disabled={createPeriodoSaving}
+                    />
+                  </label>
+                </div>
+                <div style={{ display: "flex", gap: 8, justifyContent: "flex-end", flexWrap: "wrap", marginTop: 16 }}>
+                  <button type="button" onClick={closeCreatePeriodo} style={uiStyles.buttonSecondary} disabled={createPeriodoSaving}>
+                    Cancelar
+                  </button>
+                  <button
+                    type="button"
+                    onClick={createPeriodo}
+                    style={uiStyles.buttonPrimary}
+                    disabled={createPeriodoSaving || !periodoInicio || !periodoFin}
+                  >
+                    {createPeriodoSaving ? "Abriendo…" : "Abrir período"}
+                  </button>
+                </div>
+              </div>
+            </div>
+          ) : null}
+
+          {editPeriodo ? (
+            <div
+              role="presentation"
+              style={{
+                position: "fixed",
+                inset: 0,
+                zIndex: 1000,
+                background: "rgba(15, 43, 39, 0.45)",
+                display: "flex",
+                alignItems: "flex-start",
+                justifyContent: "center",
+                padding: "max(16px, 4vh) 16px",
+                overflowY: "auto",
+              }}
+              onClick={closeEditPeriodo}
+            >
+              <div
+                role="dialog"
+                aria-modal="true"
+                aria-labelledby="edit-periodo-title"
+                onClick={(e) => e.stopPropagation()}
+                style={{
+                  background: "#fff",
+                  borderRadius: uiTheme.radius.md,
+                  maxWidth: 480,
+                  width: "100%",
+                  marginBottom: 24,
+                  padding: 22,
+                  boxShadow: uiTheme.shadow.md,
+                  border: `1px solid ${uiTheme.colors.border}`,
+                }}
+              >
+                <h2 id="edit-periodo-title" style={{ marginTop: 0, marginBottom: 12, fontSize: "1.1rem" }}>
+                  Editar período #{editPeriodo.id}
+                </h2>
+                <div style={{ display: "grid", gap: 10 }}>
+                  <label style={{ display: "grid", gap: 4 }}>
+                    <span style={{ fontSize: 12, color: uiTheme.colors.textMuted }}>Nombre (opcional)</span>
+                    <input
+                      value={editPeriodoNombre}
+                      onChange={(e) => setEditPeriodoNombre(e.target.value)}
+                      placeholder="Nombre"
+                      style={uiStyles.formControl}
+                      disabled={editPeriodoSaving}
+                    />
+                  </label>
+                  <label style={{ display: "grid", gap: 4 }}>
+                    <span style={{ fontSize: 12, color: uiTheme.colors.textMuted }}>Fecha inicio</span>
+                    <input
+                      type="date"
+                      value={editPeriodoInicio}
+                      onChange={(e) => setEditPeriodoInicio(e.target.value)}
+                      required
+                      style={uiStyles.formControl}
+                      disabled={editPeriodoSaving}
+                    />
+                  </label>
+                  <label style={{ display: "grid", gap: 4 }}>
+                    <span style={{ fontSize: 12, color: uiTheme.colors.textMuted }}>Fecha fin</span>
+                    <input
+                      type="date"
+                      value={editPeriodoFin}
+                      onChange={(e) => setEditPeriodoFin(e.target.value)}
+                      required
+                      style={uiStyles.formControl}
+                      disabled={editPeriodoSaving}
+                    />
+                  </label>
+                </div>
+                <div style={{ display: "flex", gap: 8, justifyContent: "flex-end", flexWrap: "wrap", marginTop: 16 }}>
+                  <button type="button" onClick={closeEditPeriodo} style={uiStyles.buttonSecondary} disabled={editPeriodoSaving}>
+                    Cancelar
+                  </button>
+                  <button
+                    type="button"
+                    onClick={saveEditPeriodo}
+                    style={uiStyles.buttonPrimary}
+                    disabled={editPeriodoSaving || !editPeriodoInicio || !editPeriodoFin}
+                  >
+                    {editPeriodoSaving ? "Guardando…" : "Guardar"}
+                  </button>
+                </div>
+              </div>
+            </div>
+          ) : null}
+
+          {deletePeriodo ? (
+            <div
+              role="presentation"
+              style={{
+                position: "fixed",
+                inset: 0,
+                zIndex: 1000,
+                background: "rgba(15, 43, 39, 0.45)",
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "center",
+                padding: 16,
+              }}
+              onClick={closeDeletePeriodo}
+            >
+              <div
+                role="dialog"
+                aria-modal="true"
+                onClick={(e) => e.stopPropagation()}
+                style={{
+                  background: "#fff",
+                  borderRadius: uiTheme.radius.md,
+                  maxWidth: 440,
+                  width: "100%",
+                  padding: 22,
+                  boxShadow: uiTheme.shadow.md,
+                  border: `1px solid ${uiTheme.colors.border}`,
+                }}
+              >
+                <h2 style={{ marginTop: 0 }}>Eliminar período</h2>
+                <p style={uiStyles.helpText}>
+                  ¿Eliminar el período <strong>#{deletePeriodo.id} · {deletePeriodo.nombre || "Sin nombre"}</strong> ({deletePeriodo.fecha_inicio} → {deletePeriodo.fecha_fin})?
+                  Solo es posible si no contiene cargas registradas.
+                </p>
+                <div style={{ display: "flex", gap: 8, justifyContent: "flex-end" }}>
+                  <button type="button" style={uiStyles.buttonSecondary} onClick={closeDeletePeriodo} disabled={deletePeriodoSaving}>
+                    Cancelar
+                  </button>
+                  <button type="button" style={uiStyles.buttonDanger} onClick={confirmDeletePeriodo} disabled={deletePeriodoSaving}>
+                    {deletePeriodoSaving ? "Eliminando…" : "Eliminar"}
+                  </button>
+                </div>
+              </div>
+            </div>
+          ) : null}
         </>
       ) : null}
 

@@ -88,6 +88,12 @@ class PeriodoCreateRequest(BaseModel):
     open_now: bool = True
 
 
+class PeriodoUpdateRequest(BaseModel):
+    nombre: str | None = Field(default=None, max_length=120)
+    fecha_inicio: date
+    fecha_fin: date
+
+
 class PeriodoResponse(BaseModel):
     id: int
     nombre: str | None
