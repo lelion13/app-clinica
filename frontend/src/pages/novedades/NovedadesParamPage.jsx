@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 
 import { ProfessionalCombobox } from "../../components/ProfessionalCombobox";
 import { BonoOpcionMultiCombobox } from "../../components/BonoOpcionMultiCombobox";
@@ -76,6 +76,7 @@ export function NovedadesParamPage() {
   const [moduloImportMessage, setModuloImportMessage] = useState("");
   const [moduloImporting, setModuloImporting] = useState(false);
   const [moduloImportNotice, setModuloImportNotice] = useState("");
+  const [moduloFiltro, setModuloFiltro] = useState("");
   const [createFeriadoOpen, setCreateFeriadoOpen] = useState(false);
   const [createFeriadoSaving, setCreateFeriadoSaving] = useState(false);
   const [feriadoFecha, setFeriadoFecha] = useState("");
@@ -146,6 +147,24 @@ export function NovedadesParamPage() {
     if (!Number.isFinite(n) || n < 0 || !Number.isInteger(n)) return undefined;
     return n === 0 ? null : n;
   };
+
+  const normalizeFilterText = (str) =>
+    String(str || "")
+      .normalize("NFD")
+      .replace(/[\u0300-\u036f]/g, "")
+      .toLowerCase()
+      .trim();
+
+  const modulosFiltrados = useMemo(() => {
+    const q = normalizeFilterText(moduloFiltro);
+    if (!q) return modulos;
+    return modulos.filter((item) => {
+      if (normalizeFilterText(item.descripcion).includes(q)) return true;
+      if (normalizeFilterText(item.comentario).includes(q)) return true;
+      if ((item.servicio_nombres || []).some((s) => normalizeFilterText(s).includes(q))) return true;
+      return false;
+    });
+  }, [modulos, moduloFiltro]);
 
   const resetCreateServicioForm = () => {
     setServicioNombre("");
@@ -1262,6 +1281,13 @@ export function NovedadesParamPage() {
             <button type="button" style={uiStyles.buttonPrimary} onClick={openCreateModulo}>
               Nuevo módulo
             </button>
+            <input
+              type="text"
+              value={moduloFiltro}
+              onChange={(e) => setModuloFiltro(e.target.value)}
+              placeholder="Filtrar por módulo o servicio…"
+              style={{ ...uiStyles.formControl, width: 250, minWidth: 200 }}
+            />
             <button type="button" style={uiStyles.buttonSecondary} onClick={downloadModulosTemplate} disabled={moduloImporting}>
               Plantilla de importación
             </button>
@@ -1280,7 +1306,7 @@ export function NovedadesParamPage() {
             <p style={{ color: uiTheme.colors.primaryStrong, marginTop: 0 }}>{moduloImportNotice}</p>
           ) : null}
           <ul style={uiStyles.listCard}>
-            {modulos.map((item) => (
+            {modulosFiltrados.map((item) => (
               <li key={item.id} style={{ padding: "8px 10px", borderBottom: `1px solid ${uiTheme.colors.border}` }}>
                 <div style={{ display: "flex", gap: 8, flexWrap: "wrap", alignItems: "flex-start", justifyContent: "space-between" }}>
                   <div style={{ flex: "1 1 200px" }}>
@@ -1304,6 +1330,9 @@ export function NovedadesParamPage() {
               </li>
             ))}
           </ul>
+          {!modulosFiltrados.length && modulos.length > 0 ? (
+            <p style={uiStyles.helpText}>No se encontraron módulos que coincidan con la búsqueda.</p>
+          ) : null}
 
           {createModuloOpen ? (
             <div
