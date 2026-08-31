@@ -107,6 +107,10 @@
     - Profesional SIN módulos asignados: cuenta y valoriza únicamente bonos de `DEA`, `DEP`, `CAP` o `CAI` (los de otros servicios como `GUA` no se computan); cuenta todas sus prácticas y todas sus internaciones.
   - Detalle modal en Capital Humano desglosa tablas individuales de Bonos, Prácticas traumatológicas e Internaciones.
   - Carga de módulos: formulario con layout responsive y auto-fit para evitar superposición entre servicio y fecha de realización.
+- Cambio `novedades-periodos-abm-modal`:
+  - Gestión modal de Períodos en Parametrización (modal de alta, modal de edición y modal de confirmación de eliminación).
+  - `PUT /novedades/periodos/{id}`: Permite modificar nombre y rango de fechas solo en períodos abiertos (`open`); valida de forma estricta que ninguna carga activa (asignaciones o novedades) tenga fecha de realización fuera del nuevo rango (422).
+  - `DELETE /novedades/periodos/{id}`: Permite soft-delete únicamente si el período no tiene cargas registradas ni producción/ajustes vinculados (409 si tiene datos).
 
 ## Roles (panel)
 - `admin`: distribución + novedades (todo) + usuarios
