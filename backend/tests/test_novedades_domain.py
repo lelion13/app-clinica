@@ -7,7 +7,12 @@ from fastapi import HTTPException
 
 from app.models.novedades import PeriodoEstado
 from app.models.user import UserRole
-from app.schemas.novedades import AsignacionCreateRequest, NovedadCreateRequest, PeriodoCreateRequest
+from app.schemas.novedades import (
+    AsignacionCreateRequest,
+    NovedadCreateRequest,
+    PeriodoCreateRequest,
+    PeriodoUpdateRequest,
+)
 from app.services.novedades import cargas as cargas_service
 from app.services.novedades.helpers import (
     assert_can_load_servicio,
@@ -26,6 +31,9 @@ class FakeResult:
 
     def scalars(self):
         return self
+
+    def first(self):
+        return self.scalar_one_or_none()
 
     def all(self):
         return self._value if isinstance(self._value, list) else []
@@ -313,3 +321,142 @@ def test_create_asignacion_especialista_aplica_plus(monkeypatch):
     )
     item = cargas_service.create_asignacion(db, payload, user)
     assert item.valor == Decimal("1200.00")
+
+
+def test_update_periodo_success():
+    periodo = SimpleNamespace(
+        id=1,
+        nombre="Viejo",
+        fecha_inicio=date(2026, 8, 1),
+        fecha_fin=date(2026, 8, 31),
+        estado=PeriodoEstado.open,
+        deleted_at=None,
+    )
+
+    class DB:
+        def __init__(self):
+            self.committed = False
+            self.query_count = 0
+
+        def execute(self, _stmt):
+            self.query_count += 1
+            if self.query_count == 1:
+                return FakeResult(periodo)
+            # Cargas out of range
+            return FakeResult(None)
+
+        def commit(self):
+            self.committed = True
+
+        def refresh(self, _item):
+            pass
+
+    db = DB()
+    payload = PeriodoUpdateRequest(
+        nombre="Nuevo Agosto",
+        fecha_inicio=date(2026, 8, 5),
+        fecha_fin=date(2026, 8, 25),
+    )
+    res = cargas_service.update_periodo(db, 1, payload, actor_id=10)
+    assert res.nombre == "Nuevo Agosto"
+    assert res.fecha_inicio == date(2026, 8, 5)
+    assert res.fecha_fin == date(2026, 8, 25)
+    assert db.committed
+
+
+def test_update_periodo_blocks_closed():
+    periodo = SimpleNamespace(
+        id=1,
+        nombre="Cerrado",
+        fecha_inicio=date(2026, 8, 1),
+        fecha_fin=date(2026, 8, 31),
+        estado=PeriodoEstado.closed,
+        deleted_at=None,
+    )
+
+    class DB:
+        def execute(self, _stmt):
+            return FakeResult(periodo)
+
+    db = DB()
+    payload = PeriodoUpdateRequest(
+        nombre="Intento",
+        fecha_inicio=date(2026, 8, 1),
+        fecha_fin=date(2026, 8, 31),
+    )
+    with pytest.raises(HTTPException) as exc:
+        cargas_service.update_periodo(db, 1, payload, actor_id=10)
+    assert exc.value.status_code == 409
+
+
+def test_update_periodo_blocks_when_cargas_out_of_range():
+    periodo = SimpleNamespace(
+        id=1,
+        nombre="Abierto",
+        fecha_inicio=date(2026, 8, 1),
+        fecha_fin=date(2026, 8, 31),
+        estado=PeriodoEstado.open,
+        deleted_at=None,
+    )
+
+    class DB:
+        def __init__(self):
+            self.query_count = 0
+
+        def execute(self, _stmt):
+            self.query_count += 1
+            if self.query_count == 1:
+                return FakeResult(periodo)
+            # Retorna una carga con fecha 2026-08-30 fuera de rango
+            return FakeResult(date(2026, 8, 30))
+
+    db = DB()
+    payload = PeriodoUpdateRequest(
+        nombre="Agosto corto",
+        fecha_inicio=date(2026, 8, 1),
+        fecha_fin=date(2026, 8, 20),
+    )
+    with pytest.raises(HTTPException) as exc:
+        cargas_service.update_periodo(db, 1, payload, actor_id=10)
+    assert exc.value.status_code == 422
+    assert "fuera del nuevo rango" in exc.value.detail
+
+
+def test_delete_periodo_blocks_when_has_cargas():
+    periodo = SimpleNamespace(id=1, deleted_at=None)
+
+    class DB:
+        def execute(self, _stmt):
+            # Retorna el periodo y luego encuentra un modulo asignado
+            return FakeResult(1)
+
+    db = DB()
+    with pytest.raises(HTTPException) as exc:
+        cargas_service.delete_periodo(db, 1, actor_id=10)
+    assert exc.value.status_code == 409
+
+
+def test_delete_periodo_success():
+    periodo = SimpleNamespace(id=1, deleted_at=None)
+
+    class DB:
+        def __init__(self):
+            self.committed = False
+            self.count = 0
+
+        def execute(self, _stmt):
+            self.count += 1
+            if self.count == 1:
+                return FakeResult(periodo)
+            # checks for asignaciones, novedades, bonos, practicas, internaciones, ajustes
+            return FakeResult(None)
+
+        def commit(self):
+            self.committed = True
+
+    db = DB()
+    cargas_service.delete_periodo(db, 1, actor_id=10)
+    assert db.committed
+    assert periodo.deleted_at is not None
+
+

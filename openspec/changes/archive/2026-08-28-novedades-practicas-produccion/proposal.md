@@ -18,9 +18,12 @@ Permite sincronizar las cantidades por profesional en el período seleccionado, 
 - Consulta atómica (todo o nada) en **Actualizar**: se consultan las 3 APIs (Bonos resumen, Prácticas, Internaciones). Si alguna falla, no se modifica el snapshot existente del período.
 - Persistencia de snapshots por período para prácticas e internaciones asociadas a profesional y catálogo de opciones/sucursales.
 - Configuración de tarifas unitarias en Parametrización → Producción para Prácticas e Internaciones.
-- Criterio de elegibilidad unificado: solo se contabilizan y valorizan prácticas e internaciones si el profesional tiene **módulos cargados en el período** O si el profesional/servicio pertenece al grupo `{DEA, DEP, CAP, CAI}`.
+- Criterio de elegibilidad unificado:
+  - Profesional con módulos: contabiliza y valoriza todos los bonos (todos los servicios), prácticas e internaciones.
+  - Profesional sin módulos: contabiliza únicamente bonos de servicios especiales (`DEA`, `DEP`, `CAP`, `CAI`), prácticas e internaciones.
 - Sumatoria en **Total producción** y **Total general** de la grilla de Capital Humano.
 - Desglose detallado de Bonos, Prácticas e Internaciones en el modal **Detalle** y en los reportes exportables XLS.
+- Corrección de UI en formulario de Carga para evitar superposición entre Servicio y Fecha de realización.
 
 ### Out of Scope
 - Carga manual de cantidades de prácticas e internaciones desde la UI (exclusivo vía sync).

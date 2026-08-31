@@ -37,6 +37,7 @@ from app.schemas.novedades import (
     NovedadesTransaccionalPurgeResponse,
     PeriodoCreateRequest,
     PeriodoResponse,
+    PeriodoUpdateRequest,
     ProfesionalDirectoryItem,
     ProfesionalServicioCreateRequest,
     ProfesionalServicioResponse,
@@ -444,6 +445,25 @@ def periodos_reabrir(
     user: User = Depends(require_admin_or_rrhh),
 ) -> PeriodoResponse:
     return _periodo_response(cargas_service.reopen_periodo(db, periodo_id, actor_id=user.id))
+
+
+@router.put("/periodos/{periodo_id}", response_model=PeriodoResponse)
+def periodos_update(
+    periodo_id: int,
+    payload: PeriodoUpdateRequest,
+    db: Session = Depends(get_db),
+    user: User = Depends(require_admin_or_rrhh),
+) -> PeriodoResponse:
+    return _periodo_response(cargas_service.update_periodo(db, periodo_id, payload, actor_id=user.id))
+
+
+@router.delete("/periodos/{periodo_id}", status_code=status.HTTP_204_NO_CONTENT)
+def periodos_delete(
+    periodo_id: int,
+    db: Session = Depends(get_db),
+    user: User = Depends(require_admin_or_rrhh),
+) -> None:
+    cargas_service.delete_periodo(db, periodo_id, actor_id=user.id)
 
 
 @router.get("/jefe-servicios", response_model=list[JefeServicioResponse])

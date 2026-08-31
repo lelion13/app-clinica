@@ -6,9 +6,13 @@ from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from app.models.novedades import (
+    NovedadesAjusteCapital,
     NovedadesAsignacionModulo,
+    NovedadesBonoCantidad,
+    NovedadesInternacionCantidad,
     NovedadesJefeServicio,
     NovedadesNovedad,
+    NovedadesPracticaCantidad,
     NovedadesProfesional,
     NovedadesProfesionalServicio,
     NovedadesServicio,
@@ -21,6 +25,7 @@ from app.schemas.novedades import (
     NovedadCreateRequest,
     NovedadUpdateRequest,
     PeriodoCreateRequest,
+    PeriodoUpdateRequest,
     ProfesionalServicioCreateRequest,
 )
 from app.services.novedades.helpers import (
@@ -102,6 +107,139 @@ def reopen_periodo(db: Session, periodo_id: int, actor_id: int) -> NovedadesPeri
     db.commit()
     db.refresh(item)
     return item
+
+
+def update_periodo(db: Session, periodo_id: int, payload: PeriodoUpdateRequest, actor_id: int) -> NovedadesPeriodo:
+    item = db.execute(
+        select(NovedadesPeriodo).where(NovedadesPeriodo.id == periodo_id, NovedadesPeriodo.deleted_at.is_(None))
+    ).scalar_one_or_none()
+    if not item:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Periodo no encontrado")
+    if item.estado != PeriodoEstado.open:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail="Solo se pueden editar periodos en estado abierto",
+        )
+    if payload.fecha_fin < payload.fecha_inicio:
+        raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail="Rango de fechas invalido")
+
+    # Validar que ninguna carga existente quede fuera del nuevo rango
+    asig_out = db.execute(
+        select(NovedadesAsignacionModulo.fecha_realizacion)
+        .where(
+            NovedadesAsignacionModulo.periodo_id == periodo_id,
+            NovedadesAsignacionModulo.deleted_at.is_(None),
+            (
+                (NovedadesAsignacionModulo.fecha_realizacion < payload.fecha_inicio)
+                | (NovedadesAsignacionModulo.fecha_realizacion > payload.fecha_fin)
+            ),
+        )
+        .limit(1)
+    ).scalars().first()
+
+    if asig_out:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail=f"Existen modulos asignados con fecha de realizacion ({asig_out.isoformat()}) fuera del nuevo rango",
+        )
+
+    nov_out = db.execute(
+        select(NovedadesNovedad.fecha_realizacion)
+        .where(
+            NovedadesNovedad.periodo_id == periodo_id,
+            NovedadesNovedad.deleted_at.is_(None),
+            (
+                (NovedadesNovedad.fecha_realizacion < payload.fecha_inicio)
+                | (NovedadesNovedad.fecha_realizacion > payload.fecha_fin)
+            ),
+        )
+        .limit(1)
+    ).scalars().first()
+
+    if nov_out:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail=f"Existen novedades con fecha de realizacion ({nov_out.isoformat()}) fuera del nuevo rango",
+        )
+
+    item.nombre = (payload.nombre or "").strip() or None
+    item.fecha_inicio = payload.fecha_inicio
+    item.fecha_fin = payload.fecha_fin
+    item.updated_at = datetime.utcnow()
+    item.updated_by = actor_id
+    db.commit()
+    db.refresh(item)
+    return item
+
+
+def delete_periodo(db: Session, periodo_id: int, actor_id: int) -> None:
+    item = db.execute(
+        select(NovedadesPeriodo).where(NovedadesPeriodo.id == periodo_id, NovedadesPeriodo.deleted_at.is_(None))
+    ).scalar_one_or_none()
+    if not item:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Periodo no encontrado")
+
+    # Verificar si tiene cargas asociadas
+    has_asig = db.execute(
+        select(NovedadesAsignacionModulo.id)
+        .where(NovedadesAsignacionModulo.periodo_id == periodo_id, NovedadesAsignacionModulo.deleted_at.is_(None))
+        .limit(1)
+    ).scalars().first()
+    if has_asig:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail="No se puede eliminar el periodo porque contiene modulos asignados",
+        )
+
+    has_nov = db.execute(
+        select(NovedadesNovedad.id)
+        .where(NovedadesNovedad.periodo_id == periodo_id, NovedadesNovedad.deleted_at.is_(None))
+        .limit(1)
+    ).scalars().first()
+    if has_nov:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail="No se puede eliminar el periodo porque contiene novedades cargadas",
+        )
+
+    has_bonos = db.execute(
+        select(NovedadesBonoCantidad.id).where(NovedadesBonoCantidad.periodo_id == periodo_id).limit(1)
+    ).scalars().first()
+    if has_bonos:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail="No se puede eliminar el periodo porque contiene bonos sincronizados",
+        )
+
+    has_practicas = db.execute(
+        select(NovedadesPracticaCantidad.id).where(NovedadesPracticaCantidad.periodo_id == periodo_id).limit(1)
+    ).scalars().first()
+    if has_practicas:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail="No se puede eliminar el periodo porque contiene practicas sincronizadas",
+        )
+
+    has_internaciones = db.execute(
+        select(NovedadesInternacionCantidad.id).where(NovedadesInternacionCantidad.periodo_id == periodo_id).limit(1)
+    ).scalars().first()
+    if has_internaciones:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail="No se puede eliminar el periodo porque contiene internaciones sincronizadas",
+        )
+
+    has_ajustes = db.execute(
+        select(NovedadesAjusteCapital.id).where(NovedadesAjusteCapital.periodo_id == periodo_id).limit(1)
+    ).scalars().first()
+    if has_ajustes:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail="No se puede eliminar el periodo porque contiene ajustes de Capital Humano",
+        )
+
+    soft_delete(item, actor_id)
+    db.commit()
 
 
 def list_jefe_servicios(db: Session) -> list[tuple]:
