@@ -805,3 +805,20 @@ def export_capital_bonos_xlsx(
         media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
         headers={"Content-Disposition": 'attachment; filename="capital-humano-bonos.xlsx"'},
     )
+
+
+@router.get("/export-liquidacion.xlsx")
+def export_liquidacion_xlsx(
+    periodo_id: int = Query(...),
+    db: Session = Depends(get_db),
+    user: User = Depends(require_admin_or_rrhh),
+) -> Response:
+    _ = user
+    from app.services.novedades import liquidacion_export as liquidacion_export_service
+
+    content = liquidacion_export_service.export_liquidacion_xlsx_bytes(db, periodo_id=periodo_id)
+    return Response(
+        content=content,
+        media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+        headers={"Content-Disposition": 'attachment; filename="liquidacion.xlsx"'},
+    )

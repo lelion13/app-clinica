@@ -435,6 +435,21 @@ export function NovedadesXlsPage() {
         >
           Descargar XLS (detalle)
         </button>
+        <button
+          type="button"
+          style={uiStyles.buttonPrimary}
+          onClick={() => download("/novedades/export-liquidacion.xlsx", "liquidacion.xlsx")}
+          disabled={!periodoId || !periodoClosed}
+          title={
+            !periodoId
+              ? "Seleccioná un período"
+              : !periodoClosed
+                ? "Solo disponible para períodos cerrados"
+                : "Descargar liquidación del período"
+          }
+        >
+          Descargar liquidación
+        </button>
       </div>
 
       <div style={{ overflowX: "auto" }}>
