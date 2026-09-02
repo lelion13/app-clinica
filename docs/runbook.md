@@ -111,6 +111,14 @@
   - Gestión modal de Períodos en Parametrización (modal de alta, modal de edición y modal de confirmación de eliminación).
   - `PUT /novedades/periodos/{id}`: Permite modificar nombre y rango de fechas solo en períodos abiertos (`open`); valida de forma estricta que ninguna carga activa (asignaciones o novedades) tenga fecha de realización fuera del nuevo rango (422).
   - `DELETE /novedades/periodos/{id}`: Permite soft-delete únicamente si el período no tiene cargas registradas ni producción/ajustes vinculados (409 si tiene datos).
+- Cambio `novedades-capital-humano-export-liquidacion`:
+  - Botón **Descargar liquidación** en Capital Humano (solo período **cerrado**); no reemplaza exports existentes.
+  - Endpoint `GET /novedades/export-liquidacion.xlsx?periodo_id=…` → columnas `empresa`, `legajo`, `monto`, `concepto`.
+  - Filas por `concepto_liquidacion` del servicio de cada carga; `empresa` = CHI si concepto > 100, si no CMG.
+  - Producción (bonos/prácticas/internaciones) se suma a esas filas (partes iguales si hay varios conceptos de la misma empresa; fallback a todos los conceptos de carga).
+  - Sin cargas: solo si hay DEA/DEP/CAP/CAI, con conceptos fijos 90/91/122/123.
+  - Ajustes (“Agregar importe”) se prorratean en partes iguales.
+  - Si algún servicio de las cargas no tiene concepto → bloquea exportación avisando el nombre del servicio.
 
 ## Roles (panel)
 - `admin`: distribución + novedades (todo) + usuarios
