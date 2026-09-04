@@ -25,6 +25,9 @@ from app.schemas.novedades import (
     FeriadoCreateRequest,
     FeriadoResponse,
     FeriadoUpdateRequest,
+    ImporteDescontarAnularResponse,
+    ImporteDescontarImportResponse,
+    ImporteDescontarStatusResponse,
     ModuloCreateRequest,
     ModuloImportResponse,
     ModuloResponse,
@@ -54,6 +57,7 @@ from app.services.novedades import cargas as cargas_service
 from app.services.novedades import bonos_import as bonos_import_service
 from app.services.novedades import capital_humano as capital_humano_service
 from app.services.novedades import export_xls
+from app.services.novedades import importe_descontar as importe_descontar_service
 from app.services.novedades import masters as masters_service
 from app.services.novedades import modulos_import as modulos_import_service
 from app.services.novedades import produccion_tarifas as produccion_tarifas_service
@@ -749,6 +753,40 @@ def capital_humano_ajustes_create(
     user: User = Depends(require_admin_or_rrhh),
 ) -> AjusteCapitalResponse:
     return capital_humano_service.create_ajuste(db, payload, user=user)
+
+
+@router.get("/capital-humano/importe-descontar/status", response_model=ImporteDescontarStatusResponse)
+def capital_humano_importe_descontar_status(
+    periodo_id: int = Query(...),
+    db: Session = Depends(get_db),
+    user: User = Depends(require_admin_or_rrhh),
+) -> ImporteDescontarStatusResponse:
+    _ = user
+    return importe_descontar_service.status_importe_descontar(db, periodo_id)
+
+
+@router.post("/capital-humano/importe-descontar", response_model=ImporteDescontarImportResponse)
+async def capital_humano_importe_descontar_import(
+    periodo_id: int = Query(...),
+    file: UploadFile = File(...),
+    db: Session = Depends(get_db),
+    user: User = Depends(require_admin_or_rrhh),
+) -> ImporteDescontarImportResponse:
+    raw = await file.read()
+    if not raw:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Archivo vacío")
+    return importe_descontar_service.import_importe_descontar(
+        db, periodo_id=periodo_id, content=raw, actor_id=user.id
+    )
+
+
+@router.post("/capital-humano/importe-descontar/anular", response_model=ImporteDescontarAnularResponse)
+def capital_humano_importe_descontar_anular(
+    periodo_id: int = Query(...),
+    db: Session = Depends(get_db),
+    user: User = Depends(require_admin_or_rrhh),
+) -> ImporteDescontarAnularResponse:
+    return importe_descontar_service.anular_importe_descontar(db, periodo_id, actor_id=user.id)
 
 
 @router.get("/export.xlsx")

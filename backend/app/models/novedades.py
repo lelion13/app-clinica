@@ -129,6 +129,8 @@ class NovedadesAjusteCapital(AuditMixin, Base):
     servicio_id: Mapped[int | None] = mapped_column(ForeignKey("novedades_servicio.id"), nullable=True)
     importe: Mapped[Decimal] = mapped_column(Numeric(12, 2), nullable=False)
     comentario: Mapped[str] = mapped_column(String(500), nullable=False)
+    # UUID string set only for "Importe a descontar" import lots (Anular targets these).
+    descuento_lote_id: Mapped[str | None] = mapped_column(String(36), nullable=True, index=True)
 
 
 class NovedadesBonoOpcion(AuditMixin, Base):

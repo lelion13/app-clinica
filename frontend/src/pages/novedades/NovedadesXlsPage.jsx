@@ -1,6 +1,6 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 
-import { apiDownloadWithRefresh, apiRequestWithRefresh } from "../../services/api";
+import { apiDownloadWithRefresh, apiRequestWithRefresh, apiUploadWithRefresh } from "../../services/api";
 import { AlertModal } from "../../components/AlertModal";
 import { uiStyles, uiTheme } from "../../ui/theme";
 
@@ -102,6 +102,12 @@ export function NovedadesXlsPage() {
   const [soloRows, setSoloRows] = useState([]);
   const [soloLoading, setSoloLoading] = useState(false);
 
+  const [hasDescuento, setHasDescuento] = useState(false);
+  const [descuentoBusy, setDescuentoBusy] = useState(false);
+  const [descuentoErrors, setDescuentoErrors] = useState(null);
+  const [descuentoErrorMessage, setDescuentoErrorMessage] = useState("");
+  const descuentoFileRef = useRef(null);
+
   const selectedPeriodo = useMemo(
     () => periodos.find((p) => String(p.id) === String(periodoId)) || null,
     [periodos, periodoId]
@@ -195,6 +201,83 @@ export function NovedadesXlsPage() {
     if (!bootstrapped) return;
     loadGrid(periodoId);
   }, [periodoId, bootstrapped]);
+
+  useEffect(() => {
+    const loadDescuentoStatus = async () => {
+      if (!periodoId || !periodoClosed) {
+        setHasDescuento(false);
+        return;
+      }
+      try {
+        const st = await apiRequestWithRefresh(
+          `/novedades/capital-humano/importe-descontar/status?periodo_id=${periodoId}`
+        );
+        setHasDescuento(Boolean(st?.has_descuento));
+      } catch {
+        setHasDescuento(false);
+      }
+    };
+    loadDescuentoStatus();
+  }, [periodoId, periodoClosed, rows]);
+
+  const onImporteDescontarClick = () => {
+    if (!periodoId || !periodoClosed || descuentoBusy) return;
+    if (hasDescuento) {
+      anularDescuento();
+      return;
+    }
+    descuentoFileRef.current?.click();
+  };
+
+  const anularDescuento = async () => {
+    setDescuentoBusy(true);
+    setError("");
+    try {
+      await apiRequestWithRefresh(
+        `/novedades/capital-humano/importe-descontar/anular?periodo_id=${periodoId}`,
+        { method: "POST" }
+      );
+      setInfo("Descuento anulado");
+      setHasDescuento(false);
+      await loadGrid(periodoId);
+    } catch (err) {
+      setError(err.message || "No se pudo anular el descuento");
+    } finally {
+      setDescuentoBusy(false);
+    }
+  };
+
+  const onDescuentoFile = async (event) => {
+    const file = event.target.files?.[0];
+    event.target.value = "";
+    if (!file || !periodoId) return;
+    setDescuentoBusy(true);
+    setError("");
+    setDescuentoErrors(null);
+    setDescuentoErrorMessage("");
+    try {
+      const form = new FormData();
+      form.append("file", file);
+      const result = await apiUploadWithRefresh(
+        `/novedades/capital-humano/importe-descontar?periodo_id=${periodoId}`,
+        form
+      );
+      setInfo(`Se importaron ${result?.created ?? 0} ajuste(s) de descuento`);
+      setHasDescuento(true);
+      await loadGrid(periodoId);
+    } catch (err) {
+      const detail = err.detail;
+      const errors = Array.isArray(detail?.errors) ? detail.errors : null;
+      if (errors?.length) {
+        setDescuentoErrorMessage(detail.message || err.message || "No se importó ningún descuento");
+        setDescuentoErrors(errors);
+      } else {
+        setError(err.message || "Error al importar descuentos");
+      }
+    } finally {
+      setDescuentoBusy(false);
+    }
+  };
 
   const download = async (path, fallbackName) => {
     setError("");
@@ -381,6 +464,70 @@ export function NovedadesXlsPage() {
       <AlertModal open={Boolean(error)} title="Atención" message={error} onClose={() => setError("")} />
       <AlertModal open={Boolean(info)} title="Listo" message={info} onClose={() => setInfo("")} />
 
+      {descuentoErrors ? (
+        <div
+          role="presentation"
+          style={{
+            position: "fixed",
+            inset: 0,
+            zIndex: 1000,
+            background: "rgba(15, 43, 39, 0.45)",
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            padding: 16,
+          }}
+          onClick={() => {
+            setDescuentoErrors(null);
+            setDescuentoErrorMessage("");
+          }}
+        >
+          <div
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="descuento-import-errors-title"
+            onClick={(e) => e.stopPropagation()}
+            style={{
+              background: "#fff",
+              borderRadius: uiTheme.radius.md,
+              maxWidth: 520,
+              width: "100%",
+              maxHeight: "80vh",
+              overflowY: "auto",
+              padding: 22,
+              boxShadow: "0 12px 40px rgba(0,0,0,0.18)",
+            }}
+          >
+            <h3 id="descuento-import-errors-title" style={{ marginTop: 0, marginBottom: 8 }}>
+              No se importó el descuento
+            </h3>
+            <p style={{ marginTop: 0, color: uiTheme.colors.textMuted, fontSize: 14 }}>
+              {descuentoErrorMessage || "Corregí los siguientes ítems e intentá de nuevo."}
+            </p>
+            <ul style={{ paddingLeft: 18, margin: "12px 0 20px", fontSize: 14 }}>
+              {descuentoErrors.map((item, idx) => (
+                <li key={`${item.row}-${idx}`} style={{ marginBottom: 6 }}>
+                  {item.row ? `Fila ${item.row}: ` : ""}
+                  {item.reason}
+                </li>
+              ))}
+            </ul>
+            <div style={{ display: "flex", justifyContent: "flex-end" }}>
+              <button
+                type="button"
+                style={uiStyles.buttonPrimary}
+                onClick={() => {
+                  setDescuentoErrors(null);
+                  setDescuentoErrorMessage("");
+                }}
+              >
+                Cerrar
+              </button>
+            </div>
+          </div>
+        </div>
+      ) : null}
+
       <div style={{ display: "flex", gap: 8, flexWrap: "wrap", marginBottom: 12, alignItems: "center" }}>
         <select value={periodoId} onChange={(e) => setPeriodoId(e.target.value)} style={uiStyles.formControl}>
           <option value="">Seleccioná período…</option>
@@ -434,6 +581,34 @@ export function NovedadesXlsPage() {
           onClick={() => download("/novedades/export.xlsx", "novedades-detalle.xlsx")}
         >
           Descargar XLS (detalle)
+        </button>
+        <input
+          ref={descuentoFileRef}
+          type="file"
+          accept=".xlsx,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+          style={{ display: "none" }}
+          onChange={onDescuentoFile}
+        />
+        <button
+          type="button"
+          style={hasDescuento ? uiStyles.buttonDanger : uiStyles.buttonPrimary}
+          onClick={onImporteDescontarClick}
+          disabled={!periodoId || !periodoClosed || descuentoBusy}
+          title={
+            !periodoId
+              ? "Seleccioná un período"
+              : !periodoClosed
+                ? "Solo disponible para períodos cerrados"
+                : hasDescuento
+                  ? "Anular descuentos importados"
+                  : "Importar Excel de importes a descontar"
+          }
+        >
+          {descuentoBusy
+            ? "Procesando…"
+            : hasDescuento
+              ? "Anular descuento"
+              : "Importe a descontar"}
         </button>
         <button
           type="button"

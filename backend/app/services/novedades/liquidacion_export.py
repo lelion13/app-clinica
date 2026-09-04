@@ -148,7 +148,7 @@ def build_liquidacion_rows(db: Session, *, periodo_id: int) -> list[LiquidacionR
         if getattr(row, "tipo", None) == "modulo_asignado":
             has_modulos.add(row.professional_id)
 
-    # ajustes
+    # ajustes: with servicio_id → that service's concepto; else equal split
     ajustes = list(
         db.execute(
             select(NovedadesAjusteCapital).where(
@@ -159,9 +159,24 @@ def build_liquidacion_rows(db: Session, *, periodo_id: int) -> list[LiquidacionR
         .scalars()
         .all()
     )
-    ajustes_by_prof: dict[int, Decimal] = defaultdict(lambda: Decimal("0"))
+    ajustes_equal_by_prof: dict[int, Decimal] = defaultdict(lambda: Decimal("0"))
+    ajustes_by_prof_servicio: dict[int, dict[int, Decimal]] = defaultdict(
+        lambda: defaultdict(lambda: Decimal("0"))
+    )
     for item in ajustes:
-        ajustes_by_prof[item.professional_id] += Decimal(item.importe)
+        if item.servicio_id is None:
+            ajustes_equal_by_prof[item.professional_id] += Decimal(item.importe)
+        else:
+            ajustes_by_prof_servicio[item.professional_id][item.servicio_id] += Decimal(item.importe)
+
+    # Map servicio_id -> concepto for targeted adjustments
+    ajuste_servicio_ids = {
+        sid for by_svc in ajustes_by_prof_servicio.values() for sid in by_svc
+    }
+    for sid in ajuste_servicio_ids - set(servicios):
+        svc = db.execute(select(NovedadesServicio).where(NovedadesServicio.id == sid)).scalar_one_or_none()
+        if svc:
+            servicios[sid] = svc
 
     from app.services.novedades.bonos_import import (
         load_bonos_snapshot,
@@ -176,7 +191,8 @@ def build_liquidacion_rows(db: Session, *, periodo_id: int) -> list[LiquidacionR
 
     prof_ids = (
         set(cargas)
-        | set(ajustes_by_prof)
+        | set(ajustes_equal_by_prof)
+        | set(ajustes_by_prof_servicio)
         | set(bonos_by_prof)
         | set(practicas_by_prof)
         | set(internaciones_by_prof)
@@ -249,7 +265,13 @@ def build_liquidacion_rows(db: Session, *, periodo_id: int) -> list[LiquidacionR
                 targets = by_emp.get(emp) or conceptos_list
                 _add_to(out[pid], _split_equal(amount, targets))
 
-            ajuste = ajustes_by_prof.get(pid, Decimal("0"))
+            for sid, amount in ajustes_by_prof_servicio.get(pid, {}).items():
+                svc = servicios.get(sid)
+                if svc and svc.concepto_liquidacion is not None:
+                    out[pid][int(svc.concepto_liquidacion)] += amount
+                else:
+                    _add_to(out[pid], _split_equal(amount, conceptos_list))
+            ajuste = ajustes_equal_by_prof.get(pid, Decimal("0"))
             if ajuste:
                 _add_to(out[pid], _split_equal(ajuste, conceptos_list))
             continue
@@ -293,7 +315,13 @@ def build_liquidacion_rows(db: Session, *, periodo_id: int) -> list[LiquidacionR
             targets = fixed_by_emp.get(emp) or fixed_list
             _add_to(out[pid], _split_equal(amount, targets))
 
-        ajuste = ajustes_by_prof.get(pid, Decimal("0"))
+        for sid, amount in ajustes_by_prof_servicio.get(pid, {}).items():
+            svc = servicios.get(sid)
+            if svc and svc.concepto_liquidacion is not None:
+                out[pid][int(svc.concepto_liquidacion)] += amount
+            else:
+                _add_to(out[pid], _split_equal(amount, fixed_list))
+        ajuste = ajustes_equal_by_prof.get(pid, Decimal("0"))
         if ajuste:
             _add_to(out[pid], _split_equal(ajuste, fixed_list))
 
