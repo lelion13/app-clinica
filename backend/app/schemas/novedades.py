@@ -428,3 +428,17 @@ class ModuloImportRowError(BaseModel):
 class ModuloImportResponse(BaseModel):
     created: int
     errors: list[ModuloImportRowError] = Field(default_factory=list)
+
+
+class ImporteDescontarStatusResponse(BaseModel):
+    has_descuento: bool
+    lote_id: str | None = None
+
+
+class ImporteDescontarImportResponse(BaseModel):
+    created: int
+    lote_id: str
+
+
+class ImporteDescontarAnularResponse(BaseModel):
+    deleted: int

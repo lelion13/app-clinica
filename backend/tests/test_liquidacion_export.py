@@ -230,7 +230,7 @@ def test_ajustes_prorrateo(monkeypatch):
         SimpleNamespace(professional_id=1, servicio_id=11, valor=Decimal("0"), tipo="hora_extra"),
     ]
     prof = SimpleNamespace(id=1, legajo="9", full_name="P", deleted_at=None)
-    ajuste = SimpleNamespace(professional_id=1, importe=Decimal("200"), deleted_at=None)
+    ajuste = SimpleNamespace(professional_id=1, importe=Decimal("200"), deleted_at=None, servicio_id=None)
     queue = [
         FakeResult(periodo),
         FakeResult([svc50, svc150]),
@@ -256,6 +256,43 @@ def test_ajustes_prorrateo(monkeypatch):
     assert by_c[150].monto == Decimal("100")
     assert by_c[50].empresa == "CMG"
     assert by_c[150].empresa == "CHI"
+
+
+def test_ajuste_con_servicio_va_al_concepto(monkeypatch):
+    periodo = SimpleNamespace(id=1, estado=PeriodoEstado.closed, deleted_at=None)
+    svc50 = SimpleNamespace(id=10, nombre="S50", concepto_liquidacion=50)
+    svc150 = SimpleNamespace(id=11, nombre="S150", concepto_liquidacion=150)
+    rows = [
+        SimpleNamespace(professional_id=1, servicio_id=10, valor=Decimal("0"), tipo="hora_extra"),
+        SimpleNamespace(professional_id=1, servicio_id=11, valor=Decimal("0"), tipo="hora_extra"),
+    ]
+    prof = SimpleNamespace(id=1, legajo="9", full_name="P", deleted_at=None)
+    ajuste = SimpleNamespace(
+        professional_id=1, importe=Decimal("-500"), deleted_at=None, servicio_id=10
+    )
+    queue = [
+        FakeResult(periodo),
+        FakeResult([svc50, svc150]),
+        FakeResult([ajuste]),
+        FakeResult([prof]),
+    ]
+
+    class DB:
+        def execute(self, _stmt):
+            return queue.pop(0)
+
+    monkeypatch.setattr(liq, "build_grid_rows", lambda *_a, **_k: rows)
+    import app.services.novedades.bonos_import as bi
+
+    monkeypatch.setattr(bi, "load_bonos_snapshot", lambda *_a, **_k: ([], {}))
+    monkeypatch.setattr(bi, "load_practicas_snapshot", lambda *_a, **_k: {})
+    monkeypatch.setattr(bi, "load_internaciones_snapshot", lambda *_a, **_k: {})
+    monkeypatch.setattr(liq, "load_tarifas_by_opcion_key", lambda *_a, **_k: {})
+
+    result = liq.build_liquidacion_rows(DB(), periodo_id=1)
+    by_c = {r.concepto: r for r in result}
+    assert by_c[50].monto == Decimal("-500")
+    assert 150 not in by_c
 
 
 def test_export_xlsx_headers(monkeypatch):

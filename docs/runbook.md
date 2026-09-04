@@ -117,8 +117,15 @@
   - Filas por `concepto_liquidacion` del servicio de cada carga; `empresa` = CHI si concepto > 100, si no CMG.
   - Producción (bonos/prácticas/internaciones) se suma a esas filas (partes iguales si hay varios conceptos de la misma empresa; fallback a todos los conceptos de carga).
   - Sin cargas: solo si hay DEA/DEP/CAP/CAI, con conceptos fijos 90/91/122/123.
-  - Ajustes (“Agregar importe”) se prorratean en partes iguales.
+  - Ajustes con `servicio_id` van al concepto de ese servicio; sin servicio se prorratean en partes iguales.
   - Si algún servicio de las cargas no tiene concepto → bloquea exportación avisando el nombre del servicio.
+- Cambio `novedades-capital-humano-importe-descontar` (rev `0025_ajuste_descuento_lote`):
+  - Botón **Importe a descontar** (antes de Descargar liquidación); con lote activo → **Anular descuento**.
+  - Solo período **cerrado**; `admin`/`rrhh`. Re-import exige anular antes.
+  - Excel columnas exactas: `Legajo`, `Nombre y Apellido`, `Sector`, `Monto`. Importe = `-abs(Monto)`.
+  - Comentario: `Legajo - Nombre - Sector - MontoNeg` (truncado a 500).
+  - Waterfill multi-servicio (mayor cargas primero; resto tras cargas al último servicio); tope cargas+producción.
+  - Todo-o-nada; modal con todos los errores. Anular soft-delete solo del lote (`descuento_lote_id`).
 
 ## Roles (panel)
 - `admin`: distribución + novedades (todo) + usuarios
