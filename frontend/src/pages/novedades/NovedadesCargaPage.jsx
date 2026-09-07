@@ -90,12 +90,14 @@ export function NovedadesCargaPage() {
   const [forceOpen, setForceOpen] = useState(false);
   const [forceLoading, setForceLoading] = useState(false);
   const [feriados, setFeriados] = useState([]);
+  const [novedadExtra, setNovedadExtra] = useState(false);
 
   const openPeriodo = useMemo(() => periodos.find((p) => p.estado === "open"), [periodos]);
   const selectedModulo = useMemo(
     () => modulos.find((m) => String(m.id) === String(moduloId)),
     [modulos, moduloId]
   );
+  const showNovedadExtra = Boolean(selectedModulo && selectedModulo.produccion === false);
 
   const feriadoSet = useMemo(
     () => new Set((feriados || []).map((f) => String(f.fecha || "").slice(0, 10))),
@@ -144,6 +146,19 @@ export function NovedadesCargaPage() {
     const stillValid = modulosVisibles.some((m) => String(m.id) === String(moduloId));
     if (!stillValid) setModuloId("");
   }, [moduloId, modulosVisibles]);
+
+  useEffect(() => {
+    if (!showNovedadExtra) {
+      setNovedadExtra(false);
+    }
+  }, [showNovedadExtra]);
+
+  useEffect(() => {
+    if (!novedadExtra) return;
+    setTipo("hora_extra");
+    setHoras("");
+    setIncluirNovedad(false);
+  }, [novedadExtra]);
 
   const gridRows = useMemo(() => {
     const moduloRows = asignaciones.map((item) => ({
@@ -201,6 +216,7 @@ export function NovedadesCargaPage() {
     setTipo("hora_extra");
     setHoras("");
     setIncluirNovedad(false);
+    setNovedadExtra(false);
     setFechaRealizacion(todayISO());
   };
 
@@ -283,7 +299,7 @@ export function NovedadesCargaPage() {
 
   const performCreate = async (sinProd = null) => {
     const hasModulo = Boolean(moduloId);
-    const hasNovedad = incluirNovedad || Boolean(horas);
+    const hasNovedad = !novedadExtra && (incluirNovedad || Boolean(horas));
     const extra = sinProd
       ? {
           motivo_sin_produccion: sinProd.motivo_sin_produccion,
@@ -336,7 +352,11 @@ export function NovedadesCargaPage() {
     }
 
     const hasModulo = Boolean(moduloId);
-    const hasNovedad = incluirNovedad || Boolean(horas);
+    const hasNovedad = !novedadExtra && (incluirNovedad || Boolean(horas));
+    if (novedadExtra && !hasModulo) {
+      setError("Novedad extra requiere un módulo sin producción seleccionado");
+      return;
+    }
     if (!hasModulo && !hasNovedad) {
       setError("Seleccioná un módulo y/o completá las horas de la novedad");
       return;
@@ -348,6 +368,12 @@ export function NovedadesCargaPage() {
         setError("La cantidad de horas debe ser un entero mayor o igual a 1");
         return;
       }
+    }
+
+    // Novedad extra: same force modal as sin producción, without external API.
+    if (novedadExtra && hasModulo) {
+      setForceOpen(true);
+      return;
     }
 
     const selectedProf = profesionales.find((p) => String(p.id) === String(professionalId));
@@ -484,6 +510,16 @@ export function NovedadesCargaPage() {
                 <option key={m.id} value={m.id}>{m.descripcion}</option>
               ))}
             </select>
+            {showNovedadExtra ? (
+              <label style={{ display: "inline-flex", alignItems: "center", gap: 6, fontSize: 14, whiteSpace: "nowrap" }}>
+                <input
+                  type="checkbox"
+                  checked={novedadExtra}
+                  onChange={(e) => setNovedadExtra(e.target.checked)}
+                />
+                Novedad extra
+              </label>
+            ) : null}
             <span style={uiStyles.helpText}>
               Valor (solo lectura): {selectedModulo ? `$${selectedModulo.valor}` : "—"}
             </span>
@@ -491,7 +527,12 @@ export function NovedadesCargaPage() {
 
           <h2 style={{ margin: "8px 0", fontSize: "1rem" }}>Novedad (opcional)</h2>
           <div style={{ display: "flex", gap: 8, flexWrap: "wrap", alignItems: "center", marginBottom: 16 }}>
-            <select value={tipo} onChange={(e) => setTipo(e.target.value)} style={uiStyles.formControl}>
+            <select
+              value={tipo}
+              onChange={(e) => setTipo(e.target.value)}
+              style={uiStyles.formControl}
+              disabled={novedadExtra}
+            >
               {TIPO_OPTIONS.map((opt) => (
                 <option key={opt.value} value={opt.value}>{opt.label}</option>
               ))}
@@ -502,6 +543,7 @@ export function NovedadesCargaPage() {
               min="1"
               inputMode="numeric"
               value={horas}
+              disabled={novedadExtra}
               onChange={(e) => {
                 const raw = e.target.value;
                 if (raw === "") {
@@ -516,9 +558,11 @@ export function NovedadesCargaPage() {
               style={uiStyles.formControl}
             />
             <span style={uiStyles.helpText}>
-              Valor estimado: {horas && valorHora != null
-                ? `$${(Number(horas) * Number(valorHora) * (tipo === "horas_a_descontar" ? -1 : 1)).toFixed(2)}`
-                : "—"}
+              {novedadExtra
+                ? "Novedad de horas deshabilitada (novedad extra)"
+                : horas && valorHora != null
+                  ? `Valor estimado: $${(Number(horas) * Number(valorHora) * (tipo === "horas_a_descontar" ? -1 : 1)).toFixed(2)}`
+                  : "Valor estimado: —"}
             </span>
           </div>
 
