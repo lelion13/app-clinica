@@ -80,7 +80,7 @@
   - UI Carga (admin/jefe): al **crear**, si `false` → modal force (motivo Vacaciones/Enfermedad + observación) → POST con `motivo_sin_produccion` / `observacion_sin_produccion` (rev `0017_sin_prod_motivo`); Cancelar no POST
   - Editar fecha o error del proxy: bloqueo simple (sin force). Create API no reconsulta producción; valida enum/obs si vienen
   - Si el **módulo** tiene `produccion=false` (rev `0018_modulo_produccion`), al cargar ese módulo (solo o con novedad) **no** se llama al proxy
-  - Cambio `novedades-carga-novedad-extra`: checkbox **Novedad extra** (solo módulo sin prod). Destildado = skip actual. Tildado = limpia/bloquea horas, abre el mismo modal force **sin** llamar al proxy; POST solo módulo + motivo/obs
+  - Cambio `novedades-carga-novedad-extra`: checkbox **Novedad extra** (solo módulo sin prod; UI después del valor del módulo). Destildado = skip actual. Tildado = limpia/bloquea horas, abre el mismo modal force **sin** llamar al proxy; POST solo módulo + motivo/obs
 - Cambio `novedades-modulos-edicion`: Param → Módulos: `editar` (datos + checkbox producción) y `servicios` (permite 0); `PUT /modulos/{id}` vs `PUT /modulos/{id}/servicios`
 - Cambio `novedades-sadofe-feriados-descuento` (rev `0019_sadofe_feriados` + `0020_servicio_concepto`):
   - Módulo checkbox **SADOFE** (off = Semana); Carga filtra combo según fecha + feriados (lun–vie no feriado = Semana; sáb/dom/feriado = SADOFE)

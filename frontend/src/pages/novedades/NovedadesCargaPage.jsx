@@ -510,6 +510,9 @@ export function NovedadesCargaPage() {
                 <option key={m.id} value={m.id}>{m.descripcion}</option>
               ))}
             </select>
+            <span style={uiStyles.helpText}>
+              Valor (solo lectura): {selectedModulo ? `$${selectedModulo.valor}` : "—"}
+            </span>
             {showNovedadExtra ? (
               <label style={{ display: "inline-flex", alignItems: "center", gap: 6, fontSize: 14, whiteSpace: "nowrap" }}>
                 <input
@@ -520,9 +523,6 @@ export function NovedadesCargaPage() {
                 Novedad extra
               </label>
             ) : null}
-            <span style={uiStyles.helpText}>
-              Valor (solo lectura): {selectedModulo ? `$${selectedModulo.valor}` : "—"}
-            </span>
           </div>
 
           <h2 style={{ margin: "8px 0", fontSize: "1rem" }}>Novedad (opcional)</h2>

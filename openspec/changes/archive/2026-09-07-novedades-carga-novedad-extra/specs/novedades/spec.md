@@ -4,7 +4,7 @@
 
 ### Requirement: Novedad extra en Carga (módulo sin producción)
 
-On the Carga page, when the selected módulo has `produccion=false`, the UI MUST show an optional checkbox labeled **Novedad extra** next to the módulo control. Default MUST be unchecked.
+On the Carga page, when the selected módulo has `produccion=false`, the UI MUST show an optional checkbox labeled **Novedad extra** after the módulo value (read-only) label. Default MUST be unchecked.
 
 When the selected módulo has `produccion=true` or no módulo is selected, the checkbox MUST be hidden and its state MUST be cleared.
 
@@ -21,7 +21,7 @@ When **Novedad extra** is unchecked and the módulo has `produccion=false`, Requ
 
 - GIVEN módulo M con `produccion=false` seleccionado
 - WHEN admin/jefe ve el form de Carga
-- THEN MUST ver el checkbox Novedad extra destildado junto al módulo
+- THEN MUST ver el checkbox Novedad extra destildado después del valor del módulo
 
 #### Scenario: Cambio a módulo con prod limpia
 
