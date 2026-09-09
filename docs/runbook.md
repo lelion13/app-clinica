@@ -53,6 +53,8 @@
   - Detalle unificado: cargas + producción (cantidad/subtotal) + historial de ajustes
   - Solo bonos + elegibilidad DEA/DEP/CAP/CAI sin cambio; Excel/concepto liquidación → change posterior
   - Actualizar disabled si período closed; al entrar muestra datos persistidos
+- Cambio `novedades-capital-humano-grilla-totales`:
+  - Pie de grilla Capital Humano: suma Total cargas · Ajustes · Total producción · Total general de las **filas visibles** (filtro); columnas Legajo/Profesional/Acciones vacías; sin filas → `$0,00`; solo UI (no XLS)
 - Cambio `capital-humano-profesionales-especialistas` (rev `0022_especialista_valor`):
   - Env `NOVEDADES_PROF_ESPECIALISTAS_URL` (+ timeout opcional); Bearer = `NOVEDADES_PROF_SYNC_TOKEN`
   - Sync **Parametrización** (`?include_especialistas=1`): marca `es_especialista`; modal/aviso de códigos sin match; si falla API especialistas no toca flags

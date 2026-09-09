@@ -420,6 +420,20 @@ export function NovedadesXlsPage() {
     return sorted;
   }, [rows, filterText, sortKey, sortDir]);
 
+  const gridTotals = useMemo(() => {
+    let cargas = 0;
+    let ajustes = 0;
+    let bonos = 0;
+    let total = 0;
+    for (const r of visibleRows) {
+      cargas += Number(r.monto_cargas) || 0;
+      ajustes += Number(r.monto_ajustes) || 0;
+      bonos += Number(r.monto_bonos) || 0;
+      total += Number(r.monto_total) || 0;
+    }
+    return { cargas, ajustes, bonos, total };
+  }, [visibleRows]);
+
   const detailProduccionRows = useMemo(() => {
     if (!detailRow) return [];
     const bonos = detailRow.bonos || {};
@@ -678,6 +692,58 @@ export function NovedadesXlsPage() {
               </tr>
             ))}
           </tbody>
+          <tfoot>
+            <tr>
+              <td style={tdStyle} />
+              <td style={tdStyle} />
+              <td
+                style={{
+                  ...tdStyle,
+                  fontVariantNumeric: "tabular-nums",
+                  fontWeight: 600,
+                  borderTop: `2px solid ${uiTheme.colors.borderStrong}`,
+                }}
+              >
+                {formatMoney(gridTotals.cargas)}
+              </td>
+              <td
+                style={{
+                  ...tdStyle,
+                  fontVariantNumeric: "tabular-nums",
+                  fontWeight: 600,
+                  borderTop: `2px solid ${uiTheme.colors.borderStrong}`,
+                }}
+              >
+                {formatMoney(gridTotals.ajustes)}
+              </td>
+              <td
+                style={{
+                  ...tdStyle,
+                  fontVariantNumeric: "tabular-nums",
+                  fontWeight: 600,
+                  borderTop: `2px solid ${uiTheme.colors.borderStrong}`,
+                }}
+              >
+                {formatMoney(gridTotals.bonos)}
+              </td>
+              <td
+                style={{
+                  ...tdStyle,
+                  fontVariantNumeric: "tabular-nums",
+                  fontWeight: 600,
+                  borderTop: `2px solid ${uiTheme.colors.borderStrong}`,
+                }}
+              >
+                {formatMoney(gridTotals.total)}
+              </td>
+              <td
+                style={{
+                  ...tdStyle,
+                  borderTop: `2px solid ${uiTheme.colors.borderStrong}`,
+                }}
+              />
+            </tr>
+          </tfoot>
         </table>
         {!visibleRows.length ? <p style={uiStyles.helpText}>Sin resultados.</p> : null}
       </div>
