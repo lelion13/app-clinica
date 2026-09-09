@@ -55,7 +55,7 @@ DEP_CAP = {"DEP", "CAP"}
 
 @dataclass
 class LiquidacionRow:
-    empresa: str
+    empresa: int
     legajo: str
     monto: Decimal
     concepto: int
@@ -325,8 +325,9 @@ def build_liquidacion_rows(db: Session, *, periodo_id: int) -> list[LiquidacionR
         if ajuste:
             _add_to(out[pid], _split_equal(ajuste, fixed_list))
 
-    # Aggregate to (empresa, legajo, concepto)
-    aggregated: dict[tuple[str, str, int], Decimal] = defaultdict(lambda: Decimal("0"))
+    # Aggregate by (legajo, concepto); exported empresa is always numeric 1.
+    # Internal CHI/CMG bucketing above is unchanged for allocation.
+    aggregated: dict[tuple[str, int], Decimal] = defaultdict(lambda: Decimal("0"))
     for pid, conceptos in out.items():
         prof = professionals.get(pid)
         if not prof:
@@ -335,14 +336,13 @@ def build_liquidacion_rows(db: Session, *, periodo_id: int) -> list[LiquidacionR
         for concepto, monto in conceptos.items():
             if monto == 0:
                 continue
-            emp = empresa_from_concepto(concepto)
-            aggregated[(emp, legajo, concepto)] += monto
+            aggregated[(legajo, concepto)] += monto
 
     rows = [
-        LiquidacionRow(empresa=emp, legajo=legajo, monto=monto, concepto=concepto)
-        for (emp, legajo, concepto), monto in aggregated.items()
+        LiquidacionRow(empresa=1, legajo=legajo, monto=monto, concepto=concepto)
+        for (legajo, concepto), monto in aggregated.items()
     ]
-    rows.sort(key=lambda r: (r.empresa, r.legajo, r.concepto))
+    rows.sort(key=lambda r: (r.legajo, r.concepto))
     return rows
 
 

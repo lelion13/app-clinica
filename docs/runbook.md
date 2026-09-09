@@ -117,7 +117,7 @@
 - Cambio `novedades-capital-humano-export-liquidacion`:
   - Botón **Descargar liquidación** en Capital Humano (solo período **cerrado**); no reemplaza exports existentes.
   - Endpoint `GET /novedades/export-liquidacion.xlsx?periodo_id=…` → columnas `empresa`, `legajo`, `monto`, `concepto`.
-  - Filas por `concepto_liquidacion` del servicio de cada carga; `empresa` = CHI si concepto > 100, si no CMG.
+  - Filas por `concepto_liquidacion` del servicio de cada carga; columna **`empresa` siempre numérico `1`** (el armado/reparto interno CHI/CMG no cambia).
   - Producción (bonos/prácticas/internaciones) se suma a esas filas (partes iguales si hay varios conceptos de la misma empresa; fallback a todos los conceptos de carga).
   - Sin cargas: solo si hay DEA/DEP/CAP/CAI, con conceptos fijos 90/91/122/123.
   - Ajustes con `servicio_id` van al concepto de ese servicio; sin servicio se prorratean en partes iguales.

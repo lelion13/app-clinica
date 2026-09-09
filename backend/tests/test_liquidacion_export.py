@@ -127,7 +127,8 @@ def test_multi_concepto_cargas_and_prod_split(monkeypatch):
 
     result = liq.build_liquidacion_rows(DB(), periodo_id=1)
     by_c = {r.concepto: r for r in result}
-    assert by_c[50].empresa == "CMG"
+    assert by_c[50].empresa == 1
+    assert by_c[60].empresa == 1
     assert by_c[50].legajo == "3904"
     assert by_c[50].monto == Decimal("600")  # 100 + 500
     assert by_c[60].monto == Decimal("700")  # 200 + 500
@@ -192,7 +193,7 @@ def test_solo_dea_cmg_fixed_concepto(monkeypatch):
     result = liq.build_liquidacion_rows(DB(), periodo_id=1)
     assert len(result) == 1
     assert result[0].concepto == 90
-    assert result[0].empresa == "CMG"
+    assert result[0].empresa == 1
     assert result[0].monto == Decimal("3000")
 
 
@@ -254,8 +255,8 @@ def test_ajustes_prorrateo(monkeypatch):
     by_c = {r.concepto: r for r in result}
     assert by_c[50].monto == Decimal("100")
     assert by_c[150].monto == Decimal("100")
-    assert by_c[50].empresa == "CMG"
-    assert by_c[150].empresa == "CHI"
+    assert by_c[50].empresa == 1
+    assert by_c[150].empresa == 1
 
 
 def test_ajuste_con_servicio_va_al_concepto(monkeypatch):
@@ -299,7 +300,7 @@ def test_export_xlsx_headers(monkeypatch):
     monkeypatch.setattr(
         liq,
         "build_liquidacion_rows",
-        lambda *_a, **_k: [liq.LiquidacionRow(empresa="CMG", legajo="1", monto=Decimal("10.5"), concepto=50)],
+        lambda *_a, **_k: [liq.LiquidacionRow(empresa=1, legajo="1", monto=Decimal("10.5"), concepto=50)],
     )
     content = liq.export_liquidacion_xlsx_bytes(SimpleNamespace(), periodo_id=1)
     assert content[:2] == b"PK"  # zip/xlsx
