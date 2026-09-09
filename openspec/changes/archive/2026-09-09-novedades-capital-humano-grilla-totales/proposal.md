@@ -26,6 +26,6 @@ Low — display-only; filter already defines `visibleRows`.
 
 ## Success Criteria
 
-- [ ] Footer sums match sum of visible numeric cells.
-- [ ] Filter narrows footer totals.
-- [ ] No rows → footer `$0,00`; XLS unchanged.
+- [x] Footer sums match sum of visible numeric cells.
+- [x] Filter narrows footer totals.
+- [x] No rows → footer `$0,00`; XLS unchanged.
