@@ -16,6 +16,7 @@ import { ProfessionalsPage } from "./pages/ProfessionalsPage";
 import { RoomHoursPage } from "./pages/RoomHoursPage";
 import { SetupPage } from "./pages/SetupPage";
 import { UsersPage } from "./pages/UsersPage";
+import { SettingsBackupPage } from "./pages/SettingsBackupPage";
 import { HomePage } from "./pages/HomePage";
 import { OccupancyPage } from "./pages/OccupancyPage";
 import { WeeklyOccupancyPage } from "./pages/WeeklyOccupancyPage";
@@ -87,6 +88,14 @@ function AppRouter() {
           element={
             <ProtectedRoute adminOnly>
               <UsersPage />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="configuracion"
+          element={
+            <ProtectedRoute adminOnly>
+              <SettingsBackupPage />
             </ProtectedRoute>
           }
         />

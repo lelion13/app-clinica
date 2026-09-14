@@ -2,6 +2,7 @@ import { Link } from "react-router-dom";
 
 import { useAuth } from "../auth/AuthContext";
 import {
+  CONFIG_NAV_ITEM,
   DISTRIBUTION_ITEMS,
   NOVEDADES_ITEMS,
   USERS_NAV_ITEM,
@@ -28,6 +29,7 @@ export function HomePage() {
   const distributionLinks = itemsForRole(DISTRIBUTION_ITEMS, user?.role);
   const novedadesLinks = itemsForRole(NOVEDADES_ITEMS, user?.role);
   const showUsers = isAdmin && canAccessModule(user?.role, USERS_NAV_ITEM.roles);
+  const showConfig = isAdmin && canAccessModule(user?.role, CONFIG_NAV_ITEM.roles);
 
   return (
     <section style={{ display: "grid", gap: 20 }}>
@@ -76,12 +78,27 @@ export function HomePage() {
         </div>
       ) : null}
 
-      {showUsers ? (
+      {showUsers || showConfig ? (
         <div style={{ display: "grid", gap: 12 }}>
           <h2 style={{ margin: 0, fontSize: "1.05rem", color: uiTheme.colors.text }}>Administración</h2>
-          <Link to={USERS_NAV_ITEM.path} style={{ ...cardLinkStyle, maxWidth: 280 }}>
-            {USERS_NAV_ITEM.label}
-          </Link>
+          <div
+            style={{
+              display: "grid",
+              gridTemplateColumns: "repeat(auto-fill, minmax(200px, 1fr))",
+              gap: 10,
+            }}
+          >
+            {showUsers ? (
+              <Link to={USERS_NAV_ITEM.path} style={cardLinkStyle}>
+                {USERS_NAV_ITEM.label}
+              </Link>
+            ) : null}
+            {showConfig ? (
+              <Link to={CONFIG_NAV_ITEM.path} style={cardLinkStyle}>
+                {CONFIG_NAV_ITEM.label}
+              </Link>
+            ) : null}
+          </div>
         </div>
       ) : null}
     </section>

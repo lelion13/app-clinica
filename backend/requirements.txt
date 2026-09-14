@@ -12,3 +12,5 @@ python-multipart
 pytest
 httpx
 openpyxl
+boto3
+apscheduler

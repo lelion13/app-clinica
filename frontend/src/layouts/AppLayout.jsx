@@ -3,7 +3,7 @@ import { Link, NavLink, Outlet } from "react-router-dom";
 import { useAuth } from "../auth/AuthContext";
 import { DistributionNavMenu } from "../components/DistributionNavMenu";
 import { NovedadesNavMenu } from "../components/NovedadesNavMenu";
-import { USERS_NAV_ITEM } from "../config/navigation";
+import { USERS_NAV_ITEM, CONFIG_NAV_ITEM } from "../config/navigation";
 import { navPillStyle, uiStyles, uiTheme } from "../ui/theme";
 
 const navLinkStyle = ({ isActive }) => ({
@@ -78,9 +78,14 @@ export function AppLayout() {
             <DistributionNavMenu />
             <NovedadesNavMenu />
             {isAdmin ? (
-              <NavLink to={USERS_NAV_ITEM.path} style={navLinkStyle}>
-                {USERS_NAV_ITEM.label}
-              </NavLink>
+              <>
+                <NavLink to={USERS_NAV_ITEM.path} style={navLinkStyle}>
+                  {USERS_NAV_ITEM.label}
+                </NavLink>
+                <NavLink to={CONFIG_NAV_ITEM.path} style={navLinkStyle}>
+                  {CONFIG_NAV_ITEM.label}
+                </NavLink>
+              </>
             ) : null}
           </nav>
         </div>
