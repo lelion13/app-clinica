@@ -165,6 +165,27 @@
 5. Generación XLS (admin/rrhh): grilla + filtros + descarga (incluye ambas fechas).
 6. Parametrización: Feriados globales (fecha + nombre) al lado de Períodos.
 
+## Backups de base de datos (S3)
+
+Cambio `system-backups-s3` (rev `0027_system_backups`):
+- UI **Configuración** (`/configuracion`, solo admin): S3/R2 endpoint, bucket dedicado clinica, keys, prefix (`clinica-backups/`), retención (default 15), schedule daily/weekly (default off).
+- Manual: **Realizar backup ahora** → `pg_dump -Fc` desde el backend → upload S3 → prune → log.
+- Objetos: `{prefix}clinica_backup_YYYYMMDD_HHMMSS.dump`.
+- Backend image incluye `postgresql-client`; deps `boto3` + `apscheduler`.
+- Tras deploy: `alembic upgrade head`, crear bucket clinica, cargar credenciales en UI, probar backup manual antes de habilitar schedule.
+
+### Restore CLI (sin UI)
+
+1. Descargar el `.dump` desde el bucket S3/R2.
+2. Copiar al VPS (ej. junto al compose).
+3. Restaurar (cuidado: `--clean` pisa datos):
+
+```bash
+docker compose --env-file .env.prod -f docker-compose.prod.yml exec -T db \
+  pg_restore -U "$POSTGRES_USER" -d "$POSTGRES_DB" --clean --if-exists --no-owner --no-acl \
+  < clinica_backup_YYYYMMDD_HHMMSS.dump
+```
+
 ## Docs del change
 - Archivados: `openspec/changes/archive/2026-07-29-novedades-modulos/`, `openspec/changes/archive/2026-07-29-novedades-jefe-profesionales-fecha-carga/`, `openspec/changes/archive/2026-07-30-novedades-sincro-profesionales/`
 - Specs estables: `openspec/specs/novedades/`, `openspec/specs/auth-roles/`

@@ -8,8 +8,8 @@
 - [ ] Header checks activos (`X-Frame-Options`, `X-Content-Type-Options`, `Referrer-Policy`).
 
 ## Base de datos
-- [ ] Backup inicial validado antes de salida.
-- [ ] `alembic upgrade head` aplicado en produccion.
+- [ ] Backup inicial validado antes de salida (Configuración → Realizar backup ahora → objeto en S3).
+- [ ] `alembic upgrade head` aplicado en produccion (incluye `0027_system_backups`).
 - [ ] Constraint anti-solapamiento de bookings verificado.
 
 ## Aplicacion

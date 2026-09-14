@@ -43,20 +43,22 @@ The system MUST support roles `admin`, `operador`, `jefe_medico`, `rrhh`. Users 
 
 ### Requirement: Servicios y módulos
 
-The system MUST provide ABM of **servicios** (id, nombre, activo, **valor_hora**, optional integer **concepto_liquidacion**) and **módulos** (id, descripción, comentario, valor ARS, **produccion** boolean, **sadofe** boolean) with **N:N** association to services. Admin and `rrhh` MUST manage them; `jefe_medico` MUST NOT.
+The system MUST provide ABM of **servicios** (id, nombre, activo, **valor_hora**, optional integer **concepto_liquidacion**) and **módulos** (id, descripción, comentario, valor ARS, **produccion** boolean, **tipo_dia**) with **N:N** association to services. Admin and `rrhh` MUST manage them; `jefe_medico` MUST NOT.
 
 Parametrización tabs MUST include **Producción** (tarifas de valor unitario por opción de bono importado) between **Módulos** and **Jefes ↔ servicios**, managed by `admin`/`rrhh` only. This tab MUST NOT be confused with the module boolean `produccion` (external production-check skip).
 
 Servicios: `concepto_liquidacion` MUST be optional (empty or `0` → `NULL`); non-zero MUST be integer ≥ 1; negatives MUST be rejected (422); duplicates allowed. ABM MUST use modals like Módulos: grid, **Nuevo servicio** (always `activo=true`), edit modal (nombre, valor hora, concepto, **Activo** checkbox), confirm-delete modal; Escape cancels. No inline `valor_hora` edit. Grid shows `#id · nombre · activo · Concepto liquidación` (`NULL` → "—").
 
-Modules: **sadofe** boolean (default false; off = Semana; `produccion` remains independent).
+Modules: **`tipo_dia`** MUST be exactly one of `semana` | `sadofe` | `valor_unico` (default `semana` on create; replaces former boolean `sadofe`). Field `produccion` remains independent.
 
 Modules MUST support:
-- Create with optional `produccion` (default false) and at least one `servicio_id`, via Param UI modal **Nuevo módulo** (Cancelar / Cargar → `POST /modulos`)
-- Update of data fields (descripción, comentario, valor, produccion) without changing associations (`PUT /modulos/{id}`)
+- Create with optional `produccion` (default false), `tipo_dia` (default `semana`), and at least one `servicio_id`, via Param UI modal **Nuevo módulo** (Cancelar / Cargar → `POST /modulos`)
+- Update of data fields (descripción, comentario, valor, produccion, tipo_dia) without changing associations (`PUT /modulos/{id}`)
 - Replace of service associations (including empty set) via `PUT /modulos/{id}/servicios`
-- Soft-delete only after confirmation modal showing module summary (Cancelar / Eliminar; Escape cancels)
+- Soft-delete only after confirmation modal showing module summary including **Tipo día** human label (Cancelar / Eliminar; Escape cancels)
 - Param list buttons: `editar`, `servicios`, `eliminar`; no inline create form; no `produccion` badge on list rows
+
+API create/update/list MUST expose `tipo_dia` and MUST NOT expose `sadofe`.
 
 #### Scenario: Alta módulo asociado a servicios
 
@@ -226,17 +228,24 @@ Validation/API error messages on Novedades screens MUST be shown in an **alert m
 ### Requirement: Filtro módulos por fecha y feriados
 
 The Carga module select MUST list only modules valid for the selected `fecha_realizacion`:
-- Semana (`sadofe=false`): Monday–Friday and the date is **not** a loaded holiday
-- SADOFE (`sadofe=true`): Saturday, Sunday, **or** a loaded holiday
+- `tipo_dia=semana`: Monday–Friday and the date is **not** a loaded holiday
+- `tipo_dia=sadofe`: Saturday, Sunday, **or** a loaded holiday
+- `tipo_dia=valor_unico`: **any** `fecha_realizacion` (no Semana/SADOFE restriction)
 
 Validation is UI-only. Changing the date MUST clear a previously selected module if it is no longer valid.
 
 #### Scenario: Combo filtra SADOFE
 
-- GIVEN feriado 2026-05-25 y módulo SADOFE asociado al servicio
+- GIVEN feriado 2026-05-25, módulo `sadofe` y módulo `semana` asociados al servicio
 - WHEN fecha de realización es 2026-05-25
 - THEN el combo MUST incluir el módulo SADOFE
-- AND MUST NOT incluir módulos Semana de ese servicio
+- AND MUST NOT incluir el módulo Semana
+
+#### Scenario: Valor único en cualquier día
+
+- GIVEN módulo `valor_unico` asociado al servicio
+- WHEN fecha es un martes no feriado o un domingo
+- THEN el combo MUST incluir ese módulo en ambos casos
 
 ### Requirement: Feriados Novedades
 
@@ -1151,14 +1160,56 @@ On successful Importar bonos, the system MUST soft-delete `novedades_bono_opcion
 
 ### Requirement: Plantilla Excel import módulos
 
-Parametrización tab **Módulos** MUST offer **Plantilla de importación** for `admin`/`rrhh`. Download MUST be an `.xlsx` with headers for module fields and a **dropdown of existing active service names** on the service column. Producción and SADOFE MUST use Sí/No dropdowns.
+Parametrización tab **Módulos** MUST offer **Plantilla de importación** for `admin`/`rrhh`. Download MUST be an `.xlsx` with headers for module fields and a **dropdown of existing active service names** on the service column. Producción MUST use Sí/No dropdown. Column **`tipo_dia`** MUST offer dropdown values exactly `semana`, `sadofe`, `valor_unico` (replacing former `sadofe` Sí/No).
 
 #### Scenario: Descargar plantilla
 
 - GIVEN admin en tab Módulos con servicios activos S1, S2
 - WHEN pulsa Plantilla de importación
-- THEN descarga un Excel con columnas de módulo
+- THEN descarga un Excel con columnas de módulo incluyendo `tipo_dia`
 - AND la columna servicio ofrece S1 y S2 en lista desplegable
+
+### Requirement: Carga masiva módulos
+
+Parametrización tab **Módulos** MUST offer **Carga masiva** for `admin`/`rrhh` to upload the filled template. Each data row MUST map to at most one service. Empty `valor` MUST become 0. Comentario MAY be empty. Descripción and servicio MUST be required.
+
+Import MUST read `tipo_dia`. Empty/missing `tipo_dia` MUST default to `semana`. Invalid `tipo_dia` MUST be a row error and, with any errors, MUST import **no** modules (all-or-nothing).
+
+#### Scenario: Import todo-o-nada
+
+- GIVEN Excel con una fila inválida
+- WHEN admin ejecuta Carga masiva
+- THEN MUST NOT crear ningún módulo
+- AND MUST reportar fila + motivo
+
+### Requirement: Tipo de día del módulo (`tipo_dia`)
+
+Each módulo MUST have exactly one `tipo_dia` in `{semana, sadofe, valor_unico}`. Default on create MUST be `semana`.
+
+Parametrización create/edit MUST show three mutually exclusive controls labeled **Semana**, **SADOFE**, **Valor único** (left→right). Exactly one MUST remain selected at all times (cannot clear all). Edit MUST preserve the module’s current `tipo_dia`.
+
+Delete/summary UI MUST show `Tipo día: Semana | SADOFE | Valor único` (human labels).
+
+#### Scenario: Alta default Semana
+
+- GIVEN admin abre Nuevo módulo
+- WHEN no cambia los checks de tipo día
+- THEN Semana MUST estar tildado
+- AND al guardar `tipo_dia` MUST ser `semana`
+
+#### Scenario: Exclusividad UI
+
+- GIVEN Semana tildado
+- WHEN admin tilda Valor único
+- THEN Semana MUST destildarse
+- AND solo Valor único MUST quedar activo
+
+#### Scenario: Migración datos
+
+- GIVEN módulo histórico con `sadofe=false` y otro con `sadofe=true`
+- WHEN aplica la migración
+- THEN el primero MUST quedar `tipo_dia=semana`
+- AND el segundo MUST quedar `tipo_dia=sadofe`
 
 ### Requirement: Importación múltiple de producción externa (Bonos, Prácticas e Internaciones)
 

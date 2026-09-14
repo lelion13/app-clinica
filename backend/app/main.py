@@ -1,8 +1,12 @@
+import logging
+from contextlib import asynccontextmanager
+
 from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import Response
 
 from app.api.routers.auth import router as auth_router
+from app.api.routers.backup import router as backup_router
 from app.api.routers.bookings import router as bookings_router
 from app.api.routers.consulting_rooms import router as consulting_rooms_router
 from app.api.routers.distribucion import router as distribucion_router
@@ -14,9 +18,25 @@ from app.api.routers.stats import router as stats_router
 from app.api.routers.users import router as users_router
 from app.api.routers.weekly_assignments import router as weekly_assignments_router
 from app.core.config import settings
+from app.services import scheduler_service
+
+logger = logging.getLogger(__name__)
 
 
-app = FastAPI(title=settings.app_name)
+@asynccontextmanager
+async def lifespan(_app: FastAPI):
+    try:
+        scheduler_service.start_scheduler()
+    except Exception as e:
+        logger.error("Failed to start backup scheduler on startup: %s", e)
+    yield
+    try:
+        scheduler_service.shutdown_scheduler()
+    except Exception as e:
+        logger.error("Failed to shutdown backup scheduler: %s", e)
+
+
+app = FastAPI(title=settings.app_name, lifespan=lifespan)
 
 app.add_middleware(
     CORSMiddleware,
@@ -53,3 +73,4 @@ app.include_router(stats_router, prefix="/api/v1/stats", tags=["stats"])
 app.include_router(weekly_assignments_router, prefix="/api/v1/weekly-assignments", tags=["weekly-assignments"])
 app.include_router(distribucion_router, prefix="/api/v1/distribucion", tags=["distribucion"])
 app.include_router(novedades_router, prefix="/api/v1/novedades", tags=["novedades"])
+app.include_router(backup_router, prefix="/api/v1/backups", tags=["backups"])

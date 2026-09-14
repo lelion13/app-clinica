@@ -26,6 +26,12 @@ export const USERS_NAV_ITEM = {
   roles: ["admin"],
 };
 
+export const CONFIG_NAV_ITEM = {
+  label: "Configuración",
+  path: "/configuracion",
+  roles: ["admin"],
+};
+
 export const DISTRIBUTION_PATHS = DISTRIBUTION_ITEMS.map((item) => item.path);
 export const NOVEDADES_PATHS = NOVEDADES_ITEMS.map((item) => item.path);
 
