@@ -13,7 +13,7 @@ from app.services.novedades import modulos_import as mi
 def _xlsx_bytes(rows: list[tuple]):
     wb = Workbook()
     ws = wb.active
-    ws.append(["descripcion", "comentario", "valor", "produccion", "sadofe", "servicio"])
+    ws.append(["descripcion", "comentario", "valor", "produccion", "tipo_dia", "servicio"])
     for row in rows:
         ws.append(list(row))
     buf = BytesIO()
@@ -26,6 +26,13 @@ def test_parse_si_no():
     assert mi._parse_si_no("no", field="produccion") is False
     assert mi._parse_si_no("", field="produccion") is False
     assert isinstance(mi._parse_si_no("maybe", field="produccion"), str)
+
+
+def test_parse_tipo_dia():
+    assert mi._parse_tipo_dia("") == "semana"
+    assert mi._parse_tipo_dia("sadofe") == "sadofe"
+    assert mi._parse_tipo_dia("VALOR_UNICO") == "valor_unico"
+    assert "inválido" in mi._parse_tipo_dia("feriado")
 
 
 def test_parse_valor_empty_is_zero():
@@ -43,7 +50,7 @@ def test_template_has_headers_and_validation(monkeypatch):
     wb = load_workbook(BytesIO(content))
     ws = wb["modulos"]
     headers = [c.value for c in ws[1]]
-    assert headers == ["descripcion", "comentario", "valor", "produccion", "sadofe", "servicio"]
+    assert headers == ["descripcion", "comentario", "valor", "produccion", "tipo_dia", "servicio"]
     assert "_servicios" in wb.sheetnames
 
 
@@ -66,8 +73,8 @@ def test_import_all_or_nothing_on_duplicate(monkeypatch):
 
     content = _xlsx_bytes(
         [
-            ("Nuevo OK", "", "100", "No", "No", "Guardia"),
-            ("Existente", "", "50", "Sí", "No", "Guardia"),
+            ("Nuevo OK", "", "100", "No", "semana", "Guardia"),
+            ("Existente", "", "50", "Sí", "semana", "Guardia"),
         ]
     )
     with pytest.raises(HTTPException) as exc:
@@ -98,24 +105,47 @@ def test_import_ok_commits(monkeypatch):
 
     content = _xlsx_bytes(
         [
-            ("Mod A", "c1", "", "Sí", "No", "UTI"),
-            ("Mod B", "", "20", "No", "Sí", "uti"),
+            ("Mod A", "c1", "", "Sí", "", "UTI"),
+            ("Mod B", "", "20", "No", "sadofe", "uti"),
+            ("Mod C", "", "30", "No", "valor_unico", "UTI"),
         ]
     )
     result = mi.import_modulos_from_xlsx(db, content, actor_id=9)
-    assert result.created == 2
+    assert result.created == 3
     assert created[0].valor == Decimal("0")
     assert created[0].produccion is True
+    assert created[0].tipo_dia == "semana"
     assert created[0].servicio_ids == [3]
-    assert created[1].sadofe is True
+    assert created[1].tipo_dia == "sadofe"
+    assert created[2].tipo_dia == "valor_unico"
     db.commit.assert_called_once()
+
+
+def test_import_invalid_tipo_dia_all_or_nothing(monkeypatch):
+    db = MagicMock()
+    servicio = MagicMock()
+    servicio.id = 1
+    servicio.nombre = "Guardia"
+    monkeypatch.setattr(mi.masters_service, "list_servicios", lambda _db, only_active=False: [servicio])
+    monkeypatch.setattr(mi, "_existing_descripciones", lambda _db: set())
+    created = []
+    monkeypatch.setattr(
+        mi.masters_service,
+        "create_modulo",
+        lambda *a, **k: created.append(1) or MagicMock(),
+    )
+    content = _xlsx_bytes([("Mod", "", "1", "No", "feriado", "Guardia")])
+    with pytest.raises(HTTPException) as exc:
+        mi.import_modulos_from_xlsx(db, content, actor_id=1)
+    assert created == []
+    assert "tipo_dia inválido" in exc.value.detail["errors"][0]["reason"]
 
 
 def test_import_unknown_servicio(monkeypatch):
     db = MagicMock()
     monkeypatch.setattr(mi.masters_service, "list_servicios", lambda _db, only_active=False: [])
     monkeypatch.setattr(mi, "_existing_descripciones", lambda _db: set())
-    content = _xlsx_bytes([("Mod", "", "1", "No", "No", "Inexistente")])
+    content = _xlsx_bytes([("Mod", "", "1", "No", "semana", "Inexistente")])
     with pytest.raises(HTTPException) as exc:
         mi.import_modulos_from_xlsx(db, content, actor_id=1)
     assert "servicio no encontrado" in exc.value.detail["errors"][0]["reason"]

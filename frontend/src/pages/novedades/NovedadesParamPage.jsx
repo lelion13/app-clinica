@@ -16,6 +16,16 @@ const tabs = [
   { id: "feriados", label: "Feriados" },
 ];
 
+const TIPO_DIA_OPTIONS = [
+  { value: "semana", label: "Semana" },
+  { value: "sadofe", label: "SADOFE" },
+  { value: "valor_unico", label: "Valor único" },
+];
+
+function tipoDiaLabel(value) {
+  return TIPO_DIA_OPTIONS.find((o) => o.value === value)?.label || "Semana";
+}
+
 export function NovedadesParamPage() {
   const [tab, setTab] = useState("servicios");
   const [error, setError] = useState("");
@@ -56,7 +66,7 @@ export function NovedadesParamPage() {
   const [moduloComentario, setModuloComentario] = useState("");
   const [moduloValor, setModuloValor] = useState("");
   const [moduloProduccion, setModuloProduccion] = useState(false);
-  const [moduloSadofe, setModuloSadofe] = useState(false);
+  const [moduloTipoDia, setModuloTipoDia] = useState("semana");
   const [moduloServicioIds, setModuloServicioIds] = useState([]);
   const [createModuloOpen, setCreateModuloOpen] = useState(false);
   const [createModuloSaving, setCreateModuloSaving] = useState(false);
@@ -65,7 +75,7 @@ export function NovedadesParamPage() {
   const [editComentario, setEditComentario] = useState("");
   const [editValor, setEditValor] = useState("");
   const [editProduccion, setEditProduccion] = useState(false);
-  const [editSadofe, setEditSadofe] = useState(false);
+  const [editTipoDia, setEditTipoDia] = useState("semana");
   const [editSaving, setEditSaving] = useState(false);
   const [serviciosModulo, setServiciosModulo] = useState(null);
   const [serviciosIdsEdit, setServiciosIdsEdit] = useState([]);
@@ -291,7 +301,7 @@ export function NovedadesParamPage() {
     setModuloComentario("");
     setModuloValor("");
     setModuloProduccion(false);
-    setModuloSadofe(false);
+    setModuloTipoDia("semana");
     setModuloServicioIds([]);
   };
 
@@ -370,7 +380,7 @@ export function NovedadesParamPage() {
           comentario: moduloComentario || null,
           valor: Number(moduloValor),
           produccion: Boolean(moduloProduccion),
-          sadofe: Boolean(moduloSadofe),
+          tipo_dia: moduloTipoDia || "semana",
           servicio_ids: moduloServicioIds.map(Number),
         }),
       });
@@ -390,7 +400,7 @@ export function NovedadesParamPage() {
     setEditComentario(item.comentario || "");
     setEditValor(String(item.valor ?? ""));
     setEditProduccion(Boolean(item.produccion));
-    setEditSadofe(Boolean(item.sadofe));
+    setEditTipoDia(item.tipo_dia || "semana");
   };
 
   const closeEditModulo = () => {
@@ -410,7 +420,7 @@ export function NovedadesParamPage() {
           comentario: editComentario || null,
           valor: Number(editValor),
           produccion: Boolean(editProduccion),
-          sadofe: Boolean(editSadofe),
+          tipo_dia: editTipoDia || "semana",
         }),
       });
       setEditModulo(null);
@@ -1412,15 +1422,22 @@ export function NovedadesParamPage() {
                     />
                     Producción
                   </label>
-                  <label style={{ display: "inline-flex", gap: 6, alignItems: "center" }}>
-                    <input
-                      type="checkbox"
-                      checked={moduloSadofe}
-                      onChange={(e) => setModuloSadofe(e.target.checked)}
-                      disabled={createModuloSaving}
-                    />
-                    SADOFE
-                  </label>
+                  <div>
+                    <div style={{ ...uiStyles.helpText, marginBottom: 6 }}>Tipo día</div>
+                    <div style={{ display: "flex", gap: 14, flexWrap: "wrap" }}>
+                      {TIPO_DIA_OPTIONS.map((opt) => (
+                        <label key={opt.value} style={{ display: "inline-flex", gap: 6, alignItems: "center" }}>
+                          <input
+                            type="checkbox"
+                            checked={moduloTipoDia === opt.value}
+                            onChange={() => setModuloTipoDia(opt.value)}
+                            disabled={createModuloSaving}
+                          />
+                          {opt.label}
+                        </label>
+                      ))}
+                    </div>
+                  </div>
                   <div>
                     <div style={{ ...uiStyles.helpText, marginBottom: 6 }}>Servicios (obligatorio, puede ser más de uno)</div>
                     <div style={{ display: "grid", gap: 8 }}>
@@ -1512,15 +1529,22 @@ export function NovedadesParamPage() {
                     />
                     Producción
                   </label>
-                  <label style={{ display: "inline-flex", gap: 6, alignItems: "center" }}>
-                    <input
-                      type="checkbox"
-                      checked={editSadofe}
-                      onChange={(e) => setEditSadofe(e.target.checked)}
-                      disabled={editSaving}
-                    />
-                    SADOFE
-                  </label>
+                  <div>
+                    <div style={{ ...uiStyles.helpText, marginBottom: 6 }}>Tipo día</div>
+                    <div style={{ display: "flex", gap: 14, flexWrap: "wrap" }}>
+                      {TIPO_DIA_OPTIONS.map((opt) => (
+                        <label key={opt.value} style={{ display: "inline-flex", gap: 6, alignItems: "center" }}>
+                          <input
+                            type="checkbox"
+                            checked={editTipoDia === opt.value}
+                            onChange={() => setEditTipoDia(opt.value)}
+                            disabled={editSaving}
+                          />
+                          {opt.label}
+                        </label>
+                      ))}
+                    </div>
+                  </div>
                 </div>
                 <div style={{ display: "flex", gap: 8, justifyContent: "flex-end", flexWrap: "wrap", marginTop: 16 }}>
                   <button type="button" onClick={closeEditModulo} style={uiStyles.buttonSecondary} disabled={editSaving}>
@@ -1652,7 +1676,7 @@ export function NovedadesParamPage() {
                     <strong>Producción:</strong> {deleteModulo.produccion ? "sí" : "no"}
                   </div>
                   <div>
-                    <strong>SADOFE:</strong> {deleteModulo.sadofe ? "sí" : "no"}
+                    <strong>Tipo día:</strong> {tipoDiaLabel(deleteModulo.tipo_dia)}
                   </div>
                   <div>
                     <strong>Servicios:</strong>{" "}
