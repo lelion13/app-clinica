@@ -85,10 +85,16 @@
   - Cambio `novedades-carga-novedad-extra`: checkbox **Novedad extra** (solo módulo sin prod; UI después del valor del módulo). Destildado = skip actual. Tildado = limpia/bloquea horas, abre el mismo modal force **sin** llamar al proxy; POST solo módulo + motivo/obs
 - Cambio `novedades-modulos-edicion`: Param → Módulos: `editar` (datos + checkbox producción) y `servicios` (permite 0); `PUT /modulos/{id}` vs `PUT /modulos/{id}/servicios`
 - Cambio `novedades-sadofe-feriados-descuento` (rev `0019_sadofe_feriados` + `0020_servicio_concepto`):
-  - Módulo checkbox **SADOFE** (off = Semana); Carga filtra combo según fecha + feriados (lun–vie no feriado = Semana; sáb/dom/feriado = SADOFE)
+  - Módulo **tipo día** (histórico: checkbox SADOFE; off = Semana). Ver también `novedades-modulos-tipo-dia`.
+  - Carga filtra combo según fecha + feriados (lun–vie no feriado = Semana; sáb/dom/feriado = SADOFE)
   - Param tab **Feriados** (fecha + nombre; ABM admin/rrhh)
   - Novedad tipo **Horas a descontar**: valor = −(horas × valor_hora); entra en grilla/XLS/Capital Humano
   - Servicios: campo opcional **concepto liquidación** (entero ≥ 1; vacío/`0` = NULL); ABM en modales como Módulos (Nuevo servicio / editar / eliminar; Esc). Alta siempre activa. Uso en Capital Humano queda para un change posterior
+- Cambio `novedades-modulos-tipo-dia` (rev `0026_modulo_tipo_dia`):
+  - Campo `tipo_dia` (`semana` | `sadofe` | `valor_unico`) reemplaza boolean `sadofe`. Migración: false→semana, true→sadofe.
+  - Param: tres checks exclusivos Semana · SADOFE · Valor único (default Semana).
+  - Carga: `valor_unico` visible cualquier día; semana/sadofe como antes. Filtro solo UI.
+  - Excel plantilla/import: columna `tipo_dia` (vacío→semana; inválido→error todo-o-nada). Deploy FE+BE juntos + `alembic upgrade head`.
 - Cambio `capital-humano-bonos-servicios-especiales`:
   - Capital Humano sin selector de servicio en UI (opera en todos los servicios)
   - Profesionales con solo bonos se incorporan a grilla principal solo si tienen opción de bono con `servicio` exacto `DEA`, `DEP`, `CAP` o `CAI`
@@ -152,9 +158,9 @@
 
 ## Flujo Novedades (resumen)
 1. Parametrización: servicios (**valor hora** + **concepto liquidación** opcional), módulos, **Producción** (tarifas bonos), jefes↔servicios, profesionales↔servicios, período abierto, feriados.
-   - Tab **Módulos**: **Plantilla de importación** descarga Excel con columnas `descripcion`, `comentario`, `valor`, `produccion`, `sadofe`, `servicio` (desplegable de servicios activos + Sí/No). **Carga masiva** importa todo-o-nada; errores en modal (fila + motivo). Valor vacío → 0; descripción duplicada o servicio inexistente = error (no se crea ninguno).
+   - Tab **Módulos**: **Plantilla de importación** descarga Excel con columnas `descripcion`, `comentario`, `valor`, `produccion`, `tipo_dia`, `servicio` (desplegable de servicios activos; producción Sí/No; `tipo_dia` = `semana`/`sadofe`/`valor_unico`). **Carga masiva** importa todo-o-nada; errores en modal (fila + motivo). Valor vacío → 0; `tipo_dia` vacío → `semana`; descripción duplicada o servicio inexistente = error (no se crea ninguno).
 2. Mis profesionales: asociar/quitar profesionales al servicio (typeahead); desasociar no borra cargas históricas.
-3. Carga: módulo solo / novedad solo / ambos + **fecha de realización** (calendario; sin días si el período aún no empezó). Valor novedad = horas × valor hora **del servicio** (negativo si tipo Horas a descontar). Combo de módulos filtrado Semana/SADOFE según fecha y feriados. Errores en modal OK.
+3. Carga: módulo solo / novedad solo / ambos + **fecha de realización** (calendario; sin días si el período aún no empezó). Valor novedad = horas × valor hora **del servicio** (negativo si tipo Horas a descontar). Combo de módulos filtrado por `tipo_dia` + fecha/feriados (`valor_unico` siempre). Errores en modal OK.
 4. Listado inferior (Carga): grilla unificada con F. realización y F. carga; editar fecha si período abierto; **anular** con modal.
 5. Generación XLS (admin/rrhh): grilla + filtros + descarga (incluye ambas fechas).
 6. Parametrización: Feriados globales (fecha + nombre) al lado de Períodos.

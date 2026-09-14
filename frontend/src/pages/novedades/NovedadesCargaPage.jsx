@@ -41,8 +41,11 @@ function isSadofeDay(iso, feriadoSet) {
 }
 
 function moduloValidoParaFecha(modulo, fecha, feriadoSet) {
+  const tipo = modulo?.tipo_dia || "semana";
+  if (tipo === "valor_unico") return true;
   const sadofeDay = isSadofeDay(fecha, feriadoSet);
-  return Boolean(modulo?.sadofe) === sadofeDay;
+  if (tipo === "sadofe") return sadofeDay;
+  return !sadofeDay;
 }
 
 /** @returns {Promise<boolean>} true if tiene producción */

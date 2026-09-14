@@ -56,7 +56,7 @@ class NovedadesModulo(AuditMixin, Base):
     comentario: Mapped[str | None] = mapped_column(String(500), nullable=True)
     valor: Mapped[Decimal] = mapped_column(Numeric(12, 2), nullable=False)
     produccion: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
-    sadofe: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
+    tipo_dia: Mapped[str] = mapped_column(String(20), nullable=False, default="semana")
 
 
 class NovedadesModuloServicio(AuditMixin, Base):

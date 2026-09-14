@@ -38,13 +38,13 @@ def test_novedad_create_acepta_horas_a_descontar():
     assert payload.tipo == "horas_a_descontar"
 
 
-def test_modulo_create_default_sadofe_false():
+def test_modulo_create_default_tipo_dia_semana():
     payload = ModuloCreateRequest(
         descripcion="Mod A",
         valor=Decimal("100"),
         servicio_ids=[1],
     )
-    assert payload.sadofe is False
+    assert payload.tipo_dia == "semana"
 
 
 def test_servicio_concepto_cero_queda_null():

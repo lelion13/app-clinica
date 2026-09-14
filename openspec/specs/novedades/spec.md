@@ -822,9 +822,11 @@ For each professional in the selected closed period, **carga** items (module ass
 
 Each distinct `(legajo, concepto)` from cargas MUST produce (after merges) one output row with:
 - `concepto` = that `concepto_liquidacion`
-- `empresa` = `CHI` if `concepto > 100`, else `CMG`
+- `empresa` = numeric **`1`** (constant for all rows in this export)
 - `legajo` = professional legajo (string as stored)
 - `monto` = sum of carga values for that concepto, plus allocated production and ajustes, preserving system decimal precision
+
+Internal allocation of production by CHI/CMG buckets (from concepto thresholds and `centro`/`sucursal` prefixes) MUST remain unchanged; only the exported `empresa` cell value is constant `1`.
 
 If the professional has cargas in **more than one** servicio/concepto, they MUST appear **more than once** (one row per concepto).
 
@@ -834,7 +836,8 @@ If any carga’s service has `concepto_liquidacion` null/empty, the **entire exp
 
 - GIVEN profesional con cargas en servicio concepto 50 y servicio concepto 150
 - WHEN exporta liquidación
-- THEN MUST haber dos filas (CMG/50 y CHI/150) con montos de cargas respectivos
+- THEN MUST haber dos filas con conceptos 50 y 150
+- AND ambas MUST tener empresa = 1 (numérico)
 
 #### Scenario: Servicio sin concepto bloquea
 
@@ -855,7 +858,7 @@ Allocation onto carga conceptos:
 1. If the professional has one or more carga conceptos whose empresa matches the production bucket, split that bucket’s monto **equally** across those matching conceptos.
 2. Else (no matching empresa among cargas), split equally across **all** of the professional’s carga conceptos.
 
-After allocation, rows MUST be aggregated to a single row per `(empresa, legajo, concepto)`.
+After allocation, rows MUST be aggregated to a single output row per `(legajo, concepto)` (exported `empresa` is always `1`).
 
 #### Scenario: Producción repartida en dos conceptos misma empresa
 
@@ -873,6 +876,7 @@ If a professional has **no cargas** in the period:
   - CHI + DEA/CAI → 123
   - CHI + DEP/CAP → 122
 - Create one row per fixed concepto present; production for that empresa (including prácticas/internaciones attributed to that empresa) MUST split equally across those conceptos.
+- The exported `empresa` column MUST be numeric **`1`** on those rows (CHI/CMG mapping above only selects which conceptos appear).
 - If no special bonos and no cargas → MUST NOT appear in the file.
 - Ajustes for such professionals MUST split equally across the generated fixed conceptos; if none generated, ajustes are omitted.
 
@@ -880,7 +884,8 @@ If a professional has **no cargas** in the period:
 
 - GIVEN profesional sin cargas con bono DEA en centro CMG y producción valorizada
 - WHEN exporta
-- THEN MUST existir fila empresa=CMG, concepto=90 con el monto correspondiente
+- THEN MUST existir fila concepto=90 con el monto correspondiente
+- AND empresa MUST ser 1
 
 ### Requirement: Ajustes en liquidación
 

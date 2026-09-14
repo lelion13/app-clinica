@@ -184,7 +184,7 @@ def create_modulo(
         comentario=(payload.comentario or "").strip() or None,
         valor=Decimal(payload.valor),
         produccion=bool(payload.produccion),
-        sadofe=bool(payload.sadofe),
+        tipo_dia=str(payload.tipo_dia or "semana"),
         created_at=now,
         updated_at=now,
         created_by=actor_id,
@@ -210,7 +210,7 @@ def update_modulo(db: Session, modulo_id: int, payload: ModuloUpdateRequest, act
     item.comentario = (payload.comentario or "").strip() or None
     item.valor = Decimal(payload.valor)
     item.produccion = bool(payload.produccion)
-    item.sadofe = bool(payload.sadofe)
+    item.tipo_dia = str(payload.tipo_dia or "semana")
     item.updated_at = datetime.utcnow()
     item.updated_by = actor_id
     db.commit()

@@ -19,8 +19,9 @@ from app.models.novedades import NovedadesModulo, NovedadesServicio
 from app.schemas.novedades import ModuloCreateRequest, ModuloImportResponse, ModuloImportRowError
 from app.services.novedades import masters as masters_service
 
-HEADERS = ("descripcion", "comentario", "valor", "produccion", "sadofe", "servicio")
+HEADERS = ("descripcion", "comentario", "valor", "produccion", "tipo_dia", "servicio")
 LIST_SHEET = "_servicios"
+TIPO_DIA_VALUES = ("semana", "sadofe", "valor_unico")
 
 
 @dataclass
@@ -30,7 +31,7 @@ class _ParsedRow:
     comentario: str | None
     valor: Decimal
     produccion: bool
-    sadofe: bool
+    tipo_dia: str
     servicio_id: int
 
 
@@ -50,6 +51,16 @@ def _parse_si_no(raw: str, *, field: str) -> bool | str:
     if not text:
         return False
     return f"{field} debe ser Sí o No"
+
+
+def _parse_tipo_dia(raw: str) -> str:
+    """Return tipo_dia value or error reason string."""
+    text = (raw or "").strip().casefold()
+    if not text:
+        return "semana"
+    if text in TIPO_DIA_VALUES:
+        return text
+    return f"tipo_dia inválido (use: {', '.join(TIPO_DIA_VALUES)})"
 
 
 def _parse_valor(raw: str) -> Decimal | str:
@@ -102,11 +113,22 @@ def build_modulos_import_template(db: Session) -> bytes:
     si_no_dv.error = "Usá Sí o No"
     si_no_dv.errorTitle = "Valor"
     ws.add_data_validation(si_no_dv)
-    si_no_dv.add("D2:E5001")
+    si_no_dv.add("D2:D5001")
+
+    tipo_dv = DataValidation(
+        type="list",
+        formula1='"semana,sadofe,valor_unico"',
+        allow_blank=True,
+        showDropDown=False,
+    )
+    tipo_dv.error = "Usá semana, sadofe o valor_unico"
+    tipo_dv.errorTitle = "Tipo día"
+    ws.add_data_validation(tipo_dv)
+    tipo_dv.add("E2:E5001")
 
     # Hint row (optional example style — leave blank for user fill)
     ws.cell(row=2, column=4, value="No")
-    ws.cell(row=2, column=5, value="No")
+    ws.cell(row=2, column=5, value="semana")
 
     buf = io.BytesIO()
     wb.save(buf)
@@ -157,7 +179,8 @@ def import_modulos_from_xlsx(db: Session, content: bytes, actor_id: int) -> Modu
         "valor": "valor",
         "produccion": "produccion",
         "producción": "produccion",
-        "sadofe": "sadofe",
+        "tipo_dia": "tipo_dia",
+        "tipo_día": "tipo_dia",
         "servicio": "servicio",
     }
     for idx, h in enumerate(headers):
@@ -196,7 +219,7 @@ def import_modulos_from_xlsx(db: Session, content: bytes, actor_id: int) -> Modu
         comentario_raw = col("comentario") if "comentario" in col_index else ""
         valor_raw = col("valor") if "valor" in col_index else ""
         produccion_raw = col("produccion") if "produccion" in col_index else "No"
-        sadofe_raw = col("sadofe") if "sadofe" in col_index else "No"
+        tipo_dia_raw = col("tipo_dia") if "tipo_dia" in col_index else ""
 
         # Skip completely empty hint row leftovers
         if not descripcion and not servicio_nombre and not valor_raw and not comentario_raw:
@@ -237,9 +260,9 @@ def import_modulos_from_xlsx(db: Session, content: bytes, actor_id: int) -> Modu
         if isinstance(produccion, str):
             row_errors.append(produccion)
 
-        sadofe = _parse_si_no(sadofe_raw, field="sadofe")
-        if isinstance(sadofe, str):
-            row_errors.append(sadofe)
+        tipo_dia = _parse_tipo_dia(tipo_dia_raw)
+        if tipo_dia not in TIPO_DIA_VALUES:
+            row_errors.append(tipo_dia)
 
         if row_errors:
             errors.append(ModuloImportRowError(row=row_num, reason="; ".join(row_errors)))
@@ -252,7 +275,7 @@ def import_modulos_from_xlsx(db: Session, content: bytes, actor_id: int) -> Modu
                 comentario=comentario_raw or None,
                 valor=valor,  # type: ignore[arg-type]
                 produccion=bool(produccion),
-                sadofe=bool(sadofe),
+                tipo_dia=tipo_dia,
                 servicio_id=servicio_id,
             )
         )
@@ -283,7 +306,7 @@ def import_modulos_from_xlsx(db: Session, content: bytes, actor_id: int) -> Modu
                 comentario=item.comentario,
                 valor=item.valor,
                 produccion=item.produccion,
-                sadofe=item.sadofe,
+                tipo_dia=item.tipo_dia,  # type: ignore[arg-type]
                 servicio_ids=[item.servicio_id],
             ),
             actor_id=actor_id,

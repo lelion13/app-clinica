@@ -95,7 +95,7 @@ def _modulo_response(db: Session, item) -> ModuloResponse:
         comentario=item.comentario,
         valor=item.valor,
         produccion=bool(getattr(item, "produccion", False)),
-        sadofe=bool(getattr(item, "sadofe", False)),
+        tipo_dia=getattr(item, "tipo_dia", None) or "semana",
         servicio_ids=masters_service.list_modulo_servicio_ids(db, item.id),
         servicio_nombres=masters_service.list_modulo_servicio_nombres(db, item.id),
         created_at=item.created_at,
