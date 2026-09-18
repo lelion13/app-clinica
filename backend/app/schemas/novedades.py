@@ -282,6 +282,7 @@ class GridRowResponse(BaseModel):
     servicio_nombre: str
     professional_id: int
     professional_name: str
+    legajo: str | None = None
     concepto: str
     horas: Decimal | None = None
     valor: Decimal | None

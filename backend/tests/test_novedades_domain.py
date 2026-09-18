@@ -190,6 +190,95 @@ def test_export_xlsx_content_type_bytes(monkeypatch):
     assert content[:2] == b"PK"
 
 
+def _grid_row(**overrides):
+    from datetime import datetime
+
+    from app.schemas.novedades import GridRowResponse
+
+    base = dict(
+        tipo="modulo_asignado",
+        id=1,
+        periodo_id=1,
+        periodo_nombre="P1",
+        servicio_id=1,
+        servicio_nombre="UCO",
+        professional_id=10,
+        professional_name="Ana Pérez",
+        legajo="100",
+        concepto="Módulo A",
+        horas=None,
+        valor=Decimal("1500"),
+        valor_hora=None,
+        cargado_por="Admin",
+        fecha_realizacion=date(2026, 7, 15),
+        fecha_carga=datetime(2026, 7, 16, 12, 0, 0),
+    )
+    base.update(overrides)
+    return GridRowResponse(**base)
+
+
+def test_matches_fecha_realizacion_inclusive():
+    from app.services.novedades.export_xls import _matches
+
+    row = _grid_row(fecha_realizacion=date(2026, 7, 15))
+    assert _matches(row, None, None, None, None, None, date(2026, 7, 15), date(2026, 7, 15))
+    assert _matches(row, None, None, None, None, None, date(2026, 7, 1), date(2026, 7, 31))
+    assert not _matches(row, None, None, None, None, None, date(2026, 7, 16), date(2026, 7, 31))
+    assert not _matches(row, None, None, None, None, None, date(2026, 7, 1), date(2026, 7, 14))
+    assert not _matches(
+        _grid_row(fecha_realizacion=None), None, None, None, None, None, date(2026, 7, 1), date(2026, 7, 31)
+    )
+
+
+def test_export_xlsx_one_sheet_without_dates(monkeypatch):
+    from io import BytesIO
+
+    from openpyxl import load_workbook
+
+    from app.services.novedades import export_xls
+
+    rows = [_grid_row()]
+    monkeypatch.setattr(export_xls, "build_grid_rows", lambda *a, **k: rows)
+    content = export_xls.export_xlsx_bytes(FakeDB())
+    wb = load_workbook(BytesIO(content))
+    assert wb.sheetnames == ["Novedades"]
+
+
+def test_export_xlsx_two_sheets_with_dates(monkeypatch):
+    from io import BytesIO
+
+    from openpyxl import load_workbook
+
+    from app.services.novedades import export_xls
+
+    rows = [
+        _grid_row(id=1, professional_id=10, legajo="100", professional_name="Ana", valor=Decimal("100")),
+        _grid_row(id=2, professional_id=10, legajo="100", professional_name="Ana", valor=Decimal("50")),
+        _grid_row(
+            id=3,
+            professional_id=20,
+            legajo="200",
+            professional_name="Bruno",
+            valor=Decimal("200"),
+            fecha_realizacion=date(2026, 7, 20),
+        ),
+    ]
+    monkeypatch.setattr(export_xls, "build_grid_rows", lambda *a, **k: rows)
+    content = export_xls.export_xlsx_bytes(
+        FakeDB(), fecha_desde=date(2026, 7, 1), fecha_hasta=date(2026, 7, 31)
+    )
+    wb = load_workbook(BytesIO(content))
+    assert wb.sheetnames == ["Resumen", "Detalle"]
+    resumen = list(wb["Resumen"].iter_rows(values_only=True))
+    assert resumen[0] == ("legajo", "nombre", "total_cargas")
+    # Ana 150, Bruno 200 — sorted by name
+    assert resumen[1] == ("100", "Ana", 150.0)
+    assert resumen[2] == ("200", "Bruno", 200.0)
+    detalle = list(wb["Detalle"].iter_rows(values_only=True))
+    assert len(detalle) == 4  # header + 3 rows
+
+
+
 def test_normalize_motivo_ambos_none():
     assert normalize_motivo_sin_produccion(None, None) == (None, None)
     assert normalize_motivo_sin_produccion("", "  ") == (None, None)

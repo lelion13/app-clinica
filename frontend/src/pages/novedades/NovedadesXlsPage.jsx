@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from "react";
+import { Fragment, useEffect, useMemo, useRef, useState } from "react";
 
 import { apiDownloadWithRefresh, apiRequestWithRefresh, apiUploadWithRefresh } from "../../services/api";
 import { AlertModal } from "../../components/AlertModal";
@@ -108,11 +108,23 @@ export function NovedadesXlsPage() {
   const [descuentoErrorMessage, setDescuentoErrorMessage] = useState("");
   const descuentoFileRef = useRef(null);
 
+  const [parcialOpen, setParcialOpen] = useState(false);
+  const [parcialDesde, setParcialDesde] = useState("");
+  const [parcialHasta, setParcialHasta] = useState("");
+  const [parcialRows, setParcialRows] = useState([]);
+  const [parcialLoading, setParcialLoading] = useState(false);
+  const [parcialExpandedId, setParcialExpandedId] = useState(null);
+  const [parcialDownloading, setParcialDownloading] = useState(false);
+
   const selectedPeriodo = useMemo(
     () => periodos.find((p) => String(p.id) === String(periodoId)) || null,
     [periodos, periodoId]
   );
   const periodoClosed = selectedPeriodo?.estado === "closed";
+  const periodoMin = selectedPeriodo?.fecha_inicio ? String(selectedPeriodo.fecha_inicio).slice(0, 10) : "";
+  const periodoMax = selectedPeriodo?.fecha_fin ? String(selectedPeriodo.fecha_fin).slice(0, 10) : "";
+  const parcialDatesValid =
+    Boolean(parcialDesde && parcialHasta) && parcialDesde <= parcialHasta;
 
   const optionLabels = useMemo(() => bonoOptionLabels(bonoColumns), [bonoColumns]);
 
@@ -296,6 +308,108 @@ export function NovedadesXlsPage() {
       setError(err.message || "Error al descargar XLS");
     }
   };
+
+  const openParcial = () => {
+    if (!periodoId || !periodoClosed) return;
+    setError("");
+    setParcialDesde("");
+    setParcialHasta("");
+    setParcialRows([]);
+    setParcialExpandedId(null);
+    setParcialOpen(true);
+  };
+
+  const closeParcial = () => {
+    if (parcialDownloading) return;
+    setParcialOpen(false);
+    setParcialDesde("");
+    setParcialHasta("");
+    setParcialRows([]);
+    setParcialExpandedId(null);
+  };
+
+  const downloadParcial = async () => {
+    if (!parcialDatesValid || !parcialRows.length || !periodoId) return;
+    setParcialDownloading(true);
+    setError("");
+    try {
+      const params = new URLSearchParams({
+        periodo_id: periodoId,
+        fecha_desde: parcialDesde,
+        fecha_hasta: parcialHasta,
+      });
+      const { blob, filename } = await apiDownloadWithRefresh(`/novedades/export.xlsx?${params}`);
+      const fallback = `descarga-parcial-modulos_${parcialDesde}_${parcialHasta}.xlsx`;
+      const url = URL.createObjectURL(blob);
+      const anchor = document.createElement("a");
+      anchor.href = url;
+      anchor.download = fallback || filename;
+      anchor.click();
+      URL.revokeObjectURL(url);
+    } catch (err) {
+      setError(err.message || "Error al descargar parcial");
+    } finally {
+      setParcialDownloading(false);
+    }
+  };
+
+  useEffect(() => {
+    if (!parcialOpen || !parcialDatesValid || !periodoId) {
+      if (!parcialDatesValid) {
+        setParcialRows([]);
+        setParcialExpandedId(null);
+      }
+      return undefined;
+    }
+    let cancelled = false;
+    const load = async () => {
+      setParcialLoading(true);
+      setError("");
+      try {
+        const params = new URLSearchParams({
+          periodo_id: periodoId,
+          fecha_desde: parcialDesde,
+          fecha_hasta: parcialHasta,
+        });
+        const items = await apiRequestWithRefresh(`/novedades/grilla?${params}`);
+        if (cancelled) return;
+        const list = Array.isArray(items) ? items : [];
+        const byProf = new Map();
+        for (const item of list) {
+          const id = item.professional_id;
+          if (!byProf.has(id)) {
+            byProf.set(id, {
+              professional_id: id,
+              legajo: item.legajo || "",
+              professional_name: item.professional_name || "",
+              total_cargas: 0,
+              items: [],
+            });
+          }
+          const agg = byProf.get(id);
+          agg.items.push(item);
+          agg.total_cargas += Number(item.valor) || 0;
+          if (!agg.legajo && item.legajo) agg.legajo = item.legajo;
+        }
+        const aggregated = [...byProf.values()].sort((a, b) =>
+          compareText(a.professional_name, b.professional_name)
+        );
+        setParcialRows(aggregated);
+        setParcialExpandedId(null);
+      } catch (err) {
+        if (!cancelled) {
+          setError(err.message || "Error al cargar descarga parcial");
+          setParcialRows([]);
+        }
+      } finally {
+        if (!cancelled) setParcialLoading(false);
+      }
+    };
+    load();
+    return () => {
+      cancelled = true;
+    };
+  }, [parcialOpen, parcialDatesValid, parcialDesde, parcialHasta, periodoId]);
 
   const openAgregarAjuste = (row) => {
     if (!periodoId) {
@@ -638,6 +752,21 @@ export function NovedadesXlsPage() {
           }
         >
           Descargar liquidación
+        </button>
+        <button
+          type="button"
+          style={uiStyles.buttonSecondary}
+          onClick={openParcial}
+          disabled={!periodoId || !periodoClosed}
+          title={
+            !periodoId
+              ? "Seleccioná un período"
+              : !periodoClosed
+                ? "Solo disponible para períodos cerrados"
+                : "Descarga parcial de módulos por rango de fechas"
+          }
+        >
+          Descarga parcial de módulos
         </button>
       </div>
 
@@ -1043,6 +1172,178 @@ export function NovedadesXlsPage() {
                 </section>
               </div>
             )}
+          </div>
+        </div>
+      ) : null}
+
+      {parcialOpen ? (
+        <div
+          role="presentation"
+          style={{
+            position: "fixed",
+            inset: 0,
+            zIndex: 1000,
+            background: "rgba(15, 43, 39, 0.45)",
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            padding: 16,
+          }}
+          onClick={closeParcial}
+        >
+          <div
+            role="dialog"
+            aria-modal="true"
+            style={{
+              background: uiTheme.colors.surface,
+              borderRadius: uiTheme.radius.md,
+              width: "min(920px, 100%)",
+              maxHeight: "90vh",
+              overflow: "auto",
+              padding: 22,
+              boxShadow: uiTheme.shadow.md,
+              border: `1px solid ${uiTheme.colors.border}`,
+            }}
+            onClick={(e) => e.stopPropagation()}
+          >
+            <h2 style={{ marginTop: 0, marginBottom: 8, fontSize: "1.1rem" }}>Descarga parcial de módulos</h2>
+            <p style={{ ...uiStyles.helpText, marginTop: 0 }}>
+              Elegí un rango dentro del período ({periodoMin || "—"} → {periodoMax || "—"}). La grilla muestra
+              profesionales con cargas en ese rango.
+            </p>
+            <div style={{ display: "flex", flexWrap: "wrap", gap: 12, marginBottom: 16 }}>
+              <label style={{ display: "grid", gap: 4, fontSize: 13 }}>
+                Desde
+                <input
+                  type="date"
+                  value={parcialDesde}
+                  min={periodoMin || undefined}
+                  max={periodoMax || undefined}
+                  onChange={(e) => setParcialDesde(e.target.value)}
+                  style={uiStyles.formControl}
+                />
+              </label>
+              <label style={{ display: "grid", gap: 4, fontSize: 13 }}>
+                Hasta
+                <input
+                  type="date"
+                  value={parcialHasta}
+                  min={periodoMin || undefined}
+                  max={periodoMax || undefined}
+                  onChange={(e) => setParcialHasta(e.target.value)}
+                  style={uiStyles.formControl}
+                />
+              </label>
+            </div>
+            {parcialDesde && parcialHasta && parcialDesde > parcialHasta ? (
+              <p style={{ ...uiStyles.helpText, color: uiTheme.colors.danger || "#b91c1c" }}>
+                La fecha desde debe ser menor o igual a hasta.
+              </p>
+            ) : null}
+            {parcialLoading ? <p style={uiStyles.helpText}>Cargando…</p> : null}
+            {parcialDatesValid && !parcialLoading ? (
+              <div style={{ overflowX: "auto", marginBottom: 16 }}>
+                <table style={{ width: "100%", borderCollapse: "collapse", fontSize: "0.9rem" }}>
+                  <thead>
+                    <tr>
+                      <th style={{ ...thStyle, cursor: "default" }}>Legajo</th>
+                      <th style={{ ...thStyle, cursor: "default" }}>Nombre</th>
+                      <th style={{ ...thStyle, cursor: "default" }}>Total cargas</th>
+                      <th style={{ ...thStyle, cursor: "default" }}>Detalle</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {parcialRows.map((row) => (
+                      <Fragment key={row.professional_id}>
+                        <tr>
+                          <td style={tdStyle}>{row.legajo || "—"}</td>
+                          <td style={tdStyle}>{row.professional_name}</td>
+                          <td style={{ ...tdStyle, fontVariantNumeric: "tabular-nums" }}>
+                            {formatMoney(row.total_cargas)}
+                          </td>
+                          <td style={tdStyle}>
+                            <button
+                              type="button"
+                              style={uiStyles.buttonSecondary}
+                              onClick={() =>
+                                setParcialExpandedId((cur) =>
+                                  cur === row.professional_id ? null : row.professional_id
+                                )
+                              }
+                            >
+                              {parcialExpandedId === row.professional_id ? "Ocultar" : "Detalle"}
+                            </button>
+                          </td>
+                        </tr>
+                        {parcialExpandedId === row.professional_id ? (
+                          <tr>
+                            <td colSpan={4} style={{ ...tdStyle, paddingLeft: 28, background: uiTheme.colors.surfaceMuted }}>
+                              <table
+                                style={{
+                                  width: "100%",
+                                  borderCollapse: "collapse",
+                                  fontSize: "0.85rem",
+                                  minWidth: 680,
+                                }}
+                              >
+                                <thead>
+                                  <tr>
+                                    <th style={{ ...thStyle, cursor: "default" }}>Tipo</th>
+                                    <th style={{ ...thStyle, cursor: "default" }}>Servicio</th>
+                                    <th style={{ ...thStyle, cursor: "default" }}>Concepto</th>
+                                    <th style={{ ...thStyle, cursor: "default" }}>Horas</th>
+                                    <th style={{ ...thStyle, cursor: "default" }}>Valor</th>
+                                    <th style={{ ...thStyle, cursor: "default" }}>F. realización</th>
+                                    <th style={{ ...thStyle, cursor: "default" }}>Período</th>
+                                    <th style={{ ...thStyle, cursor: "default" }}>F. carga</th>
+                                    <th style={{ ...thStyle, cursor: "default" }}>Cargado por</th>
+                                  </tr>
+                                </thead>
+                                <tbody>
+                                  {row.items.map((item) => (
+                                    <tr key={`${item.tipo}-${item.id}`}>
+                                      <td style={tdStyle}>{tipoLabel(item.tipo)}</td>
+                                      <td style={tdStyle}>{item.servicio_nombre || "—"}</td>
+                                      <td style={tdStyle}>{item.concepto}</td>
+                                      <td style={tdStyle}>{item.horas != null ? item.horas : "—"}</td>
+                                      <td style={{ ...tdStyle, fontVariantNumeric: "tabular-nums" }}>
+                                        {formatMoney(item.valor)}
+                                      </td>
+                                      <td style={tdStyle}>{formatDateOnly(item.fecha_realizacion)}</td>
+                                      <td style={tdStyle}>{item.periodo_nombre || `#${item.periodo_id}`}</td>
+                                      <td style={{ ...tdStyle, whiteSpace: "nowrap", fontSize: 12 }}>
+                                        {formatDateTime(item.fecha_carga)}
+                                      </td>
+                                      <td style={tdStyle}>{item.cargado_por || "—"}</td>
+                                    </tr>
+                                  ))}
+                                </tbody>
+                              </table>
+                            </td>
+                          </tr>
+                        ) : null}
+                      </Fragment>
+                    ))}
+                  </tbody>
+                </table>
+                {!parcialRows.length ? (
+                  <p style={uiStyles.helpText}>Sin cargas en el rango elegido.</p>
+                ) : null}
+              </div>
+            ) : null}
+            <div style={{ display: "flex", justifyContent: "flex-end", gap: 8 }}>
+              <button type="button" style={uiStyles.buttonSecondary} onClick={closeParcial} disabled={parcialDownloading}>
+                Cancelar
+              </button>
+              <button
+                type="button"
+                style={uiStyles.buttonPrimary}
+                onClick={downloadParcial}
+                disabled={!parcialDatesValid || parcialRows.length < 1 || parcialDownloading || parcialLoading}
+              >
+                {parcialDownloading ? "Descargando…" : "Descargar"}
+              </button>
+            </div>
           </div>
         </div>
       ) : null}
