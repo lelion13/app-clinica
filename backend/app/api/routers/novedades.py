@@ -1,3 +1,5 @@
+from datetime import date
+
 from fastapi import APIRouter, Depends, File, HTTPException, Query, UploadFile, status
 from fastapi.responses import Response
 from pydantic import BaseModel
@@ -680,6 +682,8 @@ def grilla_list(
     professional_id: int | None = Query(default=None),
     q: str | None = Query(default=None),
     concepto: str | None = Query(default=None),
+    fecha_desde: date | None = Query(default=None),
+    fecha_hasta: date | None = Query(default=None),
     db: Session = Depends(get_db),
     user: User = Depends(require_admin_or_rrhh),
 ) -> list[GridRowResponse]:
@@ -691,6 +695,8 @@ def grilla_list(
         professional_id=professional_id,
         q=q,
         concepto_q=concepto,
+        fecha_desde=fecha_desde,
+        fecha_hasta=fecha_hasta,
     )
 
 
@@ -795,11 +801,21 @@ def export_xlsx(
     servicio_id: int | None = Query(default=None),
     q: str | None = Query(default=None),
     concepto: str | None = Query(default=None),
+    fecha_desde: date | None = Query(default=None),
+    fecha_hasta: date | None = Query(default=None),
     db: Session = Depends(get_db),
     user: User = Depends(require_admin_or_rrhh),
 ) -> Response:
     _ = user
-    content = export_xls.export_xlsx_bytes(db, periodo_id=periodo_id, servicio_id=servicio_id, q=q, concepto_q=concepto)
+    content = export_xls.export_xlsx_bytes(
+        db,
+        periodo_id=periodo_id,
+        servicio_id=servicio_id,
+        q=q,
+        concepto_q=concepto,
+        fecha_desde=fecha_desde,
+        fecha_hasta=fecha_hasta,
+    )
     return Response(
         content=content,
         media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",

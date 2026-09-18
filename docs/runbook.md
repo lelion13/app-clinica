@@ -128,6 +128,12 @@
   - Sin cargas: solo si hay DEA/DEP/CAP/CAI, con conceptos fijos 90/91/122/123.
   - Ajustes con `servicio_id` van al concepto de ese servicio; sin servicio se prorratean en partes iguales.
   - Si algún servicio de las cargas no tiene concepto → bloquea exportación avisando el nombre del servicio.
+- Cambio `novedades-descarga-parcial-modulos`:
+  - Botón **Descarga parcial de módulos** (después de Descargar liquidación); solo período **cerrado**; `admin`/`rrhh`.
+  - Modal con fechas desde/hasta (`min`/`max` = período); grilla automática legajo · nombre · total cargas; Detalle accordion (solo cargas).
+  - `GET /novedades/grilla` y `GET /novedades/export.xlsx` aceptan `fecha_desde`/`fecha_hasta` (filtro inclusive por `fecha_realizacion`).
+  - Con ambas fechas en export → hojas **Resumen** + **Detalle**; sin fechas → una hoja detalle como antes.
+  - Archivo: `descarga-parcial-modulos_{desde}_{hasta}.xlsx`.
 - Cambio `novedades-capital-humano-importe-descontar` (rev `0025_ajuste_descuento_lote`):
   - Botón **Importe a descontar** (antes de Descargar liquidación); con lote activo → **Anular descuento**.
   - Solo período **cerrado**; `admin`/`rrhh`. Re-import exige anular antes.
