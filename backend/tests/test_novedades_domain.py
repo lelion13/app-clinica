@@ -278,6 +278,32 @@ def test_export_xlsx_two_sheets_with_dates(monkeypatch):
     assert len(detalle) == 4  # header + 3 rows
 
 
+def test_export_xlsx_includes_motivo_columns(monkeypatch):
+    from io import BytesIO
+
+    from openpyxl import load_workbook
+
+    from app.services.novedades import export_xls
+
+    rows = [
+        _grid_row(
+            motivo_sin_produccion="vacaciones",
+            observacion_sin_produccion="viaje familiar",
+        )
+    ]
+    monkeypatch.setattr(export_xls, "build_grid_rows", lambda *a, **k: rows)
+    content = export_xls.export_xlsx_bytes(FakeDB())
+    wb = load_workbook(BytesIO(content))
+    headers = list(wb["Novedades"].iter_rows(values_only=True))[0]
+    assert "motivo" in headers
+    assert "observacion" in headers
+    data = list(wb["Novedades"].iter_rows(values_only=True))[1]
+    motivo_idx = headers.index("motivo")
+    obs_idx = headers.index("observacion")
+    assert data[motivo_idx] == "Vacaciones"
+    assert data[obs_idx] == "viaje familiar"
+
+
 
 def test_normalize_motivo_ambos_none():
     assert normalize_motivo_sin_produccion(None, None) == (None, None)

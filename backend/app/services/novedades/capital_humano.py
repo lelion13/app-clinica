@@ -66,12 +66,16 @@ def build_capital_humano_rows(
     detail = build_grid_rows(db, periodo_id=periodo_id, servicio_id=servicio_id, q=None, concepto_q=None)
     cargas_by_prof: dict[int, Decimal] = {}
     has_modulos_by_prof: set[int] = set()
+    motivos_by_prof: dict[int, set[str]] = {}
     for row in detail:
         cargas_by_prof[row.professional_id] = cargas_by_prof.get(row.professional_id, Decimal("0")) + (
             row.valor or Decimal("0")
         )
         if getattr(row, "tipo", None) == "modulo_asignado":
             has_modulos_by_prof.add(row.professional_id)
+        motivo = getattr(row, "motivo_sin_produccion", None)
+        if motivo:
+            motivos_by_prof.setdefault(row.professional_id, set()).add(str(motivo))
 
     ajustes_q = select(NovedadesAjusteCapital).where(NovedadesAjusteCapital.deleted_at.is_(None))
     if periodo_id is not None:
@@ -182,6 +186,7 @@ def build_capital_humano_rows(
                 monto_internaciones=monto_internaciones,
                 monto_total=monto_total,
                 es_especialista=bool(getattr(prof, "es_especialista", False)),
+                motivos_sin_produccion=sorted(motivos_by_prof.get(pid, set())),
                 bonos=eligible_bonos,
                 bonos_subtotales=bonos_subtotales,
                 practicas=[PracticaDetalleItem(**p) for p in practicas_items],

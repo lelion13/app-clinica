@@ -290,6 +290,8 @@ class GridRowResponse(BaseModel):
     cargado_por: str | None
     fecha_realizacion: date | None = None
     fecha_carga: datetime
+    motivo_sin_produccion: str | None = None
+    observacion_sin_produccion: str | None = None
 
 
 class BonoColumnaResponse(BaseModel):
@@ -329,6 +331,7 @@ class CapitalHumanoRowResponse(BaseModel):
     monto_internaciones: int = 0
     monto_total: Decimal
     es_especialista: bool = False
+    motivos_sin_produccion: list[str] = Field(default_factory=list)
     bonos: dict[str, int] = Field(default_factory=dict)
     bonos_subtotales: dict[str, int] = Field(default_factory=dict)
     practicas: list[PracticaDetalleItem] = Field(default_factory=list)

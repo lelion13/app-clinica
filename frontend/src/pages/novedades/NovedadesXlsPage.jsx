@@ -63,6 +63,28 @@ function tipoLabel(tipo) {
   return "Novedad";
 }
 
+function motivoLabel(value) {
+  if (value === "vacaciones") return "Vacaciones";
+  if (value === "enfermedad") return "Enfermedad";
+  return value || "—";
+}
+
+const MOTIVO_HIGHLIGHT_BG = "#fff3cd";
+
+function rowHasMotivoMatch(row, motivoFilter) {
+  const motivos = Array.isArray(row.motivos_sin_produccion) ? row.motivos_sin_produccion : [];
+  if (!motivos.length) return false;
+  if (!motivoFilter || motivoFilter === "todos") return true;
+  return motivos.includes(motivoFilter);
+}
+
+function cargaMatchesMotivoFilter(item, motivoFilter) {
+  const m = item.motivo_sin_produccion;
+  if (!m) return false;
+  if (!motivoFilter || motivoFilter === "todos") return true;
+  return m === motivoFilter;
+}
+
 function bonoOptionLabels(bonoColumns) {
   const map = new Map();
   for (const col of bonoColumns || []) {
@@ -84,6 +106,7 @@ export function NovedadesXlsPage() {
   const [periodoId, setPeriodoId] = useState("");
   const [bootstrapped, setBootstrapped] = useState(false);
   const [filterText, setFilterText] = useState("");
+  const [motivoFilter, setMotivoFilter] = useState("todos");
   const [sortKey, setSortKey] = useState("professional_name");
   const [sortDir, setSortDir] = useState("asc");
 
@@ -107,6 +130,10 @@ export function NovedadesXlsPage() {
   const [descuentoErrors, setDescuentoErrors] = useState(null);
   const [descuentoErrorMessage, setDescuentoErrorMessage] = useState("");
   const descuentoFileRef = useRef(null);
+
+  const [conNovedadOpen, setConNovedadOpen] = useState(false);
+  const [conNovedadItems, setConNovedadItems] = useState([]);
+  const [conNovedadLoading, setConNovedadLoading] = useState(false);
 
   const [parcialOpen, setParcialOpen] = useState(false);
   const [parcialDesde, setParcialDesde] = useState("");
@@ -202,6 +229,34 @@ export function NovedadesXlsPage() {
       setSoloOpen(false);
     } finally {
       setSoloLoading(false);
+    }
+  };
+
+  const openConNovedad = async () => {
+    if (!periodoId) {
+      setError("Seleccioná un período");
+      return;
+    }
+    setConNovedadOpen(true);
+    setConNovedadLoading(true);
+    setError("");
+    try {
+      const params = new URLSearchParams({ periodo_id: periodoId });
+      const list = await apiRequestWithRefresh(`/novedades/grilla?${params}`);
+      const items = (Array.isArray(list) ? list : []).filter((item) =>
+        cargaMatchesMotivoFilter(item, motivoFilter)
+      );
+      items.sort((a, b) => {
+        const byName = compareText(a.professional_name, b.professional_name);
+        if (byName !== 0) return byName;
+        return compareText(a.fecha_realizacion, b.fecha_realizacion);
+      });
+      setConNovedadItems(items);
+    } catch (err) {
+      setError(err.message || "Error al cargar cargas con novedad");
+      setConNovedadOpen(false);
+    } finally {
+      setConNovedadLoading(false);
     }
   };
 
@@ -689,6 +744,25 @@ export function NovedadesXlsPage() {
           placeholder="Filtrar grilla (legajo / nombre)…"
           style={{ ...uiStyles.formControl, maxWidth: 280 }}
         />
+        <select
+          value={motivoFilter}
+          onChange={(e) => setMotivoFilter(e.target.value)}
+          style={{ ...uiStyles.formControl, maxWidth: 180 }}
+          title="Resaltar profesionales con cargas por motivo"
+        >
+          <option value="todos">Motivo: Todos</option>
+          <option value="vacaciones">Motivo: Vacaciones</option>
+          <option value="enfermedad">Motivo: Enfermedad</option>
+        </select>
+        <button
+          type="button"
+          style={uiStyles.buttonSecondary}
+          onClick={openConNovedad}
+          disabled={!periodoId || conNovedadLoading}
+          title={!periodoId ? "Seleccioná un período" : "Listar cargas con Vacaciones/Enfermedad"}
+        >
+          {conNovedadLoading ? "Cargando…" : "Con novedad"}
+        </button>
         <button
           type="button"
           style={uiStyles.buttonSecondary}
@@ -796,8 +870,13 @@ export function NovedadesXlsPage() {
             </tr>
           </thead>
           <tbody>
-            {visibleRows.map((row) => (
-              <tr key={row.professional_id}>
+            {visibleRows.map((row) => {
+              const highlighted = rowHasMotivoMatch(row, motivoFilter);
+              return (
+              <tr
+                key={row.professional_id}
+                style={highlighted ? { background: MOTIVO_HIGHLIGHT_BG } : undefined}
+              >
                 <td style={tdStyle}>{row.legajo || "—"}</td>
                 <td style={tdStyle}>{row.professional_name}</td>
                 <td style={{ ...tdStyle, fontVariantNumeric: "tabular-nums" }}>{formatMoney(row.monto_cargas)}</td>
@@ -819,7 +898,8 @@ export function NovedadesXlsPage() {
                   </button>
                 </td>
               </tr>
-            ))}
+              );
+            })}
           </tbody>
           <tfoot>
             <tr>
@@ -1020,6 +1100,8 @@ export function NovedadesXlsPage() {
                           <th style={{ ...thStyle, cursor: "default" }}>Período</th>
                           <th style={{ ...thStyle, cursor: "default" }}>F. carga</th>
                           <th style={{ ...thStyle, cursor: "default" }}>Cargado por</th>
+                          <th style={{ ...thStyle, cursor: "default" }}>Motivo</th>
+                          <th style={{ ...thStyle, cursor: "default" }}>Observación</th>
                         </tr>
                       </thead>
                       <tbody>
@@ -1038,6 +1120,10 @@ export function NovedadesXlsPage() {
                               {formatDateTime(item.fecha_carga)}
                             </td>
                             <td style={tdStyle}>{item.cargado_por || "—"}</td>
+                            <td style={tdStyle}>
+                              {item.motivo_sin_produccion ? motivoLabel(item.motivo_sin_produccion) : "—"}
+                            </td>
+                            <td style={tdStyle}>{item.observacion_sin_produccion || "—"}</td>
                           </tr>
                         ))}
                       </tbody>
@@ -1170,6 +1256,96 @@ export function NovedadesXlsPage() {
                     Para cargar un ajuste nuevo usá <strong>Agregar importe</strong> en la grilla.
                   </p>
                 </section>
+              </div>
+            )}
+          </div>
+        </div>
+      ) : null}
+
+      {conNovedadOpen ? (
+        <div
+          role="presentation"
+          style={{
+            position: "fixed",
+            inset: 0,
+            zIndex: 1000,
+            background: "rgba(15, 43, 39, 0.45)",
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            padding: 16,
+          }}
+          onClick={() => setConNovedadOpen(false)}
+        >
+          <div
+            role="dialog"
+            aria-modal="true"
+            style={{
+              background: uiTheme.colors.surface,
+              borderRadius: uiTheme.radius.md,
+              width: "min(960px, 100%)",
+              maxHeight: "90vh",
+              overflow: "auto",
+              padding: 22,
+              boxShadow: uiTheme.shadow.md,
+              border: `1px solid ${uiTheme.colors.border}`,
+            }}
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div style={{ display: "flex", justifyContent: "space-between", gap: 12, alignItems: "flex-start" }}>
+              <div>
+                <h2 style={{ marginTop: 0, marginBottom: 8, fontSize: "1.1rem" }}>Con novedad</h2>
+                <p style={{ ...uiStyles.helpText, marginTop: 0 }}>
+                  Cargas con motivo{" "}
+                  {motivoFilter === "todos"
+                    ? "Vacaciones o Enfermedad"
+                    : motivoLabel(motivoFilter)}{" "}
+                  en el período seleccionado.
+                </p>
+              </div>
+              <button type="button" style={uiStyles.buttonSecondary} onClick={() => setConNovedadOpen(false)}>
+                Cerrar
+              </button>
+            </div>
+            {conNovedadLoading ? (
+              <p style={uiStyles.helpText}>Cargando…</p>
+            ) : (
+              <div style={{ overflowX: "auto" }}>
+                <table style={{ width: "100%", borderCollapse: "collapse", fontSize: "0.85rem", minWidth: 800 }}>
+                  <thead>
+                    <tr>
+                      <th style={{ ...thStyle, cursor: "default" }}>Legajo</th>
+                      <th style={{ ...thStyle, cursor: "default" }}>Nombre</th>
+                      <th style={{ ...thStyle, cursor: "default" }}>Tipo</th>
+                      <th style={{ ...thStyle, cursor: "default" }}>Servicio</th>
+                      <th style={{ ...thStyle, cursor: "default" }}>Concepto</th>
+                      <th style={{ ...thStyle, cursor: "default" }}>Valor</th>
+                      <th style={{ ...thStyle, cursor: "default" }}>F. realización</th>
+                      <th style={{ ...thStyle, cursor: "default" }}>Motivo</th>
+                      <th style={{ ...thStyle, cursor: "default" }}>Observación</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {conNovedadItems.map((item) => (
+                      <tr key={`${item.tipo}-${item.id}`}>
+                        <td style={tdStyle}>{item.legajo || "—"}</td>
+                        <td style={tdStyle}>{item.professional_name}</td>
+                        <td style={tdStyle}>{tipoLabel(item.tipo)}</td>
+                        <td style={tdStyle}>{item.servicio_nombre || "—"}</td>
+                        <td style={tdStyle}>{item.concepto}</td>
+                        <td style={{ ...tdStyle, fontVariantNumeric: "tabular-nums" }}>
+                          {formatMoney(item.valor)}
+                        </td>
+                        <td style={tdStyle}>{formatDateOnly(item.fecha_realizacion)}</td>
+                        <td style={tdStyle}>{motivoLabel(item.motivo_sin_produccion)}</td>
+                        <td style={tdStyle}>{item.observacion_sin_produccion || "—"}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+                {!conNovedadItems.length ? (
+                  <p style={uiStyles.helpText}>Sin cargas con ese motivo en el período.</p>
+                ) : null}
               </div>
             )}
           </div>
