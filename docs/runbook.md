@@ -134,6 +134,10 @@
   - `GET /novedades/grilla` y `GET /novedades/export.xlsx` aceptan `fecha_desde`/`fecha_hasta` (filtro inclusive por `fecha_realizacion`).
   - Con ambas fechas en export → hojas **Resumen** + **Detalle**; sin fechas → una hoja detalle como antes.
   - Archivo: `descarga-parcial-modulos_{desde}_{hasta}.xlsx`.
+- Cambio `novedades-capital-humano-motivo-sin-produccion`:
+  - Select **Motivo** (Todos / Vacaciones / Enfermedad): resalta filas con cargas que tienen ese motivo (un color; no oculta filas).
+  - Botón **Con novedad**: modal con lista plana de esas cargas del período (respeta el select).
+  - Detalle Cargas y `export.xlsx`: columnas Motivo y Observación; `GridRowResponse` + flags `motivos_sin_produccion` en capital-humano.
 - Cambio `novedades-capital-humano-importe-descontar` (rev `0025_ajuste_descuento_lote`):
   - Botón **Importe a descontar** (antes de Descargar liquidación); con lote activo → **Anular descuento**.
   - Solo período **cerrado**; `admin`/`rrhh`. Re-import exige anular antes.

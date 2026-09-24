@@ -83,3 +83,47 @@ def test_build_capital_humano_aggregates(monkeypatch):
     assert by_id[1].monto_ajustes == Decimal("-10")
     assert by_id[1].monto_total == Decimal("140")
     assert by_id[2].monto_total == Decimal("20")
+
+
+def test_build_capital_humano_motivos_flags(monkeypatch):
+    monkeypatch.setattr(
+        ch,
+        "build_grid_rows",
+        lambda *a, **k: [
+            SimpleNamespace(
+                professional_id=1,
+                valor=Decimal("100"),
+                tipo="modulo_asignado",
+                motivo_sin_produccion="vacaciones",
+            ),
+            SimpleNamespace(
+                professional_id=1,
+                valor=Decimal("50"),
+                tipo="hora_extra",
+                motivo_sin_produccion="enfermedad",
+            ),
+            SimpleNamespace(
+                professional_id=2,
+                valor=Decimal("20"),
+                tipo="modulo_asignado",
+                motivo_sin_produccion=None,
+            ),
+        ],
+    )
+
+    class DB:
+        def execute(self, stmt):
+            sql = str(stmt)
+            if "novedades_ajuste_capital" in sql.lower() or "NovedadesAjusteCapital" in sql:
+                return FakeResult([])
+            return FakeResult(
+                [
+                    SimpleNamespace(id=1, full_name="Ana", legajo="5100", deleted_at=None, es_especialista=False),
+                    SimpleNamespace(id=2, full_name="Bob", legajo=None, deleted_at=None, es_especialista=False),
+                ]
+            )
+
+    rows = ch.build_capital_humano_rows(DB(), periodo_id=1)
+    by_id = {r.professional_id: r for r in rows}
+    assert by_id[1].motivos_sin_produccion == ["enfermedad", "vacaciones"]
+    assert by_id[2].motivos_sin_produccion == []

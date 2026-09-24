@@ -8,7 +8,9 @@ from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from app.models.novedades import (
+    MOTIVO_SIN_PRODUCCION_LABELS,
     NOVEDAD_TIPO_LABELS,
+    MotivoSinProduccion,
     NovedadesAsignacionModulo,
     NovedadesModulo,
     NovedadesNovedad,
@@ -33,6 +35,8 @@ _DETAIL_HEADERS = [
     "cargado_por",
     "fecha_realizacion",
     "fecha_carga",
+    "motivo",
+    "observacion",
 ]
 
 
@@ -110,6 +114,15 @@ def export_xlsx_bytes(
     return buffer.getvalue()
 
 
+def _motivo_label(value: str | None) -> str | None:
+    if not value:
+        return None
+    try:
+        return MOTIVO_SIN_PRODUCCION_LABELS.get(MotivoSinProduccion(value), value)
+    except ValueError:
+        return value
+
+
 def _append_detail_sheet(ws, rows: list[GridRowResponse]) -> None:
     ws.append(list(_DETAIL_HEADERS))
     for row in rows:
@@ -126,6 +139,8 @@ def _append_detail_sheet(ws, rows: list[GridRowResponse]) -> None:
                 row.cargado_por,
                 row.fecha_realizacion.isoformat() if row.fecha_realizacion else None,
                 row.fecha_carga.isoformat() if row.fecha_carga else None,
+                _motivo_label(row.motivo_sin_produccion),
+                row.observacion_sin_produccion,
             ]
         )
 
@@ -211,6 +226,8 @@ def _asignacion_row(db: Session, item: NovedadesAsignacionModulo) -> GridRowResp
         cargado_por=actor.name if actor else None,
         fecha_realizacion=item.fecha_realizacion,
         fecha_carga=item.created_at,
+        motivo_sin_produccion=getattr(item, "motivo_sin_produccion", None),
+        observacion_sin_produccion=getattr(item, "observacion_sin_produccion", None),
     )
 
 
@@ -241,6 +258,8 @@ def _novedad_row(db: Session, item: NovedadesNovedad) -> GridRowResponse | None:
         cargado_por=actor.name if actor else None,
         fecha_realizacion=item.fecha_realizacion,
         fecha_carga=item.created_at,
+        motivo_sin_produccion=getattr(item, "motivo_sin_produccion", None),
+        observacion_sin_produccion=getattr(item, "observacion_sin_produccion", None),
     )
 
 
