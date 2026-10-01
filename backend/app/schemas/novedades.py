@@ -16,6 +16,7 @@ def _normalize_concepto_liquidacion(value: int | None) -> int | None:
 class ServicioCreateRequest(BaseModel):
     nombre: str = Field(min_length=2, max_length=120)
     activo: bool = True
+    especialista: bool = False
     valor_hora: Decimal = Field(default=Decimal("0"), ge=0)
     concepto_liquidacion: int | None = None
 
@@ -28,6 +29,7 @@ class ServicioCreateRequest(BaseModel):
 class ServicioUpdateRequest(BaseModel):
     nombre: str = Field(min_length=2, max_length=120)
     activo: bool = True
+    especialista: bool = False
     valor_hora: Decimal = Field(ge=0)
     concepto_liquidacion: int | None = None
 
@@ -41,6 +43,7 @@ class ServicioResponse(BaseModel):
     id: int
     nombre: str
     activo: bool
+    especialista: bool = False
     valor_hora: Decimal
     concepto_liquidacion: int | None = None
     created_at: datetime
@@ -292,6 +295,7 @@ class GridRowResponse(BaseModel):
     fecha_carga: datetime
     motivo_sin_produccion: str | None = None
     observacion_sin_produccion: str | None = None
+    plus_especialista: bool = False
 
 
 class BonoColumnaResponse(BaseModel):

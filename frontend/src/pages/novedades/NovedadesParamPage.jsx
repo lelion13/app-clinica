@@ -59,6 +59,7 @@ export function NovedadesParamPage() {
   const [editServicioValorHora, setEditServicioValorHora] = useState("0");
   const [editServicioConcepto, setEditServicioConcepto] = useState("");
   const [editServicioActivo, setEditServicioActivo] = useState(true);
+  const [editServicioEspecialista, setEditServicioEspecialista] = useState(false);
   const [editServicioSaving, setEditServicioSaving] = useState(false);
   const [deleteServicio, setDeleteServicio] = useState(null);
   const [deleteServicioSaving, setDeleteServicioSaving] = useState(false);
@@ -211,6 +212,7 @@ export function NovedadesParamPage() {
         body: JSON.stringify({
           nombre: servicioNombre.trim(),
           activo: true,
+          especialista: false,
           valor_hora: Number(servicioValorHora),
           concepto_liquidacion: concepto,
         }),
@@ -231,6 +233,7 @@ export function NovedadesParamPage() {
     setEditServicioValorHora(String(item.valor_hora ?? "0"));
     setEditServicioConcepto(item.concepto_liquidacion == null ? "" : String(item.concepto_liquidacion));
     setEditServicioActivo(Boolean(item.activo));
+    setEditServicioEspecialista(Boolean(item.especialista));
   };
 
   const closeEditServicio = () => {
@@ -257,6 +260,7 @@ export function NovedadesParamPage() {
         body: JSON.stringify({
           nombre: editServicioNombre.trim(),
           activo: Boolean(editServicioActivo),
+          especialista: Boolean(editServicioEspecialista),
           valor_hora: Number(editServicioValorHora),
           concepto_liquidacion: concepto,
         }),
@@ -1010,7 +1014,9 @@ export function NovedadesParamPage() {
               <li key={item.id} style={{ padding: "8px 10px", borderBottom: `1px solid ${uiTheme.colors.border}` }}>
                 <div style={{ display: "flex", gap: 8, flexWrap: "wrap", alignItems: "flex-start", justifyContent: "space-between" }}>
                   <div style={{ flex: "1 1 200px" }}>
-                    #{item.id} · {item.nombre} {item.activo ? "" : "(inactivo)"} · Concepto liquidación {item.concepto_liquidacion == null ? "—" : item.concepto_liquidacion}
+                    #{item.id} · {item.nombre} {item.activo ? "" : "(inactivo)"}
+                    {item.especialista ? " · Especialista" : ""} · Concepto liquidación{" "}
+                    {item.concepto_liquidacion == null ? "—" : item.concepto_liquidacion}
                     <div style={uiStyles.helpText}>
                       Concepto liquidación {item.concepto_liquidacion == null ? "—" : item.concepto_liquidacion}
                       {" · "}
@@ -1199,6 +1205,15 @@ export function NovedadesParamPage() {
                     />
                     Activo
                   </label>
+                  <label style={{ display: "inline-flex", gap: 6, alignItems: "center" }}>
+                    <input
+                      type="checkbox"
+                      checked={editServicioEspecialista}
+                      onChange={(e) => setEditServicioEspecialista(e.target.checked)}
+                      disabled={editServicioSaving}
+                    />
+                    Especialista
+                  </label>
                 </div>
                 <div style={{ display: "flex", gap: 8, justifyContent: "flex-end", flexWrap: "wrap", marginTop: 16 }}>
                   <button type="button" onClick={closeEditServicio} style={uiStyles.buttonSecondary} disabled={editServicioSaving}>
@@ -1269,6 +1284,9 @@ export function NovedadesParamPage() {
                   </div>
                   <div>
                     <strong>Activo:</strong> {deleteServicio.activo ? "sí" : "no"}
+                  </div>
+                  <div>
+                    <strong>Especialista:</strong> {deleteServicio.especialista ? "sí" : "no"}
                   </div>
                 </div>
                 <div style={{ display: "flex", gap: 8, justifyContent: "flex-end", flexWrap: "wrap" }}>

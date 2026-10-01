@@ -520,7 +520,9 @@ A period MUST have optional name, start date, end date, and status open/closed. 
 
 ### Requirement: Grilla y XLS (detalle)
 
-Admin/`rrhh` MUST be able to download a detail XLS (`GET /novedades/export.xlsx`) with columns including: período, servicio, profesional, tipo, concepto, horas, valor hora, valor, cargado por, **fecha realización**, **fecha carga**. Filters: período, servicio, texto, concepto. The same detail rows MUST be available via `GET /novedades/grilla` (including optional `professional_id` for Capital Humano Detalle). Grid rows MUST include optional **`legajo`** from the Novedades professional catalog when available.
+Admin/`rrhh` MUST be able to download a detail XLS (`GET /novedades/export.xlsx`) with columns including: período, servicio, profesional, tipo, concepto, horas, valor hora, valor, cargado por, **fecha realización**, **fecha carga**, **motivo**, **observacion**. Filters: período, servicio, texto, concepto. The same detail rows MUST be available via `GET /novedades/grilla` (including optional `professional_id` for Capital Humano Detalle). Grid rows MUST include optional **`legajo`** from the Novedades professional catalog when available.
+
+`GET /novedades/grilla` row payloads MUST include optional **`motivo_sin_produccion`** and **`observacion_sin_produccion`** (null when absent). Detail sheet columns **motivo** and **observacion** MUST use a human-readable motivo label (Vacaciones / Enfermedad) when present, and empty/null when absent. The Resumen sheet (when date range produces two sheets) MUST NOT be required to include these columns.
 
 `GET /novedades/grilla` and `GET /novedades/export.xlsx` MUST accept optional query params **`fecha_desde`** and **`fecha_hasta`**. When provided, results MUST include only rows whose **`fecha_realizacion`** satisfies `fecha_desde ≤ fecha_realizacion ≤ fecha_hasta`. The API MUST NOT require the period to be closed and MUST NOT reject dates outside the period bounds (period bounds are UI-only for Descarga parcial de módulos).
 
@@ -554,6 +556,13 @@ When date params are omitted, export MUST keep the existing single-sheet detail 
 - GIVEN el export detalle histórico
 - WHEN se descarga sin `fecha_desde`/`fecha_hasta`
 - THEN MUST comportarse como antes (una hoja de detalle)
+
+#### Scenario: Export incluye motivo
+
+- GIVEN una carga con motivo Enfermedad
+- WHEN se descarga `export.xlsx` (sin o con fechas)
+- THEN la hoja de detalle MUST incluir columnas motivo y observación
+- AND esa fila MUST reflejar Enfermedad y su observación
 
 ### Requirement: Alertas UI Novedades
 
@@ -706,6 +715,8 @@ On entry, the grid MUST show **already persisted** data for the selected period.
 
 The main grid MUST show **one row per professional** with fixed columns: legajo, name, total cargas (modules/novedades), ajustes, total producción (valorized imported bonos), total general (`cargas + ajustes + producción`), plus actions. Dynamic per-option bonos columns MUST NOT appear on the main grid. The Capital Humano UI MUST NOT show a service selector. Text filter (legajo/name) and banner for options missing Producción tariffs MUST remain.
 
+In addition, the toolbar MUST show a **Motivo** select and a **Con novedad** button as defined in Requirement “Motivos sin producción en Capital Humano”. The `GET /novedades/capital-humano` response MUST expose per-row data sufficient for the UI to highlight professionals that have cargas with `motivo_sin_produccion` in the period (e.g. `motivos_sin_produccion: list[str]`).
+
 Row eligibility MUST remain: professionals with cargas and/or adjustments, or bonos-only with option `servicio` in `DEA|DEP|CAP|CAI`. Others with only non-special bonos MUST appear only in Solo bonos.
 
 Grouping/ordering by `concepto_liquidacion` is out of scope for the on-screen Capital Humano grid. Liquidación export uses `concepto_liquidacion` as defined in Requirement “Export liquidación XLS (Capital Humano)”.
@@ -741,8 +752,15 @@ Grouping/ordering by `concepto_liquidacion` is out of scope for the on-screen Ca
 
 - GIVEN usuario admin/rrhh en Capital Humano
 - WHEN visualiza filtros
-- THEN MUST ver selector de período y búsqueda de texto
+- THEN MUST ver selector de período, búsqueda de texto, select Motivo y botón Con novedad
 - AND MUST NOT ver selector de servicio
+
+#### Scenario: Controles Motivo visibles
+
+- GIVEN admin en Capital Humano
+- WHEN mira la toolbar
+- THEN MUST ver select Motivo y botón Con novedad
+- AND el filtro de texto MUST seguir siendo solo legajo/nombre
 
 #### Scenario: Solo admin/rrhh
 
@@ -780,6 +798,8 @@ The footer MUST NOT appear in XLS exports. Backend aggregation for this footer i
 
 The **Detalle** action MUST open a modal showing, for the selected professional and period: (1) carga items (módulos/novedades), (2) producción/bonos breakdown (quantities and subtotales), and (3) adjustment history. Detalle MUST indicate whether the professional is marked `es_especialista`. Adding a new adjustment MUST remain available from the main grid (**Agregar importe**) and MAY omit create-from-Detalle.
 
+In the Cargas table, columns **Motivo** and **Observación** MUST be present for each carga row as defined in Requirement “Motivo y observación en Detalle Cargas”.
+
 #### Scenario: Detalle completo
 
 - GIVEN profesional con cargas, bonos y ajustes en el período
@@ -791,6 +811,54 @@ The **Detalle** action MUST open a modal showing, for the selected professional 
 - GIVEN profesional con `es_especialista=true`
 - WHEN admin abre Detalle en Capital Humano
 - THEN MUST indicarse que es especialista
+
+### Requirement: Motivos sin producción en Capital Humano
+
+Capital Humano (`admin`/`rrhh`) MUST provide:
+
+1. A **Motivo** select with options **Todos**, **Vacaciones**, **Enfermedad** (default **Todos**). The existing text filter MUST remain legajo/nombre only.
+2. A button **Con novedad** that opens a modal listing **carga rows** (módulos and novedades) that have `motivo_sin_produccion` set, scoped to the selected period, and filtered by the Motivo select:
+   - **Todos** → any motivo (`vacaciones` or `enfermedad`)
+   - **Vacaciones** / **Enfermedad** → only that motivo
+3. Main-grid row **highlight** (single shared background/border color; no motivo text on the main grid):
+   - **Todos** → professionals with ≥1 matching carga with any motivo
+   - **Vacaciones** / **Enfermedad** → professionals with ≥1 carga of that motivo
+   - The select MUST NOT hide rows or change footer/totals logic
+
+The modal MUST be a **flat table** of cargas (not accordion). Columns MUST include at least: legajo, nombre, tipo, servicio, concepto, valor, fecha realización, **Motivo**, **Observación** (and MAY include other carga columns already used in Detalle). Empty result MUST show a clear empty state.
+
+“Matching carga” MUST mean rows from `/novedades/grilla` (or equivalent) for the period where `motivo_sin_produccion` is non-null and matches the select rule above. Professionals who only appear for producción/bonos without such cargas MUST NOT be highlighted.
+
+#### Scenario: Highlight con Todos
+
+- GIVEN período con profesionales A (carga Vacaciones) y B (sin motivo)
+- WHEN Motivo = Todos
+- THEN la fila de A MUST resaltarse
+- AND la fila de B MUST NOT resaltarse
+- AND ambas filas MUST seguir visibles
+
+#### Scenario: Select Vacaciones
+
+- GIVEN A con solo Enfermedad y C con Vacaciones
+- WHEN Motivo = Vacaciones
+- THEN solo C MUST resaltarse
+- AND el modal **Con novedad** MUST listar solo cargas con motivo Vacaciones
+
+#### Scenario: Modal vacío
+
+- GIVEN Motivo = Enfermedad y ninguna carga con ese motivo
+- WHEN admin abre **Con novedad**
+- THEN MUST ver estado vacío (sin filas)
+
+### Requirement: Motivo y observación en Detalle Cargas
+
+In Capital Humano **Detalle**, the Cargas table MUST include columns **Motivo** and **Observación** for each carga row. When the carga has no `motivo_sin_produccion`, those cells MUST be empty or “—”. Labels MUST use human-readable Motivo (Vacaciones / Enfermedad).
+
+#### Scenario: Detalle con motivo
+
+- GIVEN carga con motivo Vacaciones y observación “viaje”
+- WHEN admin abre Detalle
+- THEN MUST ver Motivo Vacaciones y Observación viaje en esa fila de Cargas
 
 ### Requirement: Ajustes de Capital Humano
 

@@ -83,6 +83,7 @@ def _servicio_response(item) -> ServicioResponse:
         id=item.id,
         nombre=item.nombre,
         activo=item.activo,
+        especialista=bool(getattr(item, "especialista", False)),
         valor_hora=item.valor_hora,
         concepto_liquidacion=getattr(item, "concepto_liquidacion", None),
         created_at=item.created_at,

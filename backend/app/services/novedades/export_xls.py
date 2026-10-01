@@ -22,6 +22,7 @@ from app.models.novedades import (
 from app.models.user import User
 from app.schemas.novedades import GridRowResponse
 from app.services.novedades.helpers import novedad_valor_calculado
+from app.services.novedades.prof_sync import assignment_has_plus_especialista
 
 _DETAIL_HEADERS = [
     "periodo",
@@ -228,6 +229,7 @@ def _asignacion_row(db: Session, item: NovedadesAsignacionModulo) -> GridRowResp
         fecha_carga=item.created_at,
         motivo_sin_produccion=getattr(item, "motivo_sin_produccion", None),
         observacion_sin_produccion=getattr(item, "observacion_sin_produccion", None),
+        plus_especialista=assignment_has_plus_especialista(Decimal(modulo.valor), valor),
     )
 
 

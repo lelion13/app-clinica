@@ -19,7 +19,7 @@ from app.services.novedades.helpers import (
     normalize_motivo_sin_produccion,
     require_periodo_open,
 )
-from app.services.novedades.prof_sync import modulo_valor_para_profesional
+from app.services.novedades.prof_sync import assignment_has_plus_especialista, modulo_valor_para_profesional
 
 
 class FakeResult:
@@ -305,6 +305,12 @@ def test_export_xlsx_includes_motivo_columns(monkeypatch):
 
 
 
+def test_assignment_has_plus_especialista_inference():
+    assert assignment_has_plus_especialista(Decimal("1000"), Decimal("1200.00")) is True
+    assert assignment_has_plus_especialista(Decimal("1000"), Decimal("1000")) is False
+    assert assignment_has_plus_especialista(Decimal("1000"), None) is False
+
+
 def test_normalize_motivo_ambos_none():
     assert normalize_motivo_sin_produccion(None, None) == (None, None)
     assert normalize_motivo_sin_produccion("", "  ") == (None, None)
@@ -338,7 +344,7 @@ def _stub_create_deps(monkeypatch):
     )
     monkeypatch.setattr(cargas_service, "require_periodo_open", lambda _db, _id: periodo)
     monkeypatch.setattr(cargas_service, "validate_fecha_realizacion", lambda *_a, **_k: None)
-    monkeypatch.setattr(cargas_service, "get_servicio_or_404", lambda *_a, **_k: SimpleNamespace(id=1))
+    monkeypatch.setattr(cargas_service, "get_servicio_or_404", lambda *_a, **_k: SimpleNamespace(id=1, especialista=False))
     monkeypatch.setattr(
         cargas_service,
         "get_professional_or_404",
@@ -415,10 +421,47 @@ def test_create_asignacion_con_motivo(monkeypatch):
 
 def test_modulo_valor_especialista_factor():
     assert modulo_valor_para_profesional(Decimal("1000"), es_especialista=False) == Decimal("1000")
-    assert modulo_valor_para_profesional(Decimal("1000"), es_especialista=True) == Decimal("1200.00")
+    assert modulo_valor_para_profesional(Decimal("1000"), es_especialista=True) == Decimal("1000")
+    assert (
+        modulo_valor_para_profesional(
+            Decimal("1000"), es_especialista=True, servicio_especialista=True
+        )
+        == Decimal("1200.00")
+    )
+    assert (
+        modulo_valor_para_profesional(
+            Decimal("1000"), es_especialista=False, servicio_especialista=True
+        )
+        == Decimal("1000")
+    )
 
 
 def test_create_asignacion_especialista_aplica_plus(monkeypatch):
+    _stub_create_deps(monkeypatch)
+    monkeypatch.setattr(
+        cargas_service,
+        "get_professional_or_404",
+        lambda *_a, **_k: SimpleNamespace(id=1, es_especialista=True),
+    )
+    monkeypatch.setattr(
+        cargas_service,
+        "get_servicio_or_404",
+        lambda *_a, **_k: SimpleNamespace(id=1, especialista=True),
+    )
+    db = FakeDB()
+    user = SimpleNamespace(id=7, role=UserRole.admin)
+    payload = AsignacionCreateRequest(
+        periodo_id=1,
+        servicio_id=1,
+        professional_id=1,
+        modulo_id=3,
+        fecha_realizacion=date(2026, 7, 15),
+    )
+    item = cargas_service.create_asignacion(db, payload, user)
+    assert item.valor == Decimal("1200.00")
+
+
+def test_create_asignacion_especialista_sin_flag_servicio(monkeypatch):
     _stub_create_deps(monkeypatch)
     monkeypatch.setattr(
         cargas_service,
@@ -435,7 +478,7 @@ def test_create_asignacion_especialista_aplica_plus(monkeypatch):
         fecha_realizacion=date(2026, 7, 15),
     )
     item = cargas_service.create_asignacion(db, payload, user)
-    assert item.valor == Decimal("1200.00")
+    assert item.valor == Decimal("1000")
 
 
 def test_update_periodo_success():
