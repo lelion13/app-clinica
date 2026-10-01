@@ -1102,6 +1102,7 @@ export function NovedadesXlsPage() {
                           <th style={{ ...thStyle, cursor: "default" }}>Cargado por</th>
                           <th style={{ ...thStyle, cursor: "default" }}>Motivo</th>
                           <th style={{ ...thStyle, cursor: "default" }}>Observación</th>
+                          <th style={{ ...thStyle, cursor: "default" }}>Plus esp.</th>
                         </tr>
                       </thead>
                       <tbody>
@@ -1124,6 +1125,7 @@ export function NovedadesXlsPage() {
                               {item.motivo_sin_produccion ? motivoLabel(item.motivo_sin_produccion) : "—"}
                             </td>
                             <td style={tdStyle}>{item.observacion_sin_produccion || "—"}</td>
+                            <td style={tdStyle}>{item.plus_especialista ? "Sí" : "—"}</td>
                           </tr>
                         ))}
                       </tbody>

@@ -134,10 +134,15 @@
   - `GET /novedades/grilla` y `GET /novedades/export.xlsx` aceptan `fecha_desde`/`fecha_hasta` (filtro inclusive por `fecha_realizacion`).
   - Con ambas fechas en export → hojas **Resumen** + **Detalle**; sin fechas → una hoja detalle como antes.
   - Archivo: `descarga-parcial-modulos_{desde}_{hasta}.xlsx`.
-- Cambio `novedades-capital-humano-motivo-sin-produccion`:
+- Cambio `novedades-capital-humano-motivo-sin-produccion` (archivado `2026-09-30-novedades-capital-humano-motivo-sin-produccion`):
   - Select **Motivo** (Todos / Vacaciones / Enfermedad): resalta filas con cargas que tienen ese motivo (un color; no oculta filas).
   - Botón **Con novedad**: modal con lista plana de esas cargas del período (respeta el select).
   - Detalle Cargas y `export.xlsx`: columnas Motivo y Observación; `GridRowResponse` + flags `motivos_sin_produccion` en capital-humano.
+  - Spec estable: `openspec/specs/novedades/spec.md` (requisitos Motivos sin producción / Motivo y observación en Detalle Cargas).
+- Cambio `novedades-servicio-especialista-plus` (rev `0028_servicio_especialista`):
+  - Servicios: flag **Especialista** (default OFF, independiente de Activo); Parametrización checkbox.
+  - +20% en **alta** de módulo solo si profesional `es_especialista` **y** servicio.especialista; edición no reaplica plus.
+  - Capital Humano Detalle Cargas: columna **Plus esp.** (Sí si valor ≈ catálogo × 1.20). Historial no se recalcula en este change.
 - Cambio `novedades-capital-humano-importe-descontar` (rev `0025_ajuste_descuento_lote`):
   - Botón **Importe a descontar** (antes de Descargar liquidación); con lote activo → **Anular descuento**.
   - Solo período **cerrado**; `admin`/`rrhh`. Re-import exige anular antes.

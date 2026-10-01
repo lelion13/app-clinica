@@ -45,11 +45,20 @@ def _normalize_especialista_row(raw: dict) -> tuple[str, str] | None:
     return codprof[:40], (descripcion[:200] if descripcion else codprof)
 
 
-def modulo_valor_para_profesional(catalog_valor: Decimal, *, es_especialista: bool) -> Decimal:
+def modulo_valor_para_profesional(
+    catalog_valor: Decimal, *, es_especialista: bool, servicio_especialista: bool = False
+) -> Decimal:
     base = Decimal(catalog_valor)
-    if es_especialista:
+    if es_especialista and servicio_especialista:
         return (base * ESPECIALISTA_MODULO_FACTOR).quantize(Decimal("0.01"))
     return base
+
+
+def assignment_has_plus_especialista(catalog_valor: Decimal, persisted_valor: Decimal | None) -> bool:
+    if persisted_valor is None:
+        return False
+    expected = (Decimal(catalog_valor) * ESPECIALISTA_MODULO_FACTOR).quantize(Decimal("0.01"))
+    return Decimal(persisted_valor).quantize(Decimal("0.01")) == expected
 
 
 def _fetch_remote_rows() -> list[dict]:

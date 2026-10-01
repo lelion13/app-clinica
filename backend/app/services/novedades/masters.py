@@ -35,6 +35,7 @@ def create_servicio(db: Session, payload: ServicioCreateRequest, actor_id: int) 
     item = NovedadesServicio(
         nombre=name,
         activo=payload.activo,
+        especialista=bool(payload.especialista),
         valor_hora=Decimal(payload.valor_hora),
         concepto_liquidacion=payload.concepto_liquidacion,
         created_at=now,
@@ -57,6 +58,7 @@ def update_servicio(db: Session, servicio_id: int, payload: ServicioUpdateReques
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Servicio no encontrado")
     item.nombre = payload.nombre.strip()
     item.activo = payload.activo
+    item.especialista = bool(payload.especialista)
     item.valor_hora = Decimal(payload.valor_hora)
     item.concepto_liquidacion = payload.concepto_liquidacion
     item.updated_at = datetime.utcnow()

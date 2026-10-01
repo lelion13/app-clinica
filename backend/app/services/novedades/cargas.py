@@ -391,7 +391,7 @@ def list_asignaciones(db: Session, user: User) -> list[NovedadesAsignacionModulo
 def create_asignacion(db: Session, payload: AsignacionCreateRequest, user: User) -> NovedadesAsignacionModulo:
     periodo = require_periodo_open(db, payload.periodo_id)
     validate_fecha_realizacion(periodo, payload.fecha_realizacion)
-    get_servicio_or_404(db, payload.servicio_id)
+    servicio = get_servicio_or_404(db, payload.servicio_id)
     professional = get_professional_or_404(db, payload.professional_id, require_active=True)
     modulo = get_modulo_or_404(db, payload.modulo_id)
     assert_can_load_servicio(db, user, payload.servicio_id)
@@ -404,7 +404,9 @@ def create_asignacion(db: Session, payload: AsignacionCreateRequest, user: User)
         payload.motivo_sin_produccion, payload.observacion_sin_produccion
     )
     valor = modulo_valor_para_profesional(
-        Decimal(modulo.valor), es_especialista=bool(professional.es_especialista)
+        Decimal(modulo.valor),
+        es_especialista=bool(professional.es_especialista),
+        servicio_especialista=bool(getattr(servicio, "especialista", False)),
     )
     now = datetime.utcnow()
     item = NovedadesAsignacionModulo(
@@ -444,14 +446,11 @@ def update_asignacion(db: Session, item_id: int, payload: AsignacionUpdateReques
     if payload.modulo_id is not None:
         modulo = get_modulo_or_404(db, payload.modulo_id)
         from app.services.novedades.masters import require_modulo_en_servicio
-        from app.services.novedades.prof_sync import modulo_valor_para_profesional
 
         require_modulo_en_servicio(db, payload.modulo_id, item.servicio_id)
-        professional = get_professional_or_404(db, item.professional_id, require_active=False)
         item.modulo_id = payload.modulo_id
-        item.valor = modulo_valor_para_profesional(
-            Decimal(modulo.valor), es_especialista=bool(professional.es_especialista)
-        )
+        # Edición: no reaplica plus especialista; valor = catálogo del módulo nuevo.
+        item.valor = Decimal(modulo.valor)
     if payload.fecha_realizacion is not None:
         validate_fecha_realizacion(periodo, payload.fecha_realizacion)
         item.fecha_realizacion = payload.fecha_realizacion
