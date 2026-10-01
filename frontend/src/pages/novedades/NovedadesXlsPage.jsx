@@ -1054,16 +1054,18 @@ export function NovedadesXlsPage() {
             style={{
               background: "#fff",
               borderRadius: uiTheme.radius.md,
-              maxWidth: 960,
+              maxWidth: "min(960px, calc(100vw - 32px))",
               width: "100%",
+              boxSizing: "border-box",
               padding: 22,
               boxShadow: uiTheme.shadow.md,
               border: `1px solid ${uiTheme.colors.border}`,
               marginBottom: 24,
+              overflow: "hidden",
             }}
           >
             <div style={{ display: "flex", justifyContent: "space-between", gap: 12, alignItems: "flex-start" }}>
-              <div>
+              <div style={{ minWidth: 0, flex: 1 }}>
                 <h2 style={{ marginTop: 0, marginBottom: 8, fontSize: "1.1rem" }}>
                   Detalle · {detailRow.professional_name}
                 </h2>
@@ -1076,7 +1078,7 @@ export function NovedadesXlsPage() {
                   Ajustes {formatMoney(detailRow.monto_ajustes)} · Total {formatMoney(detailRow.monto_total)}
                 </p>
               </div>
-              <button type="button" style={uiStyles.buttonSecondary} onClick={closeDetalle}>
+              <button type="button" style={{ ...uiStyles.buttonSecondary, flexShrink: 0 }} onClick={closeDetalle}>
                 Cerrar
               </button>
             </div>
@@ -1084,12 +1086,27 @@ export function NovedadesXlsPage() {
             {detailLoading ? (
               <p style={uiStyles.helpText}>Cargando…</p>
             ) : (
-              <div style={{ display: "grid", gap: 20 }}>
-                <section>
+              <div style={{ display: "grid", gap: 20, minWidth: 0 }}>
+                <section style={{ minWidth: 0 }}>
                   <h3 style={{ fontSize: "1rem", margin: "0 0 8px" }}>Cargas (módulos / novedades)</h3>
-                  <div style={{ overflowX: "auto", maxHeight: "36vh" }}>
-                    <table style={{ width: "100%", borderCollapse: "collapse", fontSize: "0.85rem", minWidth: 720 }}>
-                      <thead>
+                  <div
+                    style={{
+                      overflow: "auto",
+                      maxHeight: "36vh",
+                      width: "100%",
+                      maxWidth: "100%",
+                      border: `1px solid ${uiTheme.colors.border}`,
+                      borderRadius: uiTheme.radius.sm,
+                    }}
+                  >
+                    <table
+                      style={{
+                        width: "max-content",
+                        minWidth: "100%",
+                        borderCollapse: "collapse",
+                        fontSize: "0.85rem",
+                      }}
+                    >                      <thead>
                         <tr>
                           <th style={{ ...thStyle, cursor: "default" }}>Tipo</th>
                           <th style={{ ...thStyle, cursor: "default" }}>Servicio</th>

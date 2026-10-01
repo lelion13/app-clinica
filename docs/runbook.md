@@ -143,6 +143,18 @@
   - Servicios: flag **Especialista** (default OFF, independiente de Activo); Parametrización checkbox.
   - +20% en **alta** de módulo solo si profesional `es_especialista` **y** servicio.especialista; edición no reaplica plus.
   - Capital Humano Detalle Cargas: columna **Plus esp.** (Sí si valor ≈ catálogo × 1.20). Historial no se recalcula en este change.
+  - **Ops one-off** (revalorizar un período ya cargado): script `backend/scripts/recalc_especialista_plus.py`
+    1. Deploy imagen con el script + `alembic upgrade head` (0028).
+    2. En Parametrización, tildar **Especialista** solo en servicios que deben pagar plus.
+    3. Backup recomendado (dump o export de `novedades_asignacion_modulo` del período).
+    4. Dry-run (Septiembre = `periodo_id` 3 en prod al 2026-09):
+       `docker compose --env-file .env.prod -f docker-compose.prod.yml exec -T backend \
+         python -m scripts.recalc_especialista_plus --periodo-id 3 --csv /tmp/recalc_sep.csv`
+    5. Revisar listado / CSV (columnas actual → nuevo → delta).
+    6. Apply:
+       `docker compose --env-file .env.prod -f docker-compose.prod.yml exec -T backend \
+         python -m scripts.recalc_especialista_plus --periodo-id 3 --apply`
+    7. Spot-check Detalle CH (Plus esp. / montos). El script **no** toca novedades ni ajustes.
 - Cambio `novedades-capital-humano-importe-descontar` (rev `0025_ajuste_descuento_lote`):
   - Botón **Importe a descontar** (antes de Descargar liquidación); con lote activo → **Anular descuento**.
   - Solo período **cerrado**; `admin`/`rrhh`. Re-import exige anular antes.
