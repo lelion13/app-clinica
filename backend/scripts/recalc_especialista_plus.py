@@ -5,7 +5,7 @@ Por defecto es DRY-RUN (no escribe). Usar --apply para persistir.
 Ejemplos (desde el container backend):
 
   python -m scripts.recalc_especialista_plus --periodo-id 3
-  python -m scripts.recalc_especialista_plus --periodo-id 3 --apply
+  python -m scripts.recalc_especialista_plus --periodo-id 3 --ids 1706,1833 --apply
 
 Regla (igual al alta):
   nuevo = catálogo × 1.20  si profesional.es_especialista AND servicio.especialista
@@ -46,6 +46,12 @@ def _parse_args(argv: list[str] | None = None) -> argparse.Namespace:
     )
     parser.add_argument("--periodo-id", type=int, required=True, help="ID de novedades_periodo")
     parser.add_argument(
+        "--ids",
+        type=str,
+        default="",
+        help="Opcional: IDs de asignación separados por coma (ej. 1706,1833). Solo esas filas.",
+    )
+    parser.add_argument(
         "--apply",
         action="store_true",
         help="Persistir cambios. Sin este flag solo imprime el dry-run.",
@@ -59,8 +65,22 @@ def _parse_args(argv: list[str] | None = None) -> argparse.Namespace:
     return parser.parse_args(argv)
 
 
+def _parse_ids(raw: str) -> set[int] | None:
+    text = (raw or "").strip()
+    if not text:
+        return None
+    out: set[int] = set()
+    for part in text.split(","):
+        part = part.strip()
+        if not part:
+            continue
+        out.add(int(part))
+    return out or None
+
+
 def main(argv: list[str] | None = None) -> int:
     args = _parse_args(argv)
+    only_ids = _parse_ids(args.ids)
     db = SessionLocal()
     try:
         periodo = db.execute(
@@ -90,24 +110,28 @@ def main(argv: list[str] | None = None) -> int:
             f"Servicios con Especialista ON ({len(con_flag)}): "
             + (", ".join(con_flag) if con_flag else "(ninguno — el plus bajará a catálogo)")
         )
+        if only_ids:
+            print(f"Filtro --ids: {sorted(only_ids)}")
         if not con_flag:
             print(
                 "AVISO: ningún servicio tiene especialista=true. "
                 "Revisá Parametrización antes de --apply si esperabas mantener plus."
             )
 
-        asignaciones = list(
-            db.execute(
-                select(NovedadesAsignacionModulo).where(
-                    NovedadesAsignacionModulo.periodo_id == args.periodo_id,
-                    NovedadesAsignacionModulo.deleted_at.is_(None),
-                )
-            )
-            .scalars()
-            .all()
+        query = select(NovedadesAsignacionModulo).where(
+            NovedadesAsignacionModulo.periodo_id == args.periodo_id,
+            NovedadesAsignacionModulo.deleted_at.is_(None),
         )
+        if only_ids is not None:
+            query = query.where(NovedadesAsignacionModulo.id.in_(only_ids))
+        asignaciones = list(db.execute(query).scalars().all())
+        if only_ids is not None:
+            found = {a.id for a in asignaciones}
+            missing = sorted(only_ids - found)
+            if missing:
+                print(f"AVISO: IDs no encontrados en el período (o borrados): {missing}")
         if not asignaciones:
-            print("Sin asignaciones activas en el período.")
+            print("Sin asignaciones activas en el período (con el filtro actual).")
             return 0
 
         modulos = {

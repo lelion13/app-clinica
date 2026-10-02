@@ -132,6 +132,8 @@ class NovedadesAjusteCapital(AuditMixin, Base):
     comentario: Mapped[str] = mapped_column(String(500), nullable=False)
     # UUID string set only for "Importe a descontar" import lots (Anular targets these).
     descuento_lote_id: Mapped[str | None] = mapped_column(String(36), nullable=True, index=True)
+    # UUID string for "Ajuste +/-" import lots (independent of descuento_lote_id).
+    ajuste_mas_menos_lote_id: Mapped[str | None] = mapped_column(String(36), nullable=True, index=True)
 
 
 class NovedadesBonoOpcion(AuditMixin, Base):

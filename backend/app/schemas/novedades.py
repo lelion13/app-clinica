@@ -453,3 +453,17 @@ class ImporteDescontarImportResponse(BaseModel):
 
 class ImporteDescontarAnularResponse(BaseModel):
     deleted: int
+
+
+class AjusteMasMenosStatusResponse(BaseModel):
+    has_ajuste: bool
+    lote_id: str | None = None
+
+
+class AjusteMasMenosImportResponse(BaseModel):
+    created: int
+    lote_id: str
+
+
+class AjusteMasMenosAnularResponse(BaseModel):
+    deleted: int

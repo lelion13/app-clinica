@@ -43,11 +43,11 @@ The system MUST support roles `admin`, `operador`, `jefe_medico`, `rrhh`. Users 
 
 ### Requirement: Servicios y módulos
 
-The system MUST provide ABM of **servicios** (id, nombre, activo, **valor_hora**, optional integer **concepto_liquidacion**) and **módulos** (id, descripción, comentario, valor ARS, **produccion** boolean, **tipo_dia**) with **N:N** association to services. Admin and `rrhh` MUST manage them; `jefe_medico` MUST NOT.
+The system MUST provide ABM of **servicios** (id, nombre, activo, boolean **especialista**, **valor_hora**, optional integer **concepto_liquidacion**) and **módulos** (id, descripción, comentario, valor ARS, **produccion** boolean, **tipo_dia**) with **N:N** association to services. Admin and `rrhh` MUST manage them; `jefe_medico` MUST NOT.
 
 Parametrización tabs MUST include **Producción** (tarifas de valor unitario por opción de bono importado) between **Módulos** and **Jefes ↔ servicios**, managed by `admin`/`rrhh` only. This tab MUST NOT be confused with the module boolean `produccion` (external production-check skip).
 
-Servicios: `concepto_liquidacion` MUST be optional (empty or `0` → `NULL`); non-zero MUST be integer ≥ 1; negatives MUST be rejected (422); duplicates allowed. ABM MUST use modals like Módulos: grid, **Nuevo servicio** (always `activo=true`), edit modal (nombre, valor hora, concepto, **Activo** checkbox), confirm-delete modal; Escape cancels. No inline `valor_hora` edit. Grid shows `#id · nombre · activo · Concepto liquidación` (`NULL` → "—").
+Servicios: `concepto_liquidacion` MUST be optional (empty or `0` → `NULL`); non-zero MUST be integer ≥ 1; negatives MUST be rejected (422); duplicates allowed. ABM MUST use modals like Módulos: grid, **Nuevo servicio** (always `activo=true`, default `especialista=false`), edit modal (nombre, valor hora, concepto, **Activo** and **Especialista** checkboxes; `especialista` independent of `activo`), confirm-delete modal; Escape cancels. No inline `valor_hora` edit. Grid shows `#id · nombre · activo · Concepto liquidación` (`NULL` → "—").
 
 Modules: **`tipo_dia`** MUST be exactly one of `semana` | `sadofe` | `valor_unico` (default `semana` on create; replaces former boolean `sadofe`). Field `produccion` remains independent.
 
@@ -672,21 +672,65 @@ If the specialists API fails after a successful catalog sync, the catalog sync M
 - THEN flags `es_especialista` MUST permanecer como estaban
 - AND MUST mostrarse aviso de error de especialistas
 
+### Requirement: Flag Especialista en servicio
+
+Each Novedades **servicio** MUST have a boolean attribute **`especialista`** (UI label **Especialista**), editable in Parametrización alongside **Activo**. The flag MUST be independent of `activo`.
+
+Migration and create defaults MUST set `especialista=false` for existing and new servicios. `admin`/`rrhh` MUST be able to toggle it on create/edit.
+
+#### Scenario: Default OFF
+
+- GIVEN migración o alta de servicio sin tildar Especialista
+- WHEN se persiste el servicio
+- THEN `especialista` MUST ser false
+
+#### Scenario: Independiente de Activo
+
+- GIVEN servicio inactivo
+- WHEN se tilda Especialista
+- THEN MUST persistirse true sin forzar Activo
+
 ### Requirement: Plus 20% en módulos de especialistas
 
-When creating a **module assignment** (not a novedad) for a professional with `es_especialista=true`, the persisted assignment `valor` MUST be the module catalog value multiplied by **1.20**. Historical assignments keep their stored `valor`. Novedades MUST NOT receive this factor. Capital Humano and exports MUST use the assignment’s persisted `valor` for modules (no second multiplication).
+When **creating** a module assignment, the persisted `valor` MUST be catalog × **1.20** only if **both** `professional.es_especialista` **and** the assignment’s **servicio.especialista** are true; otherwise catalog value (quantize 0.01 as today). Novedades MUST NOT receive this factor.
 
-#### Scenario: Carga módulo especialista
+When **updating** an assignment, the system MUST NOT re-apply the specialist plus: changing only `fecha_realizacion` MUST keep `valor`; if `modulo_id` changes, `valor` MUST become the new module’s catalog value **without** ×1.20. Historical rows are not bulk-recalculated by default product behavior.
 
-- GIVEN profesional especialista y módulo con valor catálogo 1000
-- WHEN se carga el módulo
-- THEN el valor persistido MUST ser 1200
+Capital Humano and exports MUST continue using persisted `valor` (no second multiplication). Multi-service modules: only the **servicio_id of the assignment** counts for the service flag.
+
+#### Scenario: Especialista en servicio con flag
+
+- GIVEN profesional especialista, servicio con Especialista ON, módulo 1000
+- WHEN se crea la asignación en ese servicio
+- THEN valor persistido MUST ser 1200
+
+#### Scenario: Especialista en servicio sin flag
+
+- GIVEN profesional especialista, servicio con Especialista OFF, módulo 1000
+- WHEN se crea la asignación en ese servicio
+- THEN valor persistido MUST ser 1000
+
+#### Scenario: Edición no reaplica plus
+
+- GIVEN asignación existente
+- WHEN se actualiza solo la fecha
+- THEN el valor MUST permanecer igual
 
 #### Scenario: Novedad sin plus
 
 - GIVEN profesional especialista
 - WHEN se carga una novedad
 - THEN el valor MUST calcularse como hoy (horas × valor_hora), sin ×1.20 por especialista
+
+### Requirement: Plus esp. en Detalle Capital Humano
+
+In Capital Humano **Detalle** → tabla Cargas, module rows MUST show a column **Plus esp.** with **Sí** when the persisted assignment `valor` equals the module catalog value × **1.20** (same quantize as create), otherwise **—**. Novedad rows MUST show **—**. Excel export MUST NOT add this column.
+
+#### Scenario: Detalle marca plus
+
+- GIVEN asignación con valor 1200 y módulo catálogo 1000
+- WHEN admin abre Detalle Cargas
+- THEN Plus esp. MUST ser Sí
 
 ### Requirement: Limpieza transaccional Novedades
 
@@ -798,7 +842,7 @@ The footer MUST NOT appear in XLS exports. Backend aggregation for this footer i
 
 The **Detalle** action MUST open a modal showing, for the selected professional and period: (1) carga items (módulos/novedades), (2) producción/bonos breakdown (quantities and subtotales), and (3) adjustment history. Detalle MUST indicate whether the professional is marked `es_especialista`. Adding a new adjustment MUST remain available from the main grid (**Agregar importe**) and MAY omit create-from-Detalle.
 
-In the Cargas table, columns **Motivo** and **Observación** MUST be present for each carga row as defined in Requirement “Motivo y observación en Detalle Cargas”.
+In the Cargas table, columns **Motivo**, **Observación**, and **Plus esp.** MUST be present for module/novedad rows as defined in Requirements “Motivo y observación en Detalle Cargas” and “Plus esp. en Detalle Capital Humano”.
 
 #### Scenario: Detalle completo
 
