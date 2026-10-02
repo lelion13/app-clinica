@@ -131,6 +131,12 @@ export function NovedadesXlsPage() {
   const [descuentoErrorMessage, setDescuentoErrorMessage] = useState("");
   const descuentoFileRef = useRef(null);
 
+  const [hasAjuste, setHasAjuste] = useState(false);
+  const [ajusteBusy, setAjusteBusy] = useState(false);
+  const [ajusteErrors, setAjusteErrors] = useState(null);
+  const [ajusteErrorMessage, setAjusteErrorMessage] = useState("");
+  const ajusteFileRef = useRef(null);
+
   const [conNovedadOpen, setConNovedadOpen] = useState(false);
   const [conNovedadItems, setConNovedadItems] = useState([]);
   const [conNovedadLoading, setConNovedadLoading] = useState(false);
@@ -287,6 +293,24 @@ export function NovedadesXlsPage() {
     loadDescuentoStatus();
   }, [periodoId, periodoClosed, rows]);
 
+  useEffect(() => {
+    const loadAjusteStatus = async () => {
+      if (!periodoId || !periodoClosed) {
+        setHasAjuste(false);
+        return;
+      }
+      try {
+        const st = await apiRequestWithRefresh(
+          `/novedades/capital-humano/ajuste-mas-menos/status?periodo_id=${periodoId}`
+        );
+        setHasAjuste(Boolean(st?.has_ajuste));
+      } catch {
+        setHasAjuste(false);
+      }
+    };
+    loadAjusteStatus();
+  }, [periodoId, periodoClosed, rows]);
+
   const onImporteDescontarClick = () => {
     if (!periodoId || !periodoClosed || descuentoBusy) return;
     if (hasDescuento) {
@@ -343,6 +367,65 @@ export function NovedadesXlsPage() {
       }
     } finally {
       setDescuentoBusy(false);
+    }
+  };
+
+  const onAjusteMasMenosClick = () => {
+    if (!periodoId || !periodoClosed || ajusteBusy) return;
+    if (hasAjuste) {
+      anularAjuste();
+      return;
+    }
+    ajusteFileRef.current?.click();
+  };
+
+  const anularAjuste = async () => {
+    setAjusteBusy(true);
+    setError("");
+    try {
+      await apiRequestWithRefresh(
+        `/novedades/capital-humano/ajuste-mas-menos/anular?periodo_id=${periodoId}`,
+        { method: "POST" }
+      );
+      setInfo("Ajuste +/- anulado");
+      setHasAjuste(false);
+      await loadGrid(periodoId);
+    } catch (err) {
+      setError(err.message || "No se pudo anular el Ajuste +/-");
+    } finally {
+      setAjusteBusy(false);
+    }
+  };
+
+  const onAjusteFile = async (event) => {
+    const file = event.target.files?.[0];
+    event.target.value = "";
+    if (!file || !periodoId) return;
+    setAjusteBusy(true);
+    setError("");
+    setAjusteErrors(null);
+    setAjusteErrorMessage("");
+    try {
+      const form = new FormData();
+      form.append("file", file);
+      const result = await apiUploadWithRefresh(
+        `/novedades/capital-humano/ajuste-mas-menos?periodo_id=${periodoId}`,
+        form
+      );
+      setInfo(`Se importaron ${result?.created ?? 0} ajuste(s) +/-`);
+      setHasAjuste(true);
+      await loadGrid(periodoId);
+    } catch (err) {
+      const detail = err.detail;
+      const errors = Array.isArray(detail?.errors) ? detail.errors : null;
+      if (errors?.length) {
+        setAjusteErrorMessage(detail.message || err.message || "No se importó ningún Ajuste +/-");
+        setAjusteErrors(errors);
+      } else {
+        setError(err.message || "Error al importar Ajuste +/-");
+      }
+    } finally {
+      setAjusteBusy(false);
     }
   };
 
@@ -711,6 +794,70 @@ export function NovedadesXlsPage() {
         </div>
       ) : null}
 
+      {ajusteErrors ? (
+        <div
+          role="presentation"
+          style={{
+            position: "fixed",
+            inset: 0,
+            zIndex: 1000,
+            background: "rgba(15, 43, 39, 0.45)",
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            padding: 16,
+          }}
+          onClick={() => {
+            setAjusteErrors(null);
+            setAjusteErrorMessage("");
+          }}
+        >
+          <div
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="ajuste-import-errors-title"
+            onClick={(e) => e.stopPropagation()}
+            style={{
+              background: "#fff",
+              borderRadius: uiTheme.radius.md,
+              maxWidth: 520,
+              width: "100%",
+              maxHeight: "80vh",
+              overflowY: "auto",
+              padding: 22,
+              boxShadow: "0 12px 40px rgba(0,0,0,0.18)",
+            }}
+          >
+            <h3 id="ajuste-import-errors-title" style={{ marginTop: 0, marginBottom: 8 }}>
+              No se importó el Ajuste +/-
+            </h3>
+            <p style={{ marginTop: 0, color: uiTheme.colors.textMuted, fontSize: 14 }}>
+              {ajusteErrorMessage || "Corregí los siguientes ítems e intentá de nuevo."}
+            </p>
+            <ul style={{ paddingLeft: 18, margin: "12px 0 20px", fontSize: 14 }}>
+              {ajusteErrors.map((item, idx) => (
+                <li key={`${item.row}-${idx}`} style={{ marginBottom: 6 }}>
+                  {item.row ? `Fila ${item.row}: ` : ""}
+                  {item.reason}
+                </li>
+              ))}
+            </ul>
+            <div style={{ display: "flex", justifyContent: "flex-end" }}>
+              <button
+                type="button"
+                style={uiStyles.buttonPrimary}
+                onClick={() => {
+                  setAjusteErrors(null);
+                  setAjusteErrorMessage("");
+                }}
+              >
+                Cerrar
+              </button>
+            </div>
+          </div>
+        </div>
+      ) : null}
+
       <div style={{ display: "flex", gap: 8, flexWrap: "wrap", marginBottom: 12, alignItems: "center" }}>
         <select value={periodoId} onChange={(e) => setPeriodoId(e.target.value)} style={uiStyles.formControl}>
           <option value="">Seleccioná período…</option>
@@ -811,6 +958,34 @@ export function NovedadesXlsPage() {
             : hasDescuento
               ? "Anular descuento"
               : "Importe a descontar"}
+        </button>
+        <input
+          ref={ajusteFileRef}
+          type="file"
+          accept=".xlsx,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+          style={{ display: "none" }}
+          onChange={onAjusteFile}
+        />
+        <button
+          type="button"
+          style={hasAjuste ? uiStyles.buttonDanger : uiStyles.buttonPrimary}
+          onClick={onAjusteMasMenosClick}
+          disabled={!periodoId || !periodoClosed || ajusteBusy}
+          title={
+            !periodoId
+              ? "Seleccioná un período"
+              : !periodoClosed
+                ? "Solo disponible para períodos cerrados"
+                : hasAjuste
+                  ? "Anular ajustes +/- importados"
+                  : "Importar Excel de Ajuste +/-"
+          }
+        >
+          {ajusteBusy
+            ? "Procesando…"
+            : hasAjuste
+              ? "Anular Ajuste +/-"
+              : "Ajuste +/-"}
         </button>
         <button
           type="button"

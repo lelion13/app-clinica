@@ -139,7 +139,7 @@
   - Botón **Con novedad**: modal con lista plana de esas cargas del período (respeta el select).
   - Detalle Cargas y `export.xlsx`: columnas Motivo y Observación; `GridRowResponse` + flags `motivos_sin_produccion` en capital-humano.
   - Spec estable: `openspec/specs/novedades/spec.md` (requisitos Motivos sin producción / Motivo y observación en Detalle Cargas).
-- Cambio `novedades-servicio-especialista-plus` (rev `0028_servicio_especialista`):
+- Cambio `novedades-servicio-especialista-plus` (rev `0028_servicio_especialista`; archivado 2026-10-02 → `openspec/changes/archive/2026-10-02-novedades-servicio-especialista-plus/`):
   - Servicios: flag **Especialista** (default OFF, independiente de Activo); Parametrización checkbox.
   - +20% en **alta** de módulo solo si profesional `es_especialista` **y** servicio.especialista; edición no reaplica plus.
   - Capital Humano Detalle Cargas: columna **Plus esp.** (Sí si valor ≈ catálogo × 1.20). Historial no se recalcula en este change.
@@ -155,6 +155,7 @@
        `docker compose --env-file .env.prod -f docker-compose.prod.yml exec -T backend \
          python -m scripts.recalc_especialista_plus --periodo-id 3 --apply`
     7. Spot-check Detalle CH (Plus esp. / montos). El script **no** toca novedades ni ajustes.
+    8. Subconjunto: `--ids 1706,1833,...` (sin `--apply` primero). Corrección puntual Sept 2026: 5 filas PISO vía SQL (ver archive-report del change).
 - Cambio `novedades-capital-humano-importe-descontar` (rev `0025_ajuste_descuento_lote`):
   - Botón **Importe a descontar** (antes de Descargar liquidación); con lote activo → **Anular descuento**.
   - Solo período **cerrado**; `admin`/`rrhh`. Re-import exige anular antes.
@@ -162,6 +163,11 @@
   - Comentario: `Legajo - Nombre - Sector - MontoNeg` (truncado a 500).
   - Waterfill multi-servicio (mayor cargas primero; resto tras cargas al último servicio); tope cargas+producción.
   - Todo-o-nada; modal con todos los errores. Anular soft-delete solo del lote (`descuento_lote_id`).
+- Cambio `novedades-capital-humano-ajuste-mas-menos` (rev `0029_ajuste_mas_menos_lote`):
+  - Botón **Ajuste +/-** / **Anular Ajuste +/-** inmediatamente a la derecha de Importe a descontar.
+  - Mismo Excel/headers/roles/período cerrado/todo-o-nada/waterfill; lote independiente (`ajuste_mas_menos_lote_id`) — puede coexistir con descuento.
+  - `Monto` negativo → descuenta (mismo tope que descontar); positivo/`+`/sin signo → suma (waterfill **sin** tope).
+  - Comentario con importe firmado; Anular solo el lote Ajuste +/-.
 
 ## Roles (panel)
 - `admin`: distribución + novedades (todo) + usuarios
