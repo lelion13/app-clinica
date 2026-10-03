@@ -9,7 +9,6 @@ export const DISTRIBUTION_ITEMS = [
   { label: "Ubicaciones", path: "/ubicaciones", roles: ["admin", "operador"] },
   { label: "Profesionales", path: "/profesionales", roles: ["admin", "operador"] },
   { label: "Consultorios", path: "/consultorios", roles: ["admin", "operador"] },
-  { label: "Horarios consultorio", path: "/horarios-consultorio", roles: ["admin", "operador"] },
   { label: "Estadística", path: "/estadisticas", roles: ["admin", "operador"] },
 ];
 

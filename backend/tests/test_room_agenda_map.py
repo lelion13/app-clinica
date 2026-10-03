@@ -77,6 +77,9 @@ class FakeDB:
     def commit(self):
         return None
 
+    def rollback(self):
+        return None
+
 
 def test_lookup_by_medico():
     db = FakeDB()
@@ -84,6 +87,17 @@ def test_lookup_by_medico():
     assert len(result.items) == 1
     assert result.items[0].id_agenda == 100
     assert "100 —" in result.items[0].label
+    assert result.items[0].current_room_id is None
+    assert result.items[0].current_room_code is None
+
+
+def test_lookup_includes_current_room():
+    db = FakeDB()
+    db.maps = [SimpleNamespace(id_agenda=100, room_id=1, updated_at=None, updated_by=None)]
+    result = service.lookup_agendas_by_medico(db, "apece")
+    assert len(result.items) == 1
+    assert result.items[0].current_room_id == 1
+    assert result.items[0].current_room_code == "401"
 
 
 def test_add_and_conflict_requires_confirm(monkeypatch):
@@ -121,4 +135,67 @@ def test_add_and_conflict_requires_confirm(monkeypatch):
 
     moved = service.add_room_id_agenda(db, 2, 100, actor_id=1, confirm_move=True)
     assert moved.id_agenda == 100
+    assert db.maps[0].room_id == 2
+
+
+def test_replace_agendas_add_remove_and_conflict(monkeypatch):
+    from app.schemas.consulting_room import RoomIdAgendaReplaceItem
+
+    db = FakeDB()
+
+    def ensure(_db, room_id):
+        return next(r for r in db.rooms if r.id == room_id)
+
+    monkeypatch.setattr(service, "_ensure_room", ensure)
+    monkeypatch.setattr(service, "_label_for_id_agenda", lambda _db, i: str(i))
+
+    def execute(statement):
+        ent = str(statement)
+        low = ent.lower()
+        if "ConsultingRoomIdAgenda" in ent or "consulting_room_id_agenda" in low:
+            return FakeResult(list(db.maps))
+        if "ConsultingRoom" in ent or "consulting_rooms" in low:
+            return FakeResult(db.rooms)
+        return FakeResult([])
+
+    db.execute = execute
+
+    # Seed: room 1 has 100 and 200
+    db.maps = [
+        SimpleNamespace(id_agenda=100, room_id=1, updated_at=None, updated_by=None),
+        SimpleNamespace(id_agenda=200, room_id=1, updated_at=None, updated_by=None),
+    ]
+
+    # Replace room 1 with only 100
+    result = service.replace_room_id_agendas(
+        db,
+        1,
+        [RoomIdAgendaReplaceItem(id_agenda=100, confirm_move=False)],
+        actor_id=1,
+    )
+    assert [i.id_agenda for i in result.items] == [100]
+    assert len(db.maps) == 1
+    assert db.maps[0].id_agenda == 100
+
+    # Move 100 to room 2 without confirm → 409, no side effects
+    maps_before = list(db.maps)
+    with pytest.raises(HTTPException) as exc:
+        service.replace_room_id_agendas(
+            db,
+            2,
+            [RoomIdAgendaReplaceItem(id_agenda=100, confirm_move=False)],
+            actor_id=1,
+        )
+    assert exc.value.status_code == 409
+    assert db.maps[0].room_id == 1
+    assert len(db.maps) == len(maps_before)
+
+    # Move with confirm
+    result2 = service.replace_room_id_agendas(
+        db,
+        2,
+        [RoomIdAgendaReplaceItem(id_agenda=100, confirm_move=True)],
+        actor_id=1,
+    )
+    assert [i.id_agenda for i in result2.items] == [100]
     assert db.maps[0].room_id == 2

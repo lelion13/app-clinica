@@ -13,7 +13,6 @@ import { LocationsPage } from "./pages/LocationsPage";
 import { LoginPage } from "./pages/LoginPage";
 import { ResetPasswordPage } from "./pages/ResetPasswordPage";
 import { ProfessionalsPage } from "./pages/ProfessionalsPage";
-import { RoomHoursPage } from "./pages/RoomHoursPage";
 import { SetupPage } from "./pages/SetupPage";
 import { UsersPage } from "./pages/UsersPage";
 import { SettingsBackupPage } from "./pages/SettingsBackupPage";
@@ -49,7 +48,6 @@ function AppRouter() {
         <Route path="ubicaciones" element={<LocationsPage />} />
         <Route path="profesionales" element={<ProfessionalsPage />} />
         <Route path="consultorios" element={<ConsultingRoomsPage />} />
-        <Route path="horarios-consultorio" element={<RoomHoursPage />} />
         <Route path="estadisticas" element={<EstadisticasPage />} />
         <Route
           path="novedades/carga"

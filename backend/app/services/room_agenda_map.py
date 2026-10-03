@@ -15,6 +15,7 @@ from app.schemas.consulting_room import (
     AgendaLookupResponse,
     RoomIdAgendaItem,
     RoomIdAgendaListResponse,
+    RoomIdAgendaReplaceItem,
 )
 
 
@@ -143,6 +144,86 @@ def remove_room_id_agenda(db: Session, room_id: int, id_agenda: int) -> None:
     db.commit()
 
 
+def replace_room_id_agendas(
+    db: Session,
+    room_id: int,
+    items: list[RoomIdAgendaReplaceItem],
+    *,
+    actor_id: int,
+) -> RoomIdAgendaListResponse:
+    """Replace the set of id_agenda mappings for a room in one transaction."""
+    _ensure_room(db, room_id)
+
+    desired: list[tuple[int, bool]] = []
+    seen: set[int] = set()
+    for raw in items:
+        id_agenda = int(raw.id_agenda)
+        confirm_move = bool(raw.confirm_move)
+        if id_agenda <= 0:
+            raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail="id_agenda inválido")
+        if id_agenda in seen:
+            continue
+        seen.add(id_agenda)
+        desired.append((id_agenda, confirm_move))
+
+    all_maps = list(db.execute(select(ConsultingRoomIdAgenda)).scalars().all())
+    by_agenda = {m.id_agenda: m for m in all_maps}
+
+    for id_agenda, confirm_move in desired:
+        existing = by_agenda.get(id_agenda)
+        if existing and existing.room_id != room_id and not confirm_move:
+            other = db.execute(
+                select(ConsultingRoom).where(ConsultingRoom.id == existing.room_id)
+            ).scalar_one_or_none()
+            code = other.code if other else str(existing.room_id)
+            raise HTTPException(
+                status_code=status.HTTP_409_CONFLICT,
+                detail={
+                    "message": "id_agenda ya está asociado a otro consultorio",
+                    "id_agenda": id_agenda,
+                    "current_room_id": existing.room_id,
+                    "current_room_code": code,
+                    "requires_confirm_move": True,
+                },
+            )
+
+    now = datetime.utcnow()
+    desired_ids = {id_agenda for id_agenda, _ in desired}
+
+    try:
+        for m in all_maps:
+            if m.room_id == room_id and m.id_agenda not in desired_ids:
+                db.delete(m)
+
+        for id_agenda, confirm_move in desired:
+            existing = by_agenda.get(id_agenda)
+            if existing:
+                if existing.room_id != room_id:
+                    existing.room_id = room_id
+                    existing.updated_at = now
+                    existing.updated_by = actor_id
+            else:
+                db.add(
+                    ConsultingRoomIdAgenda(
+                        id_agenda=id_agenda,
+                        room_id=room_id,
+                        created_at=now,
+                        updated_at=now,
+                        created_by=actor_id,
+                        updated_by=actor_id,
+                    )
+                )
+        db.commit()
+    except HTTPException:
+        db.rollback()
+        raise
+    except Exception:
+        db.rollback()
+        raise
+
+    return list_room_id_agendas(db, room_id)
+
+
 def lookup_agendas_by_medico(db: Session, q: str, *, limit: int = 40) -> AgendaLookupResponse:
     needle = (q or "").strip().casefold()
     if len(needle) < 2:
@@ -173,10 +254,35 @@ def lookup_agendas_by_medico(db: Session, q: str, *, limit: int = 40) -> AgendaL
         if len(by_agenda) >= limit:
             break
 
-    items = [
-        AgendaLookupItem(**by_agenda[k])
-        for k in sorted(by_agenda.keys())
-    ]
+    maps = list(db.execute(select(ConsultingRoomIdAgenda)).scalars().all())
+    room_ids = {m.room_id for m in maps}
+    rooms_by_id: dict[int, ConsultingRoom] = {}
+    if room_ids:
+        room_rows = (
+            db.execute(
+                select(ConsultingRoom).where(
+                    ConsultingRoom.id.in_(list(room_ids)),
+                    ConsultingRoom.deleted_at.is_(None),
+                )
+            )
+            .scalars()
+            .all()
+        )
+        rooms_by_id = {r.id: r for r in room_rows}
+    map_by_agenda = {m.id_agenda: m.room_id for m in maps}
+
+    items: list[AgendaLookupItem] = []
+    for k in sorted(by_agenda.keys()):
+        data = dict(by_agenda[k])
+        rid = map_by_agenda.get(k)
+        room = rooms_by_id.get(rid) if rid is not None else None
+        if room is not None:
+            data["current_room_id"] = room.id
+            data["current_room_code"] = room.code
+        else:
+            data["current_room_id"] = None
+            data["current_room_code"] = None
+        items.append(AgendaLookupItem(**data))
     return AgendaLookupResponse(items=items)
 
 

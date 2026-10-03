@@ -9,6 +9,7 @@ from app.models.location import Location
 from app.schemas.consulting_room import (
     ConsultingRoomCreateRequest,
     ConsultingRoomUpdateRequest,
+    RoomHourReplaceItem,
     RoomOperatingHourCreateRequest,
     RoomOperatingHourUpdateRequest,
 )
@@ -156,3 +157,49 @@ def delete_room_hour(db: Session, hour_id: int, actor_id: int) -> None:
     item.updated_at = datetime.utcnow()
     item.updated_by = actor_id
     db.commit()
+
+
+def replace_room_hours(
+    db: Session,
+    room_id: int,
+    items: list[RoomHourReplaceItem],
+    *,
+    actor_id: int,
+) -> list[RoomOperatingHour]:
+    """Replace all operating hours for a room in one transaction."""
+    room = db.execute(
+        select(ConsultingRoom).where(ConsultingRoom.id == room_id, ConsultingRoom.deleted_at.is_(None))
+    ).scalar_one_or_none()
+    if not room:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Consultorio no encontrado")
+
+    for payload in items:
+        if payload.start_time >= payload.end_time:
+            raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail="Rango horario invalido")
+
+    now = datetime.utcnow()
+    existing = list_room_hours(db, room_id)
+    try:
+        for hour in existing:
+            hour.deleted_at = now
+            hour.updated_at = now
+            hour.updated_by = actor_id
+        for payload in items:
+            db.add(
+                RoomOperatingHour(
+                    room_id=room_id,
+                    weekday=payload.weekday,
+                    start_time=payload.start_time,
+                    end_time=payload.end_time,
+                    created_at=now,
+                    updated_at=now,
+                    created_by=actor_id,
+                    updated_by=actor_id,
+                    deleted_at=None,
+                )
+            )
+        db.commit()
+    except Exception:
+        db.rollback()
+        raise
+    return list_room_hours(db, room_id)

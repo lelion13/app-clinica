@@ -58,11 +58,32 @@ class RoomIdAgendaCreateRequest(BaseModel):
     confirm_move: bool = False
 
 
+class RoomIdAgendaReplaceItem(BaseModel):
+    id_agenda: int
+    confirm_move: bool = False
+
+
+class RoomIdAgendaReplaceRequest(BaseModel):
+    items: list[RoomIdAgendaReplaceItem] = Field(default_factory=list)
+
+
+class RoomHourReplaceItem(BaseModel):
+    weekday: int = Field(ge=0, le=6, description="0=domingo … 6=sabado")
+    start_time: time
+    end_time: time
+
+
+class RoomHoursReplaceRequest(BaseModel):
+    items: list[RoomHourReplaceItem] = Field(default_factory=list)
+
+
 class AgendaLookupItem(BaseModel):
     id_agenda: int
     label: str
     medico: str | None = None
     nombre_agenda: str | None = None
+    current_room_id: int | None = None
+    current_room_code: str | None = None
 
 
 class AgendaLookupResponse(BaseModel):
