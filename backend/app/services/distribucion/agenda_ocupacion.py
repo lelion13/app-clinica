@@ -163,6 +163,7 @@ def _payload_fields(row: OcupacionHorarioActivo) -> dict:
         "tipo": row.tipo or _as_str(raw.get("tipo")),
         "especialidad_agenda": row.especialidad_agenda,
         "medico": row.medico or _as_str(raw.get("medico")),
+        "medico_payload": _as_str(raw.get("medico")),
         "especialidad": _as_str(raw.get("especialidad")),
         "dia": _as_str(raw.get("dia")),
         "fecha_desde": _as_str(raw.get("fecha_desde")) or None,
@@ -205,9 +206,18 @@ def _match_multi(value: str | None, selected: list[str]) -> bool:
 
 
 def _match_especialidad(esp: str | None, esp_agenda: str | None, selected: list[str]) -> bool:
+    """Match filtro especialidad solo contra payload.especialidad (esp_agenda ignorado)."""
+    _ = esp_agenda
     if not selected:
         return True
-    return _match_multi(esp, selected) or _match_multi(esp_agenda, selected)
+    return _match_multi(esp, selected)
+
+
+def _match_medico_payload(medico_payload: str | None, selected: list[str]) -> bool:
+    """Match filtro médico solo contra payload.medico."""
+    if not selected:
+        return True
+    return _match_multi(medico_payload, selected)
 
 
 def _match_id_dominio(id_dominio: int | None, selected: list[str]) -> bool:
@@ -238,10 +248,8 @@ def list_filter_options(db: Session) -> AgendaFilterOptionsResponse:
             tipos.add(fields["tipo"])
         if fields["especialidad"]:
             especialidades.add(fields["especialidad"])
-        if fields["especialidad_agenda"]:
-            especialidades.add(fields["especialidad_agenda"])
-        if fields["medico"]:
-            medicos.add(fields["medico"])
+        if fields["medico_payload"]:
+            medicos.add(fields["medico_payload"])
         if fields["dia"] and _weekday_from_dia(fields["dia"]) is not None:
             dias.add(fields["dia"].strip().lower())
 
@@ -332,7 +340,7 @@ def list_agenda_events(
             continue
         if not _match_especialidad(fields["especialidad"], fields["especialidad_agenda"], f_esp):
             continue
-        if not _match_multi(fields["medico"], f_med):
+        if not _match_medico_payload(fields["medico_payload"], f_med):
             continue
         if not _match_multi(fields["dia"], f_dia):
             continue

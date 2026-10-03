@@ -10,9 +10,10 @@ Dominio de distribución de consultorios: sync de ocupación (horarios activos),
 |-----------|---------------------|----------------|
 | Sync Ocupación `/ocupacion`, env, tabla, split `nombre_agenda`, filtros/indicadores grilla sync | § Sync y Ocupación | `2026-08-06-distribucion-ocupacion` |
 | API `agenda/events` + `filter-options` (materialización) | § Agenda API | `2026-08-06-agenda-ocupacion-sync` |
-| Mapeo `id_agenda`→room + columnas consultorio / Sin consultorio | § Mapeo | `2026-08-06-mapeo-agenda-consultorio` |
+| Mapeo `id_agenda`→room + columnas consultorio / Sin consultorio | § Mapeo | `2026-08-06-mapeo-agenda-consultorio` (+ UI/batch `2026-10-03-consultorios-ui`) |
 | `locations.tipo` + unique par + filtro location dominio+tipo | § Ubicaciones | `2026-08-06-locations-tipo` |
 | UI Agenda ocupación (planilla, filtros una fila, modal, viewport) | § UI Agenda | `2026-08-06-agenda-ocupacion-ui` |
+| UI Consultorios (grilla, modales, horarios, sin menú Horarios) | § UI Consultorios | `2026-10-03-consultorios-ui` |
 | Indicadores ocupación (sync, un día, torta) | § Indicadores ocupación | `2026-10-03-indicadores-ocupacion` |
 | Estadística (asignaciones semanales, rango) | § Estadística | `2026-10-03-dashboard-estadisticas` |
 
@@ -114,11 +115,13 @@ Filas sin `dia`/horas válidas MUST NOT generar eventos.
 
 El sistema MUST persistir `id_agenda` → `room_id` con `id_agenda` único (rev `0015`).
 
-MUST listar/agregar/quitar desde ficha consultorio (JWT admin|operador). Si ya está en otro room, MUST 409 salvo `confirm_move=true` (mueve).
+MUST listar/agregar/quitar desde ficha **Consultorios** (JWT admin|operador), vía modal Agendas con draft hasta Aceptar. `PUT /api/v1/consulting-rooms/{room_id}/id-agendas` MUST replace atómico (todo-o-nada). Si un ítem ya está en otro room y `confirm_move` es false, MUST 409 sin aplicar el batch. Endpoints unitarios POST/DELETE MAY permanecer.
 
-MUST ofrecer lookup typeahead por médico desde snapshot sync; label `id_agenda — nombre_agenda`.
+MUST ofrecer lookup typeahead por médico desde snapshot sync; label `id_agenda — nombre_agenda`. Cada ítem del lookup MUST incluir `current_room_id` / `current_room_code` (null si no mapeado a room activo).
 
 `GET .../agenda/events` MUST resolver `resource_id` = id de room o `unassigned`.
+
+La asociación agenda↔consultorio MUST NOT validar contra `room_operating_hours` (son independientes).
 
 #### Scenario: Sin mapeo
 
@@ -129,8 +132,42 @@ MUST ofrecer lookup typeahead por médico desde snapshot sync; label `id_agenda 
 #### Scenario: Move con confirmación
 
 - **Given** id_agenda en room A
-- **When** POST a room B con `confirm_move=true`
+- **When** PUT batch a room B con ese ítem y `confirm_move=true`
 - **Then** queda solo en B
+
+#### Scenario: Lookup muestra room actual
+
+- **Given** agenda 100 asociada al room código `C3`
+- **When** lookup encuentra esa agenda
+- **Then** el ítem incluye `current_room_id` y `current_room_code=C3`
+
+### Requirement: UI Consultorios — grilla y modales
+
+`/consultorios` MUST, al abrir (JWT `admin`|`operador`), cargar consultorios en grilla con columnas **Ubicación** y **Nombre** (`code`), filtro select ubicación (**Todas** o una), y acciones por fila **Editar**, **Agendas**, **Horarios**, **Eliminar** (`window.confirm`).
+
+**Agregar** MUST abrir modal ubicación + código. Modales Agregar/Editar/Agendas/Horarios MUST ser draft hasta **Aceptar**; **Cancelar** MUST NOT persistir. Solo un modal abierto a la vez.
+
+**Editar** MUST `PATCH` ubicación y código. **Horarios** MUST permitir uno o más días (checkboxes) para la misma franja, lista con **Modificar** y **Eliminar**, y `PUT /api/v1/consulting-rooms/{room_id}/hours` replace atómico (`start_time < end_time`, weekday 0–6). Endpoints unitarios de hours MAY permanecer.
+
+El menú MUST NOT mostrar **Horarios consultorio**; la ruta `/horarios-consultorio` MUST NOT existir. La gestión de franjas MUST ser el modal Horarios en `/consultorios`.
+
+#### Scenario: Carga inicial
+
+- **Given** usuario `operador` con consultorios en DB
+- **When** abre `/consultorios`
+- **Then** ve la grilla con ubicación y nombre (`code`)
+
+#### Scenario: Menú sin Horarios consultorio
+
+- **Given** usuario `operador`
+- **When** abre el menú Distribución
+- **Then** NO ve **Horarios consultorio** y sí ve **Consultorios**
+
+#### Scenario: Reemplazar franjas
+
+- **Given** room con una franja lunes 08–12
+- **When** en modal se elimina esa y se agrega martes 09–13 y Acepta
+- **Then** GET hours del room solo tiene martes 09–13
 
 ### Requirement: Ubicación vinculada por id_dominio + tipo
 

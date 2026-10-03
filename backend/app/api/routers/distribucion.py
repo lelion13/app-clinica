@@ -59,7 +59,9 @@ def ocupacion_agenda_lookup(
 
 @router.get("/ocupacion/indicadores", response_model=IndicadoresOcupacionResponse)
 def ocupacion_indicadores(
-    date: str = Query(..., description="Día YYYY-MM-DD"),
+    period: str = Query(default="day", description="day | month"),
+    date: str | None = Query(default=None, description="Día YYYY-MM-DD (period=day)"),
+    month: str | None = Query(default=None, description="Mes YYYY-MM (period=month)"),
     location_id: int | None = Query(default=None),
     room_id: int | None = Query(default=None),
     especialidad: str | None = Query(default=None),
@@ -70,7 +72,9 @@ def ocupacion_indicadores(
     _ = user
     return indicadores_ocupacion_service.compute_indicadores(
         db,
+        period=period,
         date_str=date,
+        month_str=month,
         location_id=location_id,
         room_id=room_id,
         especialidad=especialidad,
