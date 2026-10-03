@@ -190,9 +190,10 @@ export function ConsultingRoomsPage() {
 
   const [agendaDraft, setAgendaDraft] = useState([]);
   const [hoursDraft, setHoursDraft] = useState([]);
-  const [hourWeekday, setHourWeekday] = useState("1");
+  const [hourWeekdays, setHourWeekdays] = useState(["1"]);
   const [hourStart, setHourStart] = useState("08:00");
   const [hourEnd, setHourEnd] = useState("12:00");
+  const [editingHourKey, setEditingHourKey] = useState(null);
 
   const locationName = (id) => locations.find((l) => l.id === id)?.name || id;
 
@@ -205,6 +206,13 @@ export function ConsultingRoomsPage() {
     load();
   }, []);
 
+  const resetHourForm = () => {
+    setHourWeekdays(["1"]);
+    setHourStart("08:00");
+    setHourEnd("12:00");
+    setEditingHourKey(null);
+  };
+
   const resetModalState = () => {
     setModal(null);
     setActiveRoom(null);
@@ -213,6 +221,7 @@ export function ConsultingRoomsPage() {
     setFormCode("");
     setAgendaDraft([]);
     setHoursDraft([]);
+    resetHourForm();
   };
 
   const closeModal = () => {
@@ -257,6 +266,7 @@ export function ConsultingRoomsPage() {
     setModal("hours");
     setActiveRoom(room);
     setModalError("");
+    resetHourForm();
     setBusy(true);
     try {
       const data = await apiRequestWithRefresh(`/consulting-rooms/${room.id}/hours`);
@@ -345,21 +355,64 @@ export function ConsultingRoomsPage() {
     }
   };
 
-  const addHourDraft = () => {
+  const toggleHourWeekday = (value) => {
+    setHourWeekdays((prev) => {
+      if (editingHourKey) return [value];
+      if (prev.includes(value)) {
+        return prev.filter((d) => d !== value);
+      }
+      return [...prev, value].sort((a, b) => Number(a) - Number(b));
+    });
+  };
+
+  const startEditHour = (hour) => {
+    setModalError("");
+    setEditingHourKey(hour.key);
+    setHourWeekdays([String(hour.weekday)]);
+    setHourStart(hour.start_time);
+    setHourEnd(hour.end_time);
+  };
+
+  const cancelEditHour = () => {
+    setModalError("");
+    resetHourForm();
+  };
+
+  const saveHourDraft = () => {
     setModalError("");
     if (!hourStart || !hourEnd || hourStart >= hourEnd) {
       setModalError("Rango horario inválido");
       return;
     }
+    if (hourWeekdays.length === 0) {
+      setModalError("Seleccioná al menos un día");
+      return;
+    }
+
+    if (editingHourKey) {
+      const weekday = hourWeekdays[0];
+      setHoursDraft((prev) =>
+        prev.map((h) =>
+          h.key === editingHourKey
+            ? { ...h, weekday, start_time: hourStart, end_time: hourEnd }
+            : h
+        )
+      );
+      resetHourForm();
+      return;
+    }
+
+    const stamp = Date.now();
     setHoursDraft((prev) => [
       ...prev,
-      {
-        key: `new-${Date.now()}-${prev.length}`,
-        weekday: hourWeekday,
+      ...hourWeekdays.map((weekday, idx) => ({
+        key: `new-${stamp}-${idx}`,
+        weekday,
         start_time: hourStart,
         end_time: hourEnd,
-      },
+      })),
     ]);
+    resetHourForm();
   };
 
   const acceptHours = async () => {
@@ -576,19 +629,42 @@ export function ConsultingRoomsPage() {
           busy={busy}
         >
           <p style={{ margin: "0 0 10px", fontSize: 13, color: uiTheme.colors.textMuted }}>
-            Franjas por día (0 = domingo … 6 = sábado). Se guardan al Aceptar.
+            {editingHourKey
+              ? "Modificá día y horario de la franja. Guardá la franja y luego Aceptar para persistir."
+              : "Elegí uno o más días y la misma franja horaria. Los cambios se guardan al Aceptar."}
           </p>
-          <div style={{ display: "flex", gap: 8, flexWrap: "wrap", alignItems: "flex-end", marginBottom: 12 }}>
-            <label style={{ display: "flex", flexDirection: "column", gap: 4, fontSize: "0.85rem" }}>
-              Día
-              <select value={hourWeekday} onChange={(e) => setHourWeekday(e.target.value)} style={uiStyles.formControl}>
-                {WEEKDAYS.map(([value, label]) => (
-                  <option key={value} value={value}>
+          <div style={{ marginBottom: 10 }}>
+            <div style={{ fontSize: "0.85rem", marginBottom: 6 }}>
+              {editingHourKey ? "Día" : "Días"}
+            </div>
+            <div style={{ display: "flex", flexWrap: "wrap", gap: "6px 12px" }}>
+              {WEEKDAYS.map(([value, label]) => {
+                const checked = hourWeekdays.includes(value);
+                return (
+                  <label
+                    key={value}
+                    style={{
+                      display: "inline-flex",
+                      alignItems: "center",
+                      gap: 4,
+                      fontSize: 13,
+                      cursor: "pointer",
+                      fontWeight: checked ? 600 : 400,
+                    }}
+                  >
+                    <input
+                      type={editingHourKey ? "radio" : "checkbox"}
+                      name={editingHourKey ? "edit-weekday" : undefined}
+                      checked={checked}
+                      onChange={() => toggleHourWeekday(value)}
+                    />
                     {label}
-                  </option>
-                ))}
-              </select>
-            </label>
+                  </label>
+                );
+              })}
+            </div>
+          </div>
+          <div style={{ display: "flex", gap: 8, flexWrap: "wrap", alignItems: "flex-end", marginBottom: 12 }}>
             <label style={{ display: "flex", flexDirection: "column", gap: 4, fontSize: "0.85rem" }}>
               Desde
               <input
@@ -602,9 +678,14 @@ export function ConsultingRoomsPage() {
               Hasta
               <input type="time" value={hourEnd} onChange={(e) => setHourEnd(e.target.value)} style={uiStyles.formControl} />
             </label>
-            <button type="button" style={uiStyles.buttonSecondary} onClick={addHourDraft}>
-              Agregar franja
+            <button type="button" style={uiStyles.buttonSecondary} onClick={saveHourDraft}>
+              {editingHourKey ? "Guardar franja" : "Agregar franja"}
             </button>
+            {editingHourKey ? (
+              <button type="button" style={uiStyles.buttonSecondary} onClick={cancelEditHour}>
+                Cancelar edición
+              </button>
+            ) : null}
           </div>
           <ul style={{ listStyle: "none", margin: 0, padding: 0 }}>
             {hoursDraft.length === 0 ? (
@@ -620,18 +701,27 @@ export function ConsultingRoomsPage() {
                     padding: "8px 0",
                     borderBottom: `1px solid ${uiTheme.colors.border}`,
                     fontSize: 13,
+                    background: editingHourKey === h.key ? uiTheme.colors.primarySoft || "transparent" : "transparent",
                   }}
                 >
                   <span>
                     {weekdayLabel(h.weekday)} — {h.start_time} a {h.end_time}
                   </span>
-                  <button
-                    type="button"
-                    style={uiStyles.buttonDanger}
-                    onClick={() => setHoursDraft((prev) => prev.filter((x) => x.key !== h.key))}
-                  >
-                    Eliminar
-                  </button>
+                  <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
+                    <button type="button" style={uiStyles.buttonSecondary} onClick={() => startEditHour(h)}>
+                      Modificar
+                    </button>
+                    <button
+                      type="button"
+                      style={uiStyles.buttonDanger}
+                      onClick={() => {
+                        setHoursDraft((prev) => prev.filter((x) => x.key !== h.key));
+                        if (editingHourKey === h.key) resetHourForm();
+                      }}
+                    >
+                      Eliminar
+                    </button>
+                  </div>
                 </li>
               ))
             )}
