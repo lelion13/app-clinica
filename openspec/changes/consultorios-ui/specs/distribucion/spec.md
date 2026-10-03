@@ -96,7 +96,7 @@ Endpoints unitarios POST/DELETE de id-agendas MAY permanecer; la UI de este chan
 
 ### Requirement: Modal Horarios (draft + batch)
 
-**Horarios** MUST abrir modal con la UX de franjas actual: día (0=domingo…6=sábado), desde, hasta, agregar franja al draft, lista con eliminar del draft. MUST precargar franjas existentes del room.
+**Horarios** MUST abrir modal con franjas: selección de **uno o más días** (checkboxes) para la misma franja desde/hasta, agregar al draft (una fila por día), lista con **Modificar** (edita día+horario de esa fila) y **Eliminar**. MUST precargar franjas existentes del room.
 
 **Aceptar** MUST `PUT /api/v1/consulting-rooms/{room_id}/hours` con la lista desired de franjas (`weekday`, `start_time`, `end_time`). El backend MUST replace atómico en transacción (eliminar las no listadas / crear las nuevas según implementación, resultado final = lista desired). Validación MUST exigir `start_time < end_time` y weekday 0–6.
 
