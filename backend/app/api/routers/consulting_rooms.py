@@ -8,9 +8,11 @@ from app.schemas.consulting_room import (
     ConsultingRoomCreateRequest,
     ConsultingRoomResponse,
     ConsultingRoomUpdateRequest,
+    RoomHoursReplaceRequest,
     RoomIdAgendaCreateRequest,
     RoomIdAgendaItem,
     RoomIdAgendaListResponse,
+    RoomIdAgendaReplaceRequest,
     RoomOperatingHourCreateRequest,
     RoomOperatingHourResponse,
     RoomOperatingHourUpdateRequest,
@@ -23,6 +25,7 @@ from app.services.consulting_room_service import (
     delete_room_hour,
     list_room_hours,
     list_rooms,
+    replace_room_hours,
     update_room,
     update_room_hour,
 )
@@ -119,6 +122,21 @@ def room_id_agendas_remove(
     room_agenda_map_service.remove_room_id_agenda(db, room_id, id_agenda)
 
 
+@router.put("/{room_id}/id-agendas", response_model=RoomIdAgendaListResponse)
+def room_id_agendas_replace(
+    room_id: int,
+    payload: RoomIdAgendaReplaceRequest,
+    db: Session = Depends(get_db),
+    user: User = Depends(require_operator_or_admin),
+) -> RoomIdAgendaListResponse:
+    return room_agenda_map_service.replace_room_id_agendas(
+        db,
+        room_id,
+        payload.items,
+        actor_id=user.id,
+    )
+
+
 @router.get("/{room_id}/hours", response_model=list[RoomOperatingHourResponse])
 def room_hours_list(
     room_id: int,
@@ -127,6 +145,16 @@ def room_hours_list(
 ) -> list[RoomOperatingHourResponse]:
     _ = user
     return [_hour_response(item) for item in list_room_hours(db, room_id)]
+
+
+@router.put("/{room_id}/hours", response_model=list[RoomOperatingHourResponse])
+def room_hours_replace(
+    room_id: int,
+    payload: RoomHoursReplaceRequest,
+    db: Session = Depends(get_db),
+    user: User = Depends(require_operator_or_admin),
+) -> list[RoomOperatingHourResponse]:
+    return [_hour_response(item) for item in replace_room_hours(db, room_id, payload.items, actor_id=user.id)]
 
 
 @router.post("/hours", response_model=RoomOperatingHourResponse, status_code=status.HTTP_201_CREATED)
