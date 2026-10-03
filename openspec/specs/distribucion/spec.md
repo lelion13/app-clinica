@@ -2,7 +2,7 @@
 
 ## Purpose
 
-Dominio de distribución de consultorios: sync de ocupación (horarios activos), materialización de agenda ocupación, mapeo `id_agenda` → consultorio, vínculo ubicación↔ocupación `(id_dominio, tipo)`, y UI de grillas asociadas.
+Dominio de distribución de consultorios: sync de ocupación (horarios activos), materialización de agenda ocupación, mapeo `id_agenda` → consultorio, vínculo ubicación↔ocupación `(id_dominio, tipo)`, UI de grillas, e indicadores/estadísticas de ocupación.
 
 ## Traceability (source of truth vs archives)
 
@@ -13,8 +13,10 @@ Dominio de distribución de consultorios: sync de ocupación (horarios activos),
 | Mapeo `id_agenda`→room + columnas consultorio / Sin consultorio | § Mapeo | `2026-08-06-mapeo-agenda-consultorio` |
 | `locations.tipo` + unique par + filtro location dominio+tipo | § Ubicaciones | `2026-08-06-locations-tipo` |
 | UI Agenda ocupación (planilla, filtros una fila, modal, viewport) | § UI Agenda | `2026-08-06-agenda-ocupacion-ui` |
+| Indicadores ocupación (sync, un día, torta) | § Indicadores ocupación | `2026-10-03-indicadores-ocupacion` |
+| Estadística (asignaciones semanales, rango) | § Estadística | `2026-10-03-dashboard-estadisticas` |
 
-**Regla anti-ambigüedad:** si un archive antiguo dice FullCalendar/popover/multi-select o PK=`id_dato`, **prevalece esta spec estable**. Los deltas archivados son histórico; no reabrir esos changes para “arreglar” texto contradictorio sin actualizar esta spec.
+**Regla anti-ambigüedad:** si un archive antiguo dice FullCalendar/popover/multi-select, PK=`id_dato`, o “Estadística = bookings”, **prevalece esta spec estable**. Los deltas archivados son histórico.
 
 ---
 
@@ -163,3 +165,42 @@ Click bloque → modal centrado + overlay; cierra Esc / overlay / Cerrar. Títul
 - **Given** modal abierto
 - **When** Esc o overlay
 - **Then** se cierra
+
+### Requirement: Menú Indicadores ocupación
+
+El sistema MUST mostrar **Indicadores ocupación** → `/indicadores-ocupacion` (`admin`/`operador`). MUST coexistir con **Estadística**; MUST NOT alterar el cálculo de Estadística.
+
+### Requirement: API e UI Indicadores ocupación (sync)
+
+`GET /api/v1/distribucion/ocupacion/indicadores` (JWT admin|operador) MUST calcular, para un `date`:
+
+- **Rooms:** activos, filtros opcionales `location_id` / `room_id`.
+- **Denominador:** suma `room_operating_hours` ese weekday (JS). Rooms sin franja ese día → `rooms_without_hours` (fuera de torta).
+- **Numerador:** duración completa de bloques sync del día con `id_agenda` mapeada a room incluido; sin recorte al horario del box; filtros `especialidad`/`medico` solo al numerador. Sin mapeo → 0 al numerador. % MAY > 100.
+
+UI `/indicadores-ocupacion`: día (default hoy), selects ubicación/consultorio/especialidad/médico, torta global + horas + aviso sin horario; solo lectura; sin sync.
+
+#### Scenario: Room sin agenda
+
+- **Given** room con horario y sin `id_agenda`
+- **When** indicadores del día
+- **Then** aporta al denom y 0 al numerador
+
+### Requirement: Menú Estadística
+
+El sistema MUST mostrar **Estadística** → `/estadisticas` (`admin`/`operador`), coexistiendo con Indicadores ocupación.
+
+### Requirement: API e UI Estadística (asignaciones semanales)
+
+`GET /api/v1/stats/summary` MUST aceptar rango `start_date`/`end_date` y filtros (ubicaciones, rooms, profesionales, especialidades).
+
+- **Denominador:** horas `room_operating_hours` en el rango para rooms incluidos.
+- **Numerador:** horas de `room_weekly_assignments` proyectadas por ocurrencias de weekday en el rango (NO bookings puntuales; NO sync externo). Especialidad MUST filtrar numerador sin reducir denominador.
+
+UI `/estadisticas`: rango + filtros + torta/KPIs/series.
+
+#### Scenario: Distinto de Indicadores
+
+- **Given** mismo día y mismos rooms
+- **When** se consulta Estadística vs Indicadores ocupación
+- **Then** las fuentes de numerador son independientes (weekly assignments vs sync mapeado)

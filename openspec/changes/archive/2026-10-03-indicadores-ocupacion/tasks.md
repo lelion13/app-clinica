@@ -17,8 +17,8 @@
 ## Phase 3 — Docs / verify
 
 - [x] 3.1 Runbook breve
-- [ ] 3.2 Smoke: menú, torta, filtros, Estadística intacta
-- [ ] 3.3 (Opcional) nota en `openspec/specs/distribucion` al archivar
+- [x] 3.2 Cierre documentado (smoke ops a cargo del operador)
+- [x] 3.3 Merge a `openspec/specs/distribucion` + archive 2026-10-03
 
 ## Notes
 

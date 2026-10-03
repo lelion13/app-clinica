@@ -71,7 +71,8 @@
   - Env: `DISTRIBUCION_HORARIOS_ACTIVOS_URL` (+ timeout; default 120s); Bearer = `NOVEDADES_PROF_SYNC_TOKEN`
   - Tras deploy: set env en `.env.prod`, `alembic upgrade head`, redeploy backend+frontend, **Actualizar** en Ocupación (esperar synced ≈ miles de filas)
   - **Agenda ocupación** (`/agenda-ocupacion`): grilla día × consultorios (+ **Sin consultorio**); viewport full-bleed + scroll interno; filtros en una fila (selects: ubicación/tipo/especialidad/médico + día); detalle en modal (Esc/overlay); sync solo desde Ocupación
-  - **Indicadores ocupación** (`/indicadores-ocupacion`): torta global del día; % = horas sync (agendas mapeadas) ÷ `room_operating_hours`; `GET .../ocupacion/indicadores`; filtros ubicación/consultorio/especialidad/médico; sin horario → aviso fuera de torta; convive con Estadística (bookings)
+  - **Indicadores ocupación** (`/indicadores-ocupacion`): torta del día; % = horas sync mapeadas ÷ `room_operating_hours`; `GET .../ocupacion/indicadores` (archivado `2026-10-03-indicadores-ocupacion`)
+  - **Estadística** (`/estadisticas`): rango fechas; % = asignaciones semanales proyectadas ÷ horario box; `GET /stats/summary` — **no** es sync ni bookings puntuales (archivado `2026-10-03-dashboard-estadisticas`)
   - Mapeo `id_agenda` → consultorio (rev `0015_room_id_agenda`): en ficha **Consultorios**; typeahead `GET .../ocupacion/agenda-lookup?q=`
   - `locations.id_dominio` (rev `0014`) + `locations.tipo` (rev `0016_locations_tipo`): vínculo con ocupación por par `(id_dominio, tipo)` único entre activas; `tipo` obligatorio al crear/editar; existentes migran con `PENDIENTE-{id}` hasta corregir en UI; Agenda ocupación filtra ubicación por dominio+tipo
   - Split `nombre_agenda`: `" - "` o fallback `-` (valores compactos); tras cambiar parser → **Actualizar** en Ocupación
