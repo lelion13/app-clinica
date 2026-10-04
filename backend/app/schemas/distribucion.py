@@ -93,8 +93,17 @@ class IndicadoresRoomRef(BaseModel):
     code: str
 
 
+class IndicadoresTopItem(BaseModel):
+    label: str
+    hours: float
+    percent_box: float | None = None
+    percent_occupied: float | None = None
+
+
 class IndicadoresOcupacionResponse(BaseModel):
-    date: str
+    period: str = "day"
+    date: str | None = None
+    month: str | None = None
     occupied_hours: float
     enabled_hours: float
     free_hours: float
@@ -103,3 +112,5 @@ class IndicadoresOcupacionResponse(BaseModel):
     rooms_in_pie: int = 0
     rooms_without_hours: list[IndicadoresRoomRef] = Field(default_factory=list)
     rooms_without_agenda: int = 0
+    top_especialidad: list[IndicadoresTopItem] = Field(default_factory=list)
+    top_medico: list[IndicadoresTopItem] = Field(default_factory=list)
