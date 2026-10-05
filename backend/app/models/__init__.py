@@ -4,6 +4,7 @@ from app.models.consulting_room import ConsultingRoom, ConsultingRoomIdAgenda, R
 from app.models.location import Location
 from app.models.ocupacion import OcupacionHorarioActivo
 from app.models.password_reset import PasswordResetToken
+from app.models.turnos_csv import TurnosCsvImport, TurnosCsvRow
 from app.models.novedades import (
     NovedadesAsignacionModulo,
     NovedadesConfig,
@@ -42,6 +43,8 @@ __all__ = [
     "NovedadesAsignacionModulo",
     "NovedadesNovedad",
     "OcupacionHorarioActivo",
+    "TurnosCsvImport",
+    "TurnosCsvRow",
     "PasswordResetToken",
     "SystemBackupConfig",
     "SystemBackupLog",

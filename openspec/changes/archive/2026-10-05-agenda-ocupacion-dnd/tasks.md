@@ -22,4 +22,4 @@
 ## Phase 3: Docs y cierre
 
 - [x] 3.1 Nota `docs/runbook.md` (DnD + divergencia vs modal Agendas Consultorios)
-- [ ] 3.2 Verify + archive cuando pase smoke
+- [x] 3.2 Verify + archive (smoke: rechazo solape multi-día C5→C2)

@@ -12,7 +12,7 @@ Dominio de distribución de consultorios: sync de ocupación (horarios activos),
 | API `agenda/events` + `filter-options` (materialización) | § Agenda API | `2026-08-06-agenda-ocupacion-sync` |
 | Mapeo `id_agenda`→room + columnas consultorio / Sin consultorio | § Mapeo | `2026-08-06-mapeo-agenda-consultorio` (+ UI/batch `2026-10-03-consultorios-ui`) |
 | `locations.tipo` + unique par + filtro location dominio+tipo | § Ubicaciones | `2026-08-06-locations-tipo` |
-| UI Agenda ocupación (planilla, filtros una fila, modal, viewport) | § UI Agenda | `2026-08-06-agenda-ocupacion-ui` |
+| UI Agenda ocupación (planilla, filtros, modal, DnD reassign) | § UI Agenda | `2026-08-06-agenda-ocupacion-ui` + `2026-10-05-agenda-ocupacion-dnd` |
 | UI Consultorios (grilla, modales, horarios, sin menú Horarios) | § UI Consultorios | `2026-10-03-consultorios-ui` |
 | Indicadores ocupación (sync, Día\|Mes, torta, tops; filtros payload; medico sync) | § Indicadores ocupación | `2026-10-03-indicadores-ocupacion` + `2026-10-05-indicadores-ocupacion-ui` |
 | Estadística (asignaciones semanales, rango) | § Estadística | `2026-10-03-dashboard-estadisticas` |
@@ -200,13 +200,15 @@ Filtro agenda por `location_id` MUST aplicar **id_dominio y tipo** de esa locati
 
 ### Requirement: UI Agenda ocupación
 
-Menú **Agenda ocupación** `/agenda-ocupacion` (`admin`/`operador`). Solo lectura; MUST NOT sync (sync solo en Ocupación). `/agenda` (bookings) intacta.
+Menú **Agenda ocupación** `/agenda-ocupacion` (`admin`/`operador`). MUST NOT sync (sync solo en Ocupación). `/agenda` (bookings) intacta.
 
 MUST mostrar grilla día × consultorios (+ **Sin consultorio**), horas alineadas (sin drift box-model), full-bleed + altura viewport, scroll interno, cabecera sticky, columnas ≥160px.
 
 Filtros en **una fila** de selects (un valor o vacío=Todos): Ubicación, Día (+ nav), Tipo, Especialidad, Médico — vía `filter-options` / `events`. Sin consultorio respeta los mismos filtros.
 
-Click bloque → modal centrado + overlay; cierra Esc / overlay / Cerrar. Título/ayuda mínimos para maximizar grilla.
+Click bloque → modal centrado + overlay; cierra Esc / overlay / Cerrar.
+
+Respecto del mapeo agenda↔consultorio, la UI MUST permitir drag-and-drop horizontal entre columnas (ver requisitos Reassign / Validación / Confirmaciones / Feedback). MUST NOT permitir drag vertical ni resize que altere horarios del sync.
 
 #### Scenario: Filtros en una fila
 
@@ -219,6 +221,44 @@ Click bloque → modal centrado + overlay; cierra Esc / overlay / Cerrar. Títul
 - **Given** modal abierto
 - **When** Esc o overlay
 - **Then** se cierra
+
+#### Scenario: DnD con filtros
+
+- **Given** filtro de ubicación que oculta room X
+- **When** el usuario arrastra un bloque
+- **Then** no puede soltar en X (no visible)
+
+### Requirement: Reassign agenda via Agenda ocupación (DnD)
+
+El sistema MUST permitir reasignar el mapeo persistente `id_agenda` → `room_id` desde Agenda ocupación mediante DnD horizontal. Persistencia al soltar vía `POST /api/v1/distribucion/ocupacion/agenda/reassign` (JWT `admin`|`operador`).
+
+Movimientos: Sin consultorio ↔ consultorio y entre consultorios. Solo columnas visibles son destinos.
+
+#### Scenario: Asignar desde Sin consultorio
+
+- **Given** bloque unassigned y room destino válido (horario + sin solape en todos los weekdays)
+- **When** drop en esa columna
+- **Then** mapeo persistido; todas las ocurrencias de esa agenda pasan al room
+
+### Requirement: Validación horario box y sin solape (path reassign)
+
+Al asignar/mover (`target_room_id` no null), el backend MUST validar **todos** los weekdays con bloques sync parseables de ese `id_agenda`: cobertura en `room_operating_hours` y sin solape con otras agendas del room (half-open; excluir propio `id_agenda`). Fallo → no persistir + error detallado.
+
+Esta validación MUST aplicar al path reassign/DnD. El modal Agendas en Consultorios MAY seguir sin estas reglas.
+
+#### Scenario: Un weekday falla, otros OK
+
+- **Given** agenda OK el lunes en pantalla pero solapa el jueves en el room destino
+- **When** reassign
+- **Then** se rechaza (validación multi-weekday)
+
+### Requirement: Confirmaciones robo y desasignar
+
+Robo de otro room: UI confirm + `confirm_move`; sin confirm → 409. Desasignar (Sin consultorio): UI confirm + `confirm_unassign`; sin validar horario/solape.
+
+### Requirement: Feedback de rechazo DnD
+
+Fallo de validación → modal con motivo detallado; bloque permanece en columna origen.
 
 ### Requirement: Menú Indicadores ocupación
 
