@@ -39,7 +39,7 @@ El backend MUST persistir cada fila del endpoint externo en `ocupacion_horario_a
 
 - PK **serial local** (no colapsar por `id_dato`: el API puede repetir `id_dato`)
 - `payload` JSONB = fila externa tal cual
-- columnas derivadas `tipo` / `especialidad_agenda` / `medico` (+ campos de filtro/vigencia según implementación)
+- columnas derivadas `tipo` / `especialidad_agenda` / `medico` (este último desde `medico_responsable_equipo` del payload; + campos de filtro/vigencia según implementación)
 
 `POST /api/v1/distribucion/ocupacion/horarios-activos/sync` MUST, tras GET externo OK, wipe+reload en una transacción. Si el GET falla, MUST NOT modificar la tabla (502).
 
@@ -69,21 +69,29 @@ Env: `DISTRIBUCION_HORARIOS_ACTIVOS_URL` (+ timeout). MUST NOT eliminarse al toc
 
 ### Requirement: Split de nombre_agenda
 
-El backend MUST derivar `tipo`, `especialidad_agenda` y `medico` partiendo `nombre_agenda` por `" - "`. Si no hay ese separador y hay `-`, MUST partir por `-` (strip). Parte 1 → `tipo`, parte 2 → `especialidad_agenda`, resto → `medico`. Faltantes → null. La grilla Ocupación MUST NOT mostrar `nombre_agenda` crudo.
+El backend MUST derivar `tipo` y `especialidad_agenda` partiendo `nombre_agenda` por `" - "`. Si no hay ese separador y hay `-`, MUST partir por `-` (strip). Parte 1 → `tipo`, parte 2 → `especialidad_agenda`. Faltantes → null. La grilla Ocupación MUST NOT mostrar `nombre_agenda` crudo.
 
-Tras cambiar el parser, MUST re-sync (Actualizar en Ocupación) para refrescar derivados.
+La columna **`medico`** MUST completarse desde el campo del payload **`medico_responsable_equipo`** (strip; vacío/ausente → null). MUST NOT usar el resto de `nombre_agenda` para `medico`.
+
+Tras cambiar el parser o la fuente de `medico`, MUST re-sync (Actualizar en Ocupación) para refrescar derivados.
 
 #### Scenario: Tres partes espaciadas
 
-- **Given** `ART - TRAUMATOLOGIA - APECECHEA …`
+- **Given** `nombre_agenda` = `ART - TRAUMATOLOGIA - APECECHEA …` y `medico_responsable_equipo` = `APECECHEA …`
 - **When** sync/derive
-- **Then** tipo/especialidad_agenda/medico partidos correctamente
+- **Then** `tipo=ART`, `especialidad_agenda=TRAUMATOLOGIA`, `medico` = valor de `medico_responsable_equipo`
 
 #### Scenario: Compacto con guiones
 
-- **Given** `CMG-ECOGRAFIA-DR. BARRERA`
+- **Given** `CMG-ECOGRAFIA-DR. BARRERA` y sin `medico_responsable_equipo`
 - **When** sync/derive
-- **Then** `tipo=CMG`, `especialidad_agenda=ECOGRAFIA`, resto en `medico`
+- **Then** `tipo=CMG`, `especialidad_agenda=ECOGRAFIA`, `medico` = null (no el resto del nombre)
+
+#### Scenario: medico_responsable_equipo
+
+- **Given** `nombre_agenda` = `00.TOTEM - PB - CONSULTORIOS` y `medico_responsable_equipo` = `LOPEZ JUAN`
+- **When** sync
+- **Then** la columna `medico` de la grilla muestra `LOPEZ JUAN`
 
 ### Requirement: Grilla Ocupación (sync UI)
 

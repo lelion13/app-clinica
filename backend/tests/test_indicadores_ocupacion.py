@@ -82,7 +82,7 @@ def _ocup_row(
             "hora_desde": hora_desde,
             "hora_hasta": hora_hasta,
             "especialidad": especialidad,
-            "medico": medico,
+            "medico_responsable_equipo": medico,
         },
     )
 
@@ -170,7 +170,7 @@ def test_tops_and_empty_labels(monkeypatch):
     a = _ocup_row(id_agenda=10, especialidad="CARDIO", medico="DOC", hora_desde="09:00:00", hora_hasta="10:00:00")
     b = _ocup_row(id_agenda=11, especialidad="", medico="", hora_desde="10:00:00", hora_hasta="11:00:00")
     b.id = 2
-    b.payload = {**b.payload, "id_agenda": 11, "especialidad": "", "medico": ""}
+    b.payload = {**b.payload, "id_agenda": 11, "especialidad": "", "medico_responsable_equipo": ""}
     monkeypatch.setattr(service.room_agenda_map_service, "agenda_to_room_map", lambda _db: {10: 1, 11: 1})
     result = service.compute_indicadores(FakeDB(rooms, hours, [a, b]), date_str="2026-08-06")
     assert result.occupied_hours == 2.0
@@ -220,7 +220,8 @@ def test_filter_options_payload_only():
             "id_dominio": 1,
             "tipo": "T",
             "especialidad": "FROM_PAYLOAD",
-            "medico": "MED_PAYLOAD",
+            "medico_responsable_equipo": "MED_RESP",
+            "medico": "MED_LEGACY",
             "dia": "lunes",
         },
     )
@@ -230,5 +231,6 @@ def test_filter_options_payload_only():
     med_values = {o.value for o in opts.medico}
     assert "FROM_PAYLOAD" in esp_values
     assert "FROM_AGENDA" not in esp_values
-    assert "MED_PAYLOAD" in med_values
+    assert "MED_RESP" in med_values
+    assert "MED_LEGACY" not in med_values
     assert "FROM_COL" not in med_values
