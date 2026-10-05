@@ -82,3 +82,23 @@ Al filtrar por `especialidad` / `medico` en **Agenda ocupación** (`events`) e *
 ### Requirement: API e UI Indicadores ocupación (sync)
 
 Además del cálculo día existente, la API/UI MUST soportar período mes, torta con horas+%, y tops (ver requisitos ADDED). La fórmula base sync÷box y la regla % MAY > 100 MUST permanecer. Especialidad/médico MUST filtrar solo el numerador (y tops derivados del numerador filtrado); el denominador del box MUST seguir siendo por rooms incluidos (ubicación/consultorio), no reducido por especialidad/médico.
+
+### Requirement: Split de nombre_agenda / columna medico (Ocupación sync)
+
+MODIFIED respecto a la spec estable previa: el backend MUST seguir derivando solo `tipo` y `especialidad_agenda` desde `nombre_agenda` (split `" - "` o fallback `-`).
+
+La columna **`medico`** (grilla `/ocupacion`, columna DB `ocupacion_horario_activo.medico`, filtros/tops que leen médico del sync) MUST completarse desde **`payload.medico_responsable_equipo`** (strip; ausente/vacío → null). MUST NOT asignar a `medico` el resto del split de `nombre_agenda`.
+
+Tras el cambio, MUST re-sync (**Actualizar** en Ocupación) para refrescar filas locales.
+
+#### Scenario: medico_responsable_equipo en grilla
+
+- **Given** fila remota con `nombre_agenda` = `00.TOTEM - PB - CONSULTORIOS` y `medico_responsable_equipo` = `LOPEZ JUAN`
+- **When** sync Actualizar
+- **Then** la columna `medico` muestra `LOPEZ JUAN` (no `CONSULTORIOS`)
+
+#### Scenario: Sin responsable
+
+- **Given** fila con `nombre_agenda` de tres partes y sin `medico_responsable_equipo`
+- **When** sync
+- **Then** `tipo`/`especialidad_agenda` derivados del nombre; `medico` = null

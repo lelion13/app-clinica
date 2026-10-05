@@ -2,7 +2,7 @@
 
 ## Technical Approach
 
-Ajustar filter-options/match a payload-only; extender `compute_indicadores` con `period` + tops; actualizar UI Indicadores (modo Día/Mes, torta labels, panel tops).
+Ajustar filter-options/match a payload-only; sync Ocupación con `medico` ← `medico_responsable_equipo`; extender `compute_indicadores` con `period` + tops; actualizar UI Indicadores (modo Día/Mes, torta labels, panel tops).
 
 ## Architecture Decisions
 
@@ -12,7 +12,17 @@ Ajustar filter-options/match a payload-only; extender `compute_indicadores` con 
 | Tops en misma response | Un fetch; coherente con filtros |
 | Mes: un scan sync + hours por weekday×count | Evita N queries por día |
 | Match payload en agenda_ocupacion e indicadores | Q6; una regla compartida helper |
+| `medico` sync = `medico_responsable_equipo` | Q8; nombre_agenda parte 3 no es el médico real (p. ej. CONSULTORIOS) |
 | Labels pie en frontend (Recharts) | No requiere backend extra |
+
+## Sync Ocupación (`horarios_activos._raw_to_model`)
+
+```python
+tipo, especialidad_agenda, _ = _split_nombre_agenda(payload.get("nombre_agenda"))
+medico = _as_str(payload.get("medico_responsable_equipo"))  # columna DB + UI
+```
+
+`filter-options` / match / tops leen `medico_payload` = `medico_responsable_equipo` (fallback legado `payload.medico`).
 
 ## API
 
@@ -25,56 +35,13 @@ Ajustar filter-options/match a payload-only; extender `compute_indicadores` con 
 | `month` | obligatorio si period=month (`YYYY-MM`) |
 | `location_id`, `room_id`, `especialidad`, `medico` | como hoy |
 
-Response extends current fields:
+Response extends current fields with `period`, `month`, `top_especialidad`, `top_medico` (`IndicadoresTopItem`: label, hours, percent_box, percent_occupied).
 
-```json
-{
-  "period": "month",
-  "date": null,
-  "month": "2026-10",
-  "occupied_hours": 0,
-  "enabled_hours": 0,
-  "free_hours": 0,
-  "occupancy_percent": null,
-  "rooms_included": 0,
-  "rooms_in_pie": 0,
-  "rooms_without_hours": [],
-  "rooms_without_agenda": 0,
-  "top_especialidad": [
-    { "label": "CLINICA", "hours": 12.5, "percent_box": 25.0, "percent_occupied": 40.0 }
-  ],
-  "top_medico": [
-    { "label": "Sin médico", "hours": 1.0, "percent_box": 2.0, "percent_occupied": 3.2 }
-  ]
-}
-```
+### Month aggregation
 
-`percent_*` null si denom 0. Top length ≤ 10, sort hours desc.
-
-### Month enabled_hours
-
-For each included room, for each calendar day in month: add operating hours for that day's JS weekday. Rooms with 0 hours all month contribute to without_hours logic analogous to day (document in apply: rooms with no hours on any day of month vs pie — prefer: room enters pie if has any hours in month).
-
-### Month occupied_hours
-
-Reuse day-overlap logic for each day in month (or equivalent interval intersection with [month_start, month_end+1)). Group by payload especialidad/medico for tops **after** filters.
-
-### filter-options
-
-```python
-if fields["especialidad"]: especialidades.add(...)  # payload only
-# remove especialidad_agenda from set
-if payload medico: medicos.add(...)  # from raw payload, not only row.medico
-```
-
-### Match helpers
-
-```python
-def match_especialidad_payload(esp, selected): ...  # only esp
-def match_medico_payload(medico_payload, selected): ...
-```
-
-Use in indicadores + agenda events.
+- **enabled:** count de cada JS weekday en el mes × horas del room ese weekday.
+- **occupied:** por cada bloque sync, ocurrencias de su `dia` en el mes dentro de `[fecha_desde, fecha_hasta]` × duración del bloque.
+- Room entra a la torta si tiene enabled > 0 en el período.
 
 ## UI
 
@@ -84,19 +51,18 @@ KPIs...
 [ Pie (labels h + %) ]  [ Top especialidad ]  [ Top médico ]
 ```
 
-Mobile: stack pie then tops. Labels pie: `Ocupado: {h}h ({%}%)`.
-
 ## File Changes
 
 | File | Change |
 |------|--------|
+| `horarios_activos.py` | medico ← medico_responsable_equipo |
 | `schemas/distribucion.py` | period fields, TopItem, lists |
 | `indicadores_ocupacion.py` | month + tops + payload match |
-| `agenda_ocupacion.py` | filter-options + events match |
+| `agenda_ocupacion.py` | filter-options + events match + medico_payload |
 | `distribucion.py` router | query params |
 | `IndicadoresOcupacionPage.jsx` | mode, pie labels, tops |
-| tests | filter-options, match, month, tops |
-| `docs/runbook.md` | note |
+| tests | sync medico, filter-options, month, tops |
+| `docs/runbook.md` + specs | note + delta |
 
 ## Risks & Mitigations
 
@@ -104,7 +70,8 @@ Mobile: stack pie then tops. Labels pie: `Ocupado: {h}h ({%}%)`.
 |------|------------|
 | Month CPU | weekday multiplicity for hours; single ocupacion load |
 | Agenda UX change | runbook + tests |
+| Snapshot DB viejo | Actualizar tras deploy |
 
 ## Open Questions
 
-None — survey closed.
+None — survey Q1–Q8 closed.

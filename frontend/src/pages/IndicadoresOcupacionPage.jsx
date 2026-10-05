@@ -1,11 +1,19 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { Cell, Legend, Pie, PieChart, ResponsiveContainer, Tooltip } from "recharts";
+import { Cell, Pie, PieChart, ResponsiveContainer, Tooltip } from "recharts";
 
 import { apiRequestWithRefresh } from "../services/api";
 import { safeLoad } from "../lib/apiHelpers";
 import { uiStyles, uiTheme } from "../ui/theme";
 
-const PIE_COLORS = ["#0f766e", "#cbd5e1"];
+const PIE_COLORS = {
+  Ocupado: "#0f766e",
+  Libre: "#e2e8f0",
+};
+const PIE_LABEL_COLORS = {
+  Ocupado: "#ffffff",
+  Libre: "#334155",
+};
+const RADIAN = Math.PI / 180;
 
 function todayISO() {
   const d = new Date();
@@ -43,6 +51,42 @@ function formatHours(h) {
 function formatPercent(p) {
   if (p === null || p === undefined) return "—";
   return `${p}%`;
+}
+
+/** Labels inside the donut slices; skip tiny slices to avoid clutter. */
+function renderPieSliceLabel({
+  cx,
+  cy,
+  midAngle,
+  innerRadius,
+  outerRadius,
+  percent,
+  name,
+  hoursLabel,
+  percentLabel,
+}) {
+  if (!percent || percent < 0.07) return null;
+  const radius = innerRadius + (outerRadius - innerRadius) * 0.52;
+  const x = cx + radius * Math.cos(-midAngle * RADIAN);
+  const y = cy + radius * Math.sin(-midAngle * RADIAN);
+  const fill = PIE_LABEL_COLORS[name] || uiTheme.colors.text;
+  return (
+    <text
+      x={x}
+      y={y}
+      fill={fill}
+      textAnchor="middle"
+      dominantBaseline="central"
+      style={{ fontSize: 12, fontWeight: 700, pointerEvents: "none" }}
+    >
+      <tspan x={x} dy="-0.55em">
+        {percentLabel}%
+      </tspan>
+      <tspan x={x} dy="1.25em" style={{ fontSize: 11, fontWeight: 600 }}>
+        {hoursLabel}h
+      </tspan>
+    </text>
+  );
 }
 
 function TopTable({ title, items }) {
@@ -316,45 +360,135 @@ export function IndicadoresOcupacionPage() {
       <div
         style={{
           display: "grid",
-          gridTemplateColumns: "repeat(auto-fit, minmax(240px, 1fr))",
+          gridTemplateColumns: "repeat(auto-fit, minmax(260px, 1fr))",
           gap: 16,
           marginBottom: 16,
           alignItems: "stretch",
         }}
       >
-        <div style={{ height: 320, minWidth: 0 }}>
+        <div
+          style={{
+            ...uiStyles.listCard,
+            padding: 14,
+            minWidth: 0,
+            display: "flex",
+            flexDirection: "column",
+          }}
+        >
+          <h3 style={{ margin: "0 0 4px", fontSize: 15 }}>Ocupación del box</h3>
+          <p style={{ margin: "0 0 8px", fontSize: 12, color: uiTheme.colors.textMuted }}>
+            Horas sync mapeadas vs horario habilitado
+          </p>
           {pieData.length ? (
-            <ResponsiveContainer width="100%" height="100%">
-              <PieChart>
-                <Pie
-                  data={pieData}
-                  dataKey="value"
-                  nameKey="name"
-                  cx="50%"
-                  cy="50%"
-                  outerRadius={110}
-                  label={({ name, hoursLabel, percentLabel: pct }) => `${name}: ${hoursLabel}h (${pct}%)`}
+            <>
+              <div style={{ position: "relative", width: "100%", height: 260, flex: 1 }}>
+                <ResponsiveContainer width="100%" height="100%">
+                  <PieChart margin={{ top: 8, right: 8, bottom: 8, left: 8 }}>
+                    <Pie
+                      data={pieData}
+                      dataKey="value"
+                      nameKey="name"
+                      cx="50%"
+                      cy="50%"
+                      innerRadius={68}
+                      outerRadius={108}
+                      paddingAngle={3}
+                      stroke={uiTheme.colors.surface}
+                      strokeWidth={3}
+                      labelLine={false}
+                      label={renderPieSliceLabel}
+                      isAnimationActive={!loading}
+                    >
+                      {pieData.map((entry) => (
+                        <Cell key={entry.name} fill={PIE_COLORS[entry.name] || "#94a3b8"} />
+                      ))}
+                    </Pie>
+                    <Tooltip
+                      formatter={(value, name, item) => {
+                        const pct = item?.payload?.percentLabel;
+                        return [`${formatHours(value)} h (${pct}%)`, name];
+                      }}
+                    />
+                  </PieChart>
+                </ResponsiveContainer>
+                <div
+                  style={{
+                    position: "absolute",
+                    inset: 0,
+                    display: "flex",
+                    flexDirection: "column",
+                    alignItems: "center",
+                    justifyContent: "center",
+                    pointerEvents: "none",
+                  }}
                 >
-                  {pieData.map((_, index) => (
-                    <Cell key={index} fill={PIE_COLORS[index % PIE_COLORS.length]} />
-                  ))}
-                </Pie>
-                <Tooltip
-                  formatter={(value, name, item) => {
-                    const pct = item?.payload?.percentLabel;
-                    return [`${formatHours(value)} h (${pct}%)`, name];
-                  }}
-                />
-                <Legend
-                  formatter={(value, entry) => {
-                    const p = entry?.payload;
-                    return `${value}: ${p?.hoursLabel ?? "—"}h (${p?.percentLabel ?? "—"}%)`;
-                  }}
-                />
-              </PieChart>
-            </ResponsiveContainer>
+                  <div
+                    style={{
+                      fontSize: 28,
+                      fontWeight: 800,
+                      letterSpacing: "-0.02em",
+                      color: uiTheme.colors.text,
+                      lineHeight: 1,
+                    }}
+                  >
+                    {percentLabel}
+                  </div>
+                  <div
+                    style={{
+                      marginTop: 4,
+                      fontSize: 11,
+                      fontWeight: 600,
+                      color: uiTheme.colors.textMuted,
+                      textTransform: "uppercase",
+                      letterSpacing: "0.06em",
+                    }}
+                  >
+                    ocupación
+                  </div>
+                </div>
+              </div>
+              <div
+                style={{
+                  display: "flex",
+                  flexWrap: "wrap",
+                  gap: 10,
+                  justifyContent: "center",
+                  marginTop: 4,
+                }}
+              >
+                {pieData.map((entry) => (
+                  <div
+                    key={entry.name}
+                    style={{
+                      display: "flex",
+                      alignItems: "center",
+                      gap: 8,
+                      padding: "6px 10px",
+                      borderRadius: uiTheme.radius.sm,
+                      background: uiTheme.colors.surfaceMuted,
+                      border: `1px solid ${uiTheme.colors.border}`,
+                      fontSize: 12,
+                    }}
+                  >
+                    <span
+                      style={{
+                        width: 10,
+                        height: 10,
+                        borderRadius: 3,
+                        background: PIE_COLORS[entry.name],
+                        flexShrink: 0,
+                      }}
+                    />
+                    <span style={{ fontWeight: 600, color: uiTheme.colors.text }}>{entry.name}</span>
+                    <span style={{ color: uiTheme.colors.textMuted }}>
+                      {entry.hoursLabel}h · {entry.percentLabel}%
+                    </span>
+                  </div>
+                ))}
+              </div>
+            </>
           ) : (
-            <p style={{ color: uiTheme.colors.textMuted, fontSize: 13 }}>
+            <p style={{ color: uiTheme.colors.textMuted, fontSize: 13, margin: "auto 0" }}>
               {loading
                 ? "Calculando…"
                 : "Sin horas habilitadas para la torta (consultorios sin horario en el período, o sin consultorios)."}
