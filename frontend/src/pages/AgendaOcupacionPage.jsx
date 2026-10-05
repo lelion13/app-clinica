@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
 import { apiRequestWithRefresh } from "../services/api";
 import { safeLoad } from "../lib/apiHelpers";
@@ -10,6 +10,7 @@ const PX_PER_HOUR = 48;
 const HOUR_COL_PX = 56;
 const COL_MIN_PX = 160;
 const HEADER_H = 36;
+const DND_MIME = "application/x-agenda-id";
 
 function isoDate(d) {
   const y = d.getFullYear();
@@ -68,7 +69,7 @@ function FilterSelect({ label, value, onChange, options, allLabel = "Todos" }) {
   );
 }
 
-function DetailModal({ detail, onClose }) {
+function ModalShell({ title, onClose, children, footer }) {
   useEffect(() => {
     const onKey = (event) => {
       if (event.key === "Escape") onClose();
@@ -77,6 +78,51 @@ function DetailModal({ detail, onClose }) {
     return () => window.removeEventListener("keydown", onKey);
   }, [onClose]);
 
+  return (
+    <div
+      role="presentation"
+      onClick={onClose}
+      style={{
+        position: "fixed",
+        inset: 0,
+        zIndex: 60,
+        background: "rgba(15, 23, 42, 0.45)",
+        display: "flex",
+        alignItems: "center",
+        justifyContent: "center",
+        padding: 16,
+      }}
+    >
+      <div
+        role="dialog"
+        aria-modal="true"
+        aria-label={title}
+        onClick={(event) => event.stopPropagation()}
+        style={{
+          width: "min(440px, 100%)",
+          maxHeight: "min(80vh, 560px)",
+          overflowY: "auto",
+          background: uiTheme.colors.surface,
+          border: `1px solid ${uiTheme.colors.borderStrong}`,
+          borderRadius: uiTheme.radius.md,
+          boxShadow: "0 16px 40px rgba(0,0,0,0.22)",
+          padding: 16,
+        }}
+      >
+        <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 10, gap: 8 }}>
+          <strong style={{ fontSize: 14 }}>{title}</strong>
+          <button type="button" onClick={onClose} style={{ ...uiStyles.buttonSecondary, padding: "2px 10px" }}>
+            Cerrar
+          </button>
+        </div>
+        {children}
+        {footer ? <div style={{ marginTop: 14, display: "flex", justifyContent: "flex-end", gap: 8 }}>{footer}</div> : null}
+      </div>
+    </div>
+  );
+}
+
+function DetailModal({ detail, onClose }) {
   if (!detail) return null;
 
   const rows = [
@@ -100,60 +146,40 @@ function DetailModal({ detail, onClose }) {
   ];
 
   return (
-    <div
-      role="presentation"
-      onClick={onClose}
-      style={{
-        position: "fixed",
-        inset: 0,
-        zIndex: 60,
-        background: "rgba(15, 23, 42, 0.45)",
-        display: "flex",
-        alignItems: "center",
-        justifyContent: "center",
-        padding: 16,
-      }}
-    >
-      <div
-        role="dialog"
-        aria-modal="true"
-        aria-label="Detalle de agenda"
-        onClick={(event) => event.stopPropagation()}
-        style={{
-          width: "min(420px, 100%)",
-          maxHeight: "min(80vh, 520px)",
-          overflowY: "auto",
-          background: uiTheme.colors.surface,
-          border: `1px solid ${uiTheme.colors.borderStrong}`,
-          borderRadius: uiTheme.radius.md,
-          boxShadow: "0 16px 40px rgba(0,0,0,0.22)",
-          padding: 16,
-        }}
-      >
-        <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 10, gap: 8 }}>
-          <strong style={{ fontSize: 14 }}>Detalle</strong>
-          <button type="button" onClick={onClose} style={{ ...uiStyles.buttonSecondary, padding: "2px 10px" }}>
-            Cerrar
-          </button>
-        </div>
-        <dl style={{ margin: 0, display: "grid", gap: 8, fontSize: 12 }}>
-          {rows.map(([k, v]) =>
-            v === null || v === undefined || v === "" ? null : (
-              <div key={k}>
-                <dt style={{ color: uiTheme.colors.textMuted, margin: 0 }}>{k}</dt>
-                <dd style={{ margin: "2px 0 0", color: uiTheme.colors.text }}>{String(v)}</dd>
-              </div>
-            )
-          )}
-        </dl>
-      </div>
-    </div>
+    <ModalShell title="Detalle" onClose={onClose}>
+      <dl style={{ margin: 0, display: "grid", gap: 8, fontSize: 12 }}>
+        {rows.map(([k, v]) =>
+          v === null || v === undefined || v === "" ? null : (
+            <div key={k}>
+              <dt style={{ color: uiTheme.colors.textMuted, margin: 0 }}>{k}</dt>
+              <dd style={{ margin: "2px 0 0", color: uiTheme.colors.text }}>{String(v)}</dd>
+            </div>
+          )
+        )}
+      </dl>
+    </ModalShell>
   );
+}
+
+function formatReassignError(err) {
+  const detail = err?.detail;
+  if (!detail || typeof detail !== "object") {
+    return { title: "No se pudo mover", body: err?.message || "Error inesperado" };
+  }
+  const conflicts = Array.isArray(detail.conflicts) ? detail.conflicts : [];
+  const lines = conflicts.length
+    ? conflicts.map((c) => c.message || JSON.stringify(c))
+    : [detail.message || err.message || "Error de validación"];
+  return {
+    title: "No se pudo asignar",
+    body: lines.join("\n"),
+  };
 }
 
 export function AgendaOcupacionPage() {
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
+  const [busy, setBusy] = useState(false);
   const [locations, setLocations] = useState([]);
   const [locationId, setLocationId] = useState("");
   const [day, setDay] = useState(() => isoDate(new Date()));
@@ -164,6 +190,11 @@ export function AgendaOcupacionPage() {
   const [tipo, setTipo] = useState("");
   const [especialidad, setEspecialidad] = useState("");
   const [medico, setMedico] = useState("");
+  const [dragOverId, setDragOverId] = useState(null);
+  const [confirmMove, setConfirmMove] = useState(null);
+  const [confirmUnassign, setConfirmUnassign] = useState(null);
+  const [errorModal, setErrorModal] = useState(null);
+  const suppressClickRef = useRef(false);
 
   useEffect(() => {
     safeLoad("/locations", setLocations, setError);
@@ -242,6 +273,69 @@ export function AgendaOcupacionPage() {
     }
   }, [day]);
 
+  const doReassign = useCallback(
+    async ({ id_agenda, target_room_id, confirm_move = false, confirm_unassign = false }) => {
+      setBusy(true);
+      setError("");
+      try {
+        await apiRequestWithRefresh("/distribucion/ocupacion/agenda/reassign", {
+          method: "POST",
+          body: JSON.stringify({
+            id_agenda,
+            target_room_id,
+            confirm_move,
+            confirm_unassign,
+          }),
+        });
+        await loadEvents();
+        return true;
+      } catch (err) {
+        if (err?.status === 409 && err?.detail?.requires_confirm_move) {
+          setConfirmMove({
+            id_agenda,
+            target_room_id,
+            current_room_code: err.detail.current_room_code,
+            target_room_code: err.detail.target_room_code,
+            message: err.detail.message || err.message,
+          });
+          return false;
+        }
+        setErrorModal(formatReassignError(err));
+        return false;
+      } finally {
+        setBusy(false);
+      }
+    },
+    [loadEvents]
+  );
+
+  const handleDropOnResource = useCallback(
+    async (res, rawIdAgenda) => {
+      const id_agenda = Number(rawIdAgenda);
+      if (!Number.isFinite(id_agenda) || id_agenda <= 0) return;
+
+      const isUnassigned = res.id === "unassigned";
+      const target_room_id = isUnassigned ? null : res.room_id ?? Number(res.id);
+      if (!isUnassigned && (!Number.isFinite(target_room_id) || target_room_id <= 0)) return;
+
+      // Same column?
+      const alreadyHere = events.some(
+        (ev) =>
+          Number(ev.extended?.id_agenda) === id_agenda &&
+          (ev.resource_id || "unassigned") === res.id
+      );
+      if (alreadyHere) return;
+
+      if (isUnassigned) {
+        setConfirmUnassign({ id_agenda });
+        return;
+      }
+
+      await doReassign({ id_agenda, target_room_id, confirm_move: false });
+    },
+    [doReassign, events]
+  );
+
   const stickyHeaderBase = {
     position: "sticky",
     top: 0,
@@ -286,12 +380,26 @@ export function AgendaOcupacionPage() {
       >
         <h2 style={{ margin: 0, fontSize: "1.1rem", whiteSpace: "nowrap" }}>Agenda ocupación</h2>
         <span style={{ color: uiTheme.colors.textMuted, fontSize: 12, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
-          Sync desde Ocupación
-          {loading ? " · Cargando…" : ""}
+          Sync desde Ocupación · Arrastrá bloques entre columnas
+          {loading || busy ? " · Cargando…" : ""}
         </span>
       </div>
 
-      {error ? <div style={{ ...uiStyles.alertError, flexShrink: 0, padding: "6px 10px", fontSize: 13 }}>{error}</div> : null}
+      {error ? (
+        <div
+          style={{
+            flexShrink: 0,
+            padding: "6px 10px",
+            fontSize: 13,
+            color: uiTheme.colors.danger,
+            border: `1px solid ${uiTheme.colors.borderStrong}`,
+            borderRadius: uiTheme.radius.sm,
+            background: "#fff5f5",
+          }}
+        >
+          {error}
+        </div>
+      ) : null}
 
       <div
         style={{
@@ -399,7 +507,6 @@ export function AgendaOcupacionPage() {
               borderRight: `1px solid ${uiTheme.colors.border}`,
               height: gridHeight,
               boxSizing: "border-box",
-              /* relative + sticky: absolute hour marks share coords with resource columns */
             }}
           >
             <div style={{ position: "relative", height: gridHeight, width: "100%" }}>
@@ -426,73 +533,123 @@ export function AgendaOcupacionPage() {
             </div>
           </div>
 
-          {displayResources.map((res) => (
-            <div
-              key={res.id}
-              style={{
-                position: "relative",
-                height: gridHeight,
-                borderRight: `1px solid ${uiTheme.colors.border}`,
-                boxSizing: "border-box",
-                background:
-                  res.id === "unassigned"
-                    ? "repeating-linear-gradient(135deg, transparent, transparent 6px, rgba(0,0,0,0.03) 6px, rgba(0,0,0,0.03) 12px)"
-                    : uiTheme.colors.surface,
-              }}
-            >
-              {hours.map((h) => (
-                <div
-                  key={h}
-                  style={{
-                    position: "absolute",
-                    left: 0,
-                    right: 0,
-                    top: (h - HOUR_START) * PX_PER_HOUR,
-                    height: PX_PER_HOUR,
-                    boxSizing: "border-box",
-                    borderBottom: `1px solid ${uiTheme.colors.border}`,
-                    pointerEvents: "none",
-                  }}
-                />
-              ))}
-              {(eventsByResource[res.id] || []).map((ev) => {
-                const startDt = parseLocalDateTime(ev.start);
-                const endDt = parseLocalDateTime(ev.end);
-                const topMin = minutesFromDayStart(startDt) - HOUR_START * 60;
-                const endMin = minutesFromDayStart(endDt) - HOUR_START * 60;
-                const top = Math.max(0, (topMin / 60) * PX_PER_HOUR);
-                const height = Math.max(18, ((endMin - topMin) / 60) * PX_PER_HOUR);
-                return (
-                  <button
-                    key={ev.id}
-                    type="button"
-                    title={ev.title}
-                    onClick={() => setModalDetail(ev.extended || {})}
+          {displayResources.map((res) => {
+            const canDrop = res.id !== "_empty";
+            const isOver = dragOverId === res.id;
+            return (
+              <div
+                key={res.id}
+                onDragOver={
+                  canDrop
+                    ? (e) => {
+                        e.preventDefault();
+                        e.dataTransfer.dropEffect = "move";
+                        setDragOverId(res.id);
+                      }
+                    : undefined
+                }
+                onDragLeave={
+                  canDrop
+                    ? () => {
+                        setDragOverId((cur) => (cur === res.id ? null : cur));
+                      }
+                    : undefined
+                }
+                onDrop={
+                  canDrop
+                    ? (e) => {
+                        e.preventDefault();
+                        setDragOverId(null);
+                        const raw = e.dataTransfer.getData(DND_MIME) || e.dataTransfer.getData("text/plain");
+                        handleDropOnResource(res, raw);
+                      }
+                    : undefined
+                }
+                style={{
+                  position: "relative",
+                  height: gridHeight,
+                  borderRight: `1px solid ${uiTheme.colors.border}`,
+                  boxSizing: "border-box",
+                  outline: isOver ? `2px solid ${uiTheme.colors.primary}` : "none",
+                  outlineOffset: -2,
+                  background:
+                    res.id === "unassigned"
+                      ? "repeating-linear-gradient(135deg, transparent, transparent 6px, rgba(0,0,0,0.03) 6px, rgba(0,0,0,0.03) 12px)"
+                      : uiTheme.colors.surface,
+                }}
+              >
+                {hours.map((h) => (
+                  <div
+                    key={h}
                     style={{
                       position: "absolute",
-                      left: 3,
-                      right: 3,
-                      top,
-                      height,
-                      overflow: "hidden",
-                      border: "none",
-                      borderRadius: 4,
-                      background: uiTheme.colors.primary,
-                      color: "#fff",
-                      fontSize: 11,
-                      fontWeight: 600,
-                      textAlign: "left",
-                      padding: "4px 6px",
-                      cursor: "pointer",
-                      lineHeight: 1.25,
+                      left: 0,
+                      right: 0,
+                      top: (h - HOUR_START) * PX_PER_HOUR,
+                      height: PX_PER_HOUR,
+                      boxSizing: "border-box",
+                      borderBottom: `1px solid ${uiTheme.colors.border}`,
+                      pointerEvents: "none",
                     }}
-                  >
-                    {ev.title || "(sin médico)"}
-                  </button>
-                );
-              })}
-            </div>
-          ))}
+                  />
+                ))}
+                {(eventsByResource[res.id] || []).map((ev) => {
+                  const startDt = parseLocalDateTime(ev.start);
+                  const endDt = parseLocalDateTime(ev.end);
+                  const topMin = minutesFromDayStart(startDt) - HOUR_START * 60;
+                  const endMin = minutesFromDayStart(endDt) - HOUR_START * 60;
+                  const top = Math.max(0, (topMin / 60) * PX_PER_HOUR);
+                  const height = Math.max(18, ((endMin - topMin) / 60) * PX_PER_HOUR);
+                  const idAgenda = ev.extended?.id_agenda;
+                  const draggable = Number.isFinite(Number(idAgenda)) && Number(idAgenda) > 0 && !busy;
+                  return (
+                    <button
+                      key={ev.id}
+                      type="button"
+                      title={ev.title}
+                      draggable={draggable}
+                      onDragStart={(e) => {
+                        if (!draggable) return;
+                        suppressClickRef.current = true;
+                        e.dataTransfer.setData(DND_MIME, String(idAgenda));
+                        e.dataTransfer.setData("text/plain", String(idAgenda));
+                        e.dataTransfer.effectAllowed = "move";
+                      }}
+                      onDragEnd={() => setDragOverId(null)}
+                      onClick={() => {
+                        if (suppressClickRef.current) {
+                          suppressClickRef.current = false;
+                          return;
+                        }
+                        setModalDetail(ev.extended || {});
+                      }}
+                      style={{
+                        position: "absolute",
+                        left: 3,
+                        right: 3,
+                        top,
+                        height,
+                        overflow: "hidden",
+                        border: "none",
+                        borderRadius: 4,
+                        background: uiTheme.colors.primary,
+                        color: "#fff",
+                        fontSize: 11,
+                        fontWeight: 600,
+                        textAlign: "left",
+                        padding: "4px 6px",
+                        cursor: draggable ? "grab" : "pointer",
+                        lineHeight: 1.25,
+                        opacity: busy ? 0.7 : 1,
+                      }}
+                    >
+                      {ev.title || "(sin médico)"}
+                    </button>
+                  );
+                })}
+              </div>
+            );
+          })}
         </div>
       </div>
 
@@ -503,6 +660,96 @@ export function AgendaOcupacionPage() {
       ) : null}
 
       <DetailModal detail={modalDetail} onClose={() => setModalDetail(null)} />
+
+      {confirmMove ? (
+        <ModalShell
+          title="Mover agenda"
+          onClose={() => setConfirmMove(null)}
+          footer={
+            <>
+              <button type="button" style={uiStyles.buttonSecondary} onClick={() => setConfirmMove(null)}>
+                Cancelar
+              </button>
+              <button
+                type="button"
+                style={uiStyles.buttonPrimary}
+                disabled={busy}
+                onClick={async () => {
+                  const payload = confirmMove;
+                  setConfirmMove(null);
+                  await doReassign({
+                    id_agenda: payload.id_agenda,
+                    target_room_id: payload.target_room_id,
+                    confirm_move: true,
+                  });
+                }}
+              >
+                Mover
+              </button>
+            </>
+          }
+        >
+          <p style={{ margin: 0, fontSize: 13, lineHeight: 1.45 }}>
+            {confirmMove.message ||
+              `Esta agenda está en ${confirmMove.current_room_code}. ¿Moverla a ${confirmMove.target_room_code}?`}
+          </p>
+          <p style={{ margin: "8px 0 0", fontSize: 12, color: uiTheme.colors.textMuted }}>
+            Se reasignan todos los días de la agenda (id {confirmMove.id_agenda}).
+          </p>
+        </ModalShell>
+      ) : null}
+
+      {confirmUnassign ? (
+        <ModalShell
+          title="Quitar consultorio"
+          onClose={() => setConfirmUnassign(null)}
+          footer={
+            <>
+              <button type="button" style={uiStyles.buttonSecondary} onClick={() => setConfirmUnassign(null)}>
+                Cancelar
+              </button>
+              <button
+                type="button"
+                style={uiStyles.buttonPrimary}
+                disabled={busy}
+                onClick={async () => {
+                  const payload = confirmUnassign;
+                  setConfirmUnassign(null);
+                  await doReassign({
+                    id_agenda: payload.id_agenda,
+                    target_room_id: null,
+                    confirm_unassign: true,
+                  });
+                }}
+              >
+                Desasignar
+              </button>
+            </>
+          }
+        >
+          <p style={{ margin: 0, fontSize: 13, lineHeight: 1.45 }}>
+            ¿Quitar el consultorio de esta agenda (id {confirmUnassign.id_agenda})? Pasará a{" "}
+            <strong>Sin consultorio</strong> en todos los días.
+          </p>
+        </ModalShell>
+      ) : null}
+
+      {errorModal ? (
+        <ModalShell title={errorModal.title} onClose={() => setErrorModal(null)}>
+          <pre
+            style={{
+              margin: 0,
+              whiteSpace: "pre-wrap",
+              fontFamily: "inherit",
+              fontSize: 13,
+              lineHeight: 1.45,
+              color: uiTheme.colors.text,
+            }}
+          >
+            {errorModal.body}
+          </pre>
+        </ModalShell>
+      ) : null}
     </section>
   );
 }

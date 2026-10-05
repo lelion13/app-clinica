@@ -14,7 +14,7 @@ Dominio de distribución de consultorios: sync de ocupación (horarios activos),
 | `locations.tipo` + unique par + filtro location dominio+tipo | § Ubicaciones | `2026-08-06-locations-tipo` |
 | UI Agenda ocupación (planilla, filtros una fila, modal, viewport) | § UI Agenda | `2026-08-06-agenda-ocupacion-ui` |
 | UI Consultorios (grilla, modales, horarios, sin menú Horarios) | § UI Consultorios | `2026-10-03-consultorios-ui` |
-| Indicadores ocupación (sync, un día, torta) | § Indicadores ocupación | `2026-10-03-indicadores-ocupacion` |
+| Indicadores ocupación (sync, Día\|Mes, torta, tops; filtros payload; medico sync) | § Indicadores ocupación | `2026-10-03-indicadores-ocupacion` + `2026-10-05-indicadores-ocupacion-ui` |
 | Estadística (asignaciones semanales, rango) | § Estadística | `2026-10-03-dashboard-estadisticas` |
 
 **Regla anti-ambigüedad:** si un archive antiguo dice FullCalendar/popover/multi-select, PK=`id_dato`, o “Estadística = bookings”, **prevalece esta spec estable**. Los deltas archivados son histórico.
@@ -107,9 +107,12 @@ MUST materializar un evento por ocurrencia de fila sync con `dia` válido (ES), 
 
 Cada evento MUST incluir `start`, `end`, `title` (= medico o vacío), `resource_id`, `extended` (detalle).
 
-MUST aceptar filtros opcionales: `location_id`, `id_dominio`, `tipo`, `especialidad`, `medico`, `dia` (listas). `especialidad` matchea `especialidad` **o** `especialidad_agenda` (casefold). Vacío = sin filtro.
+MUST aceptar filtros opcionales: `location_id`, `id_dominio`, `tipo`, `especialidad`, `medico`, `dia` (listas). `especialidad` MUST matchear solo `payload.especialidad` (MUST NOT `especialidad_agenda`). `medico` MUST matchear `payload.medico_responsable_equipo` (fallback legado `payload.medico`). Vacío = sin filtro.
 
-`GET .../agenda/filter-options` MUST exponer valores distintos para armar filtros UI.
+`GET .../agenda/filter-options` MUST exponer valores distintos para armar filtros UI:
+- `especialidad`: solo `payload.especialidad` (no vacíos)
+- `medico`: solo `payload.medico_responsable_equipo` (fallback `payload.medico`)
+- demás dimensiones según implementación
 
 Filas sin `dia`/horas válidas MUST NOT generar eventos.
 
@@ -118,6 +121,12 @@ Filas sin `dia`/horas válidas MUST NOT generar eventos.
 - **Given** fila `dia=lunes` 09:00–12:00 vigente
 - **When** events cubre ese lunes
 - **Then** hay evento ese día en ese rango
+
+#### Scenario: Filtro especialidad payload-only
+
+- **Given** bloque con `especialidad_agenda` coincidente y `payload.especialidad` distinto
+- **When** filtro especialidad = valor de `especialidad_agenda`
+- **Then** ese bloque MUST NOT listarse en events
 
 ### Requirement: Mapeo id_agenda → consultorio
 
@@ -217,19 +226,35 @@ El sistema MUST mostrar **Indicadores ocupación** → `/indicadores-ocupacion` 
 
 ### Requirement: API e UI Indicadores ocupación (sync)
 
-`GET /api/v1/distribucion/ocupacion/indicadores` (JWT admin|operador) MUST calcular, para un `date`:
+`GET /api/v1/distribucion/ocupacion/indicadores` (JWT admin|operador) MUST aceptar `period=day|month`:
+- **day:** `date=YYYY-MM-DD` (cálculo de un día).
+- **month:** `month=YYYY-MM`; `enabled_hours` y `occupied_hours` MUST ser la **suma** de todos los días del mes calendario (no promedio de %).
 
+Por el período y filtros:
 - **Rooms:** activos, filtros opcionales `location_id` / `room_id`.
-- **Denominador:** suma `room_operating_hours` ese weekday (JS). Rooms sin franja ese día → `rooms_without_hours` (fuera de torta).
-- **Numerador:** duración completa de bloques sync del día con `id_agenda` mapeada a room incluido; sin recorte al horario del box; filtros `especialidad`/`medico` solo al numerador. Sin mapeo → 0 al numerador. % MAY > 100.
+- **Denominador (`enabled_hours`):** suma `room_operating_hours` por weekday(s) del período (JS). Rooms sin franja → `rooms_without_hours` (fuera de torta).
+- **Numerador (`occupied_hours`):** duración de bloques sync con `id_agenda` mapeada a room incluido en torta; sin recorte al horario del box; filtros `especialidad`/`medico` **payload-only** solo al numerador. Sin mapeo → no cuenta. % MAY > 100.
+- **Tops:** `top_especialidad` y `top_medico` (hasta 10, horas > 0, orden horas desc). Cada ítem: label, hours, `percent_box` (= ÷ enabled), `percent_occupied` (= ÷ occupied). Labels vacíos → “Sin especialidad” / “Sin médico”. Misma fuente payload que filtros. Solo bloques que entran al numerador.
 
-UI `/indicadores-ocupacion`: día (default hoy), selects ubicación/consultorio/especialidad/médico, torta global + horas + aviso sin horario; solo lectura; sin sync.
+UI `/indicadores-ocupacion`: control Día|Mes, selects ubicación/consultorio/especialidad/médico, KPIs, torta (horas y % por segmento; preferible donut con % al centro), tops al costado; avisos rooms sin horario / sin agenda; solo lectura; sin sync.
 
 #### Scenario: Room sin agenda
 
 - **Given** room con horario y sin `id_agenda`
-- **When** indicadores del día
+- **When** indicadores del período
 - **Then** aporta al denom y 0 al numerador
+
+#### Scenario: Mes suma
+
+- **Given** rooms con horario L–V y sync mapeado en varios días de un mes
+- **When** period=month ese mes
+- **Then** `enabled_hours` y `occupied_hours` son la suma de todos los días del mes
+
+#### Scenario: Top solo mapeadas
+
+- **Given** filas sync sin mapeo a consultorio y otras mapeadas
+- **When** tops
+- **Then** solo las mapeadas (que entran a la torta) aportan horas a los tops
 
 ### Requirement: Menú Estadística
 

@@ -8,12 +8,15 @@ from app.schemas.consulting_room import AgendaLookupResponse
 from app.schemas.distribucion import (
     AgendaFilterOptionsResponse,
     AgendaOcupacionEventsResponse,
+    AgendaReassignRequest,
+    AgendaReassignResponse,
     HorariosActivosResponse,
     HorariosActivosSyncResponse,
     IndicadoresOcupacionResponse,
 )
 from app.services import room_agenda_map as room_agenda_map_service
 from app.services.distribucion import agenda_ocupacion as agenda_ocupacion_service
+from app.services.distribucion import agenda_reassign as agenda_reassign_service
 from app.services.distribucion import horarios_activos as horarios_activos_service
 from app.services.distribucion import indicadores_ocupacion as indicadores_ocupacion_service
 
@@ -45,6 +48,22 @@ def ocupacion_agenda_filter_options(
 ) -> AgendaFilterOptionsResponse:
     _ = user
     return agenda_ocupacion_service.list_filter_options(db)
+
+
+@router.post("/ocupacion/agenda/reassign", response_model=AgendaReassignResponse)
+def ocupacion_agenda_reassign(
+    payload: AgendaReassignRequest,
+    db: Session = Depends(get_db),
+    user: User = Depends(require_operator_or_admin),
+) -> AgendaReassignResponse:
+    return agenda_reassign_service.reassign_agenda(
+        db,
+        id_agenda=payload.id_agenda,
+        target_room_id=payload.target_room_id,
+        actor_id=user.id,
+        confirm_move=payload.confirm_move,
+        confirm_unassign=payload.confirm_unassign,
+    )
 
 
 @router.get("/ocupacion/agenda-lookup", response_model=AgendaLookupResponse)
