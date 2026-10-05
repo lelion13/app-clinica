@@ -1,4 +1,4 @@
-from fastapi import APIRouter, Depends, Query
+from fastapi import APIRouter, Depends, File, Query, UploadFile
 from sqlalchemy.orm import Session
 
 from app.api.deps import require_operator_or_admin
@@ -13,12 +13,15 @@ from app.schemas.distribucion import (
     HorariosActivosResponse,
     HorariosActivosSyncResponse,
     IndicadoresOcupacionResponse,
+    TurnosCsvImportResponse,
+    TurnosCsvStatsResponse,
 )
 from app.services import room_agenda_map as room_agenda_map_service
 from app.services.distribucion import agenda_ocupacion as agenda_ocupacion_service
 from app.services.distribucion import agenda_reassign as agenda_reassign_service
 from app.services.distribucion import horarios_activos as horarios_activos_service
 from app.services.distribucion import indicadores_ocupacion as indicadores_ocupacion_service
+from app.services.distribucion import turnos_csv as turnos_csv_service
 
 router = APIRouter()
 
@@ -90,6 +93,46 @@ def ocupacion_indicadores(
 ) -> IndicadoresOcupacionResponse:
     _ = user
     return indicadores_ocupacion_service.compute_indicadores(
+        db,
+        period=period,
+        date_str=date,
+        month_str=month,
+        location_id=location_id,
+        room_id=room_id,
+        especialidad=especialidad,
+        medico=medico,
+    )
+
+
+@router.post("/ocupacion/indicadores/turnos/import", response_model=TurnosCsvImportResponse)
+async def ocupacion_indicadores_turnos_import(
+    file: UploadFile = File(...),
+    db: Session = Depends(get_db),
+    user: User = Depends(require_operator_or_admin),
+) -> TurnosCsvImportResponse:
+    content = await file.read()
+    return turnos_csv_service.import_turnos_csv(
+        db,
+        filename=file.filename or "turnos.csv",
+        content=content,
+        actor_id=user.id,
+    )
+
+
+@router.get("/ocupacion/indicadores/turnos/stats", response_model=TurnosCsvStatsResponse)
+def ocupacion_indicadores_turnos_stats(
+    period: str = Query(default="day", description="day | month"),
+    date: str | None = Query(default=None),
+    month: str | None = Query(default=None),
+    location_id: int | None = Query(default=None),
+    room_id: int | None = Query(default=None),
+    especialidad: str | None = Query(default=None),
+    medico: str | None = Query(default=None),
+    db: Session = Depends(get_db),
+    user: User = Depends(require_operator_or_admin),
+) -> TurnosCsvStatsResponse:
+    _ = user
+    return turnos_csv_service.compute_turnos_stats(
         db,
         period=period,
         date_str=date,

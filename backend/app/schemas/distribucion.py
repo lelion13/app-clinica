@@ -127,3 +127,33 @@ class IndicadoresOcupacionResponse(BaseModel):
     rooms_without_agenda: int = 0
     top_especialidad: list[IndicadoresTopItem] = Field(default_factory=list)
     top_medico: list[IndicadoresTopItem] = Field(default_factory=list)
+
+
+class TurnosCsvUnmatchedItem(BaseModel):
+    row: int
+    nombre: str
+
+
+class TurnosCsvImportResponse(BaseModel):
+    id: int
+    filename: str
+    period_start: str
+    period_end: str
+    row_count: int
+
+
+class TurnosCsvImportInfo(BaseModel):
+    id: int
+    filename: str
+    period_start: str
+    period_end: str
+    rows: int
+
+
+class TurnosCsvStatsResponse(BaseModel):
+    turnos: int = 0
+    ausentes: int = 0
+    ausentismo_percent: float | None = None
+    avg_presente_atendido_minutes: float | None = None
+    avg_espera_dias: float | None = None
+    imports: list[TurnosCsvImportInfo] = Field(default_factory=list)
