@@ -12,7 +12,9 @@ async function parseError(response) {
   let message = "Error inesperado";
   let detail = null;
   const raw = await response.text();
-  if (raw) {
+  if (response.status === 413) {
+    message = "El archivo es demasiado grande para el servidor (límite de upload). Probá de nuevo tras el deploy o comprimí/dividí el CSV.";
+  } else if (raw) {
     try {
       const data = JSON.parse(raw);
       if (typeof data.detail === "string") message = data.detail;
@@ -21,7 +23,12 @@ async function parseError(response) {
       } else if (typeof data.message === "string") message = data.message;
       detail = data.detail ?? null;
     } catch {
-      message = raw;
+      // nginx HTML errors (413, 502, …)
+      if (/413|Request Entity Too Large|Content Too Large/i.test(raw)) {
+        message = "El archivo es demasiado grande para el servidor (límite de upload).";
+      } else {
+        message = raw.length > 200 ? raw.slice(0, 200) + "…" : raw;
+      }
     }
   }
   const error = new Error(message);
