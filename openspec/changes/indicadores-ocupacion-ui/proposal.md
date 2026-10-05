@@ -7,7 +7,7 @@ Mejorar Indicadores ocupación: filtros desde payload puro, período día/mes, t
 ## Scope
 
 ### In Scope
-- `filter-options` compartido: especialidad = solo `payload.especialidad`; médico = solo `payload.medico`.
+- `filter-options` compartido: especialidad = solo `payload.especialidad`; médico = solo `payload.medico_responsable_equipo` (fallback `payload.medico`).
 - Match de filtros (Indicadores + Agenda): solo esos campos payload.
 - UI modo **Día | Mes**; mes agrega occupied/enabled como suma del mes.
 - Torta: etiquetas/leyenda con horas y %.

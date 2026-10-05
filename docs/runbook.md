@@ -66,7 +66,7 @@
   - Menú Distribución → **Ocupación** (`/ocupacion`); convive con Ocupación semanal
   - Tabla `ocupacion_horario_activo` (rev `0013_ocupacion_serial`): PK serial local; `payload` JSONB = cada fila del endpoint tal cual
   - Importante: `id_dato` del API **no es único** → se guarda 1 fila DB por cada fila del JSON (no colapsar)
-  - Derivados `tipo`/`especialidad_agenda`/`medico` + `fecha_hasta` para filtro/UI
+  - Derivados `tipo`/`especialidad_agenda` desde `nombre_agenda`; columna `medico` desde `medico_responsable_equipo` del payload (+ `fecha_hasta` para filtro/UI). Tras cambiar fuente → **Actualizar** en Ocupación.
   - `GET .../horarios-activos` lee DB (`fecha_hasta >= hoy`); `POST .../sync` wipe+reload (botón Actualizar)
   - Env: `DISTRIBUCION_HORARIOS_ACTIVOS_URL` (+ timeout; default 120s); Bearer = `NOVEDADES_PROF_SYNC_TOKEN`
   - Tras deploy: set env en `.env.prod`, `alembic upgrade head`, redeploy backend+frontend, **Actualizar** en Ocupación (esperar synced ≈ miles de filas)

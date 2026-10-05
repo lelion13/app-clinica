@@ -9,12 +9,12 @@ Survey closed 2026-10-03. Change: `indicadores-ocupacion-ui`. Branch: `indicador
 | Q3 / Q3b | % en tops | A+B → A | Cada fila: **horas** + **% sobre box** (÷ denom torta) + **% sobre ocupado** (÷ numerador total). |
 | Q4 | Tamaño/orden tops | B | Top **10**, orden por horas desc. |
 | Q5 | Alcance filter-options | B | Cambiar `filter-options` compartido: especialidad = solo payload; médico = solo payload. Afecta también Agenda ocupación. |
-| Q6 | Match al filtrar | A | Match estricto payload-only en Indicadores **y** Agenda (especialidad ≠ especialidad_agenda; médico = payload.medico). |
+| Q6 | Match al filtrar | A | Match estricto payload-only en Indicadores **y** Agenda (especialidad ≠ especialidad_agenda; médico = `medico_responsable_equipo` / legado `payload.medico`). |
 | Q7 | Vacíos en tops | B | Agrupar como **“Sin especialidad”** / **“Sin médico”**. |
 
 ## Defaults (no preguntados)
 
 - Torta: cada segmento/leyenda muestra **horas y %**.
-- Tops usan `payload.especialidad` y `payload.medico` (misma fuente que filtros).
+- Tops usan `payload.especialidad` y `payload.medico_responsable_equipo` (misma fuente que filtros).
 - Filtros ubicación/consultorio/especialidad/médico aplican al período activo (día o mes) y a torta + tops.
 - Roles sin cambio: `admin` / `operador`.

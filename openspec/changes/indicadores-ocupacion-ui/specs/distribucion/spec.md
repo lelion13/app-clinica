@@ -41,7 +41,7 @@ Cada top MUST listar hasta **10** ítems con horas > 0, ordenados por horas desc
 - **% box** = horas del ítem ÷ `enabled_hours` de la respuesta (mismo denom que torta); si enabled=0 → null/—
 - **% ocupado** = horas del ítem ÷ `occupied_hours` de la respuesta; si occupied=0 → null/—
 
-Agrupación MUST usar `payload.especialidad` y `payload.medico`. Valores vacíos MUST agruparse como **“Sin especialidad”** / **“Sin médico”**.
+Agrupación MUST usar `payload.especialidad` y `payload.medico_responsable_equipo` (fallback legado `payload.medico`). Valores vacíos MUST agruparse como **“Sin especialidad”** / **“Sin médico”**.
 
 Los tops MUST respetar el mismo período y filtros que la torta. Response API MUST incluir estas listas.
 
@@ -63,7 +63,7 @@ Los tops MUST respetar el mismo período y filtros que la torta. Response API MU
 
 `GET .../ocupacion/agenda/filter-options` MUST poblar:
 - `especialidad`: valores distintos no vacíos de **`payload.especialidad`** únicamente (MUST NOT incluir `especialidad_agenda`).
-- `medico`: valores distintos no vacíos de **`payload.medico`** únicamente (MUST NOT usar solo la columna derivada si difiere del payload; fuente = campo payload).
+- `medico`: valores distintos no vacíos de **`payload.medico_responsable_equipo`** (fallback legado `payload.medico`) únicamente (MUST NOT usar solo la columna derivada si difiere del payload; fuente = campo payload).
 
 Al filtrar por `especialidad` / `medico` en **Agenda ocupación** (`events`) e **Indicadores**, el match MUST ser solo contra esos campos payload (MUST NOT matchear `especialidad_agenda` para el filtro especialidad).
 

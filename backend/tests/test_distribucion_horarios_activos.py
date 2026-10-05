@@ -53,6 +53,7 @@ def test_map_row_subset():
             "id_dominio": 1651,
             "id_agenda": 10366,
             "nombre_agenda": "ART - TRAUMATOLOGIA - APECECHEA CAIRONE DIEGO",
+            "medico_responsable_equipo": "APECECHEA CAIRONE DIEGO",
             "especialidad": "TRAUMATOLOGIA Y ORTOPEDIA ",
             "dia": "lunes",
             "fecha_desde": "2023-01-01",
@@ -76,6 +77,44 @@ def test_map_row_subset():
     assert item.dia == "lunes"
     assert item.cantidad_turnos == 24.0
     assert item.cantidad_sobreturno == 2
+
+
+def test_map_row_medico_from_medico_responsable_equipo():
+    """Columna medico = payload.medico_responsable_equipo (no el resto de nombre_agenda)."""
+    item = service._map_row(
+        {
+            "id": 1,
+            "id_dato": "1",
+            "id_dominio": 1651,
+            "nombre_agenda": "00.TOTEM - PB - CONSULTORIOS",
+            "medico_responsable_equipo": "LOPEZ JUAN",
+            "especialidad": "CLINICA MEDICA",
+            "dia": "lunes",
+            "fecha_hasta": "2099-12-31",
+            "hora_desde": "8:00:00",
+            "hora_hasta": "12:00:00",
+        }
+    )
+    assert item.tipo == "00.TOTEM"
+    assert item.especialidad_agenda == "PB"
+    assert item.medico == "LOPEZ JUAN"
+
+
+def test_map_row_medico_null_when_responsable_missing():
+    item = service._map_row(
+        {
+            "id": 1,
+            "id_dato": "1",
+            "nombre_agenda": "ART - TRAUMA - ALGUIEN",
+            "especialidad": "X",
+            "dia": "lunes",
+            "fecha_hasta": "2099-12-31",
+            "hora_desde": "8:00:00",
+            "hora_hasta": "12:00:00",
+        }
+    )
+    assert item.especialidad_agenda == "TRAUMA"
+    assert item.medico is None
 
 
 def test_fetch_requires_config(monkeypatch):
