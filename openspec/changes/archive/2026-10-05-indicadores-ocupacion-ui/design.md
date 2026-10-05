@@ -48,8 +48,10 @@ Response extends current fields with `period`, `month`, `top_especialidad`, `top
 ```
 [ Día | Mes ]  [date | month]  Ubicación  Consultorio  Especialidad  Médico
 KPIs...
-[ Pie (labels h + %) ]  [ Top especialidad ]  [ Top médico ]
+[ Donut (% centro + labels internos + chips) ]  [ Top especialidad ]  [ Top médico ]
 ```
+
+Torta: donut Recharts; % ocupación al centro; horas/% dentro del segmento; chips debajo con texto completo (evita labels externos cortados).
 
 ## File Changes
 

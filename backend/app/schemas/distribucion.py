@@ -88,6 +88,19 @@ class AgendaFilterOptionsResponse(BaseModel):
     dia: list[AgendaFilterOption] = Field(default_factory=list)
 
 
+class AgendaReassignRequest(BaseModel):
+    id_agenda: int
+    target_room_id: int | None = None
+    confirm_move: bool = False
+    confirm_unassign: bool = False
+
+
+class AgendaReassignResponse(BaseModel):
+    id_agenda: int
+    room_id: int | None = None
+    room_code: str | None = None
+
+
 class IndicadoresRoomRef(BaseModel):
     id: int
     code: str

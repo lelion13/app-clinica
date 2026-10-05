@@ -27,10 +27,15 @@
 
 - [x] 4.1 Nota `docs/runbook.md` (filtros payload; día/mes; tops; impacto Agenda; medico_responsable_equipo)
 - [x] 4.2 Correr tests backend tocados
-- [ ] 4.3 Smoke UI: filtros, día/mes, torta, tops
+- [x] 4.3 Smoke UI: filtros, día/mes, torta, tops (validado en sesión 2026-10-05)
 
 ## Phase 5: Sync Ocupación — fuente medico (Q8)
 
 - [x] 5.1 `_raw_to_model`: `medico` ← `medico_responsable_equipo`; split solo tipo/especialidad_agenda
 - [x] 5.2 Tests map_row / medico null sin responsable
 - [x] 5.3 Delta + stable spec § Split; decisions Q8; proposal/design/tasks
+
+## Phase 6: Polish UI torta + cierre
+
+- [x] 6.1 Donut con % al centro, labels internos, chips completos (sin corte)
+- [x] 6.2 implementation-notes + verify-report + archive

@@ -52,3 +52,11 @@ Approach 1. Query `period=day|month` + `date` o `month=YYYY-MM`; tops en respons
 ## Ready for Proposal
 
 Yes.
+
+## Post-delivery notes (2026-10-05)
+
+Ver `implementation-notes.md` para significados % box / % ocup, alcance tops (solo mapeadas), avisos rooms, y donut UI.
+
+### Future (otro change) — Looker Studio / turnos reales
+Unir capacidad+programación (este sistema) con detalle de turnos/ausentes del tablero Looker  
+`reporting/cc363811-240f-42b1-a1c4-e4b5a3a59df8`. No hay API del reporte; requiere fuente detrás + KPI inicial. **No implementado aquí.**
