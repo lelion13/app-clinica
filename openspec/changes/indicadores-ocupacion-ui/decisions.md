@@ -1,6 +1,6 @@
 # Decisions: indicadores-ocupacion-ui
 
-Survey closed 2026-10-03. Change: `indicadores-ocupacion-ui`. Branch: `indicadores-ocupacion-ui`.
+Survey closed 2026-10-03 (+ follow-up 2026-10-05). Change: `indicadores-ocupacion-ui`. Branch: `indicadores-ocupacion-ui`.
 
 | # | Topic | Choice | Decision |
 |---|--------|--------|----------|
@@ -11,10 +11,11 @@ Survey closed 2026-10-03. Change: `indicadores-ocupacion-ui`. Branch: `indicador
 | Q5 | Alcance filter-options | B | Cambiar `filter-options` compartido: especialidad = solo payload; médico = solo payload. Afecta también Agenda ocupación. |
 | Q6 | Match al filtrar | A | Match estricto payload-only en Indicadores **y** Agenda (especialidad ≠ especialidad_agenda; médico = `medico_responsable_equipo` / legado `payload.medico`). |
 | Q7 | Vacíos en tops | B | Agrupar como **“Sin especialidad”** / **“Sin médico”**. |
+| Q8 | Fuente columna `medico` (Ocupación sync) | User | Columna `medico` MUST venir de **`medico_responsable_equipo`** del payload API. MUST NOT usar el resto de `nombre_agenda`. `tipo` / `especialidad_agenda` siguen del split. Requiere **Actualizar** (re-sync) tras deploy. |
 
 ## Defaults (no preguntados)
 
 - Torta: cada segmento/leyenda muestra **horas y %**.
-- Tops usan `payload.especialidad` y `payload.medico_responsable_equipo` (misma fuente que filtros).
+- Tops usan `payload.especialidad` y `payload.medico_responsable_equipo` (misma fuente que filtros / columna Ocupación).
 - Filtros ubicación/consultorio/especialidad/médico aplican al período activo (día o mes) y a torta + tops.
 - Roles sin cambio: `admin` / `operador`.

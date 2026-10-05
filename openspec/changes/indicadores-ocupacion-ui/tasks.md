@@ -2,7 +2,7 @@
 
 ## Phase 1: Backend — filtros compartidos
 
-- [x] 1.1 `list_filter_options`: especialidad solo `payload.especialidad`; medico solo `payload.medico`
+- [x] 1.1 `list_filter_options`: especialidad solo `payload.especialidad`; medico solo `payload.medico_responsable_equipo` (fallback `payload.medico`)
 - [x] 1.2 Match payload-only en `list_agenda_events` (especialidad/medico)
 - [x] 1.3 Match payload-only en `compute_indicadores`
 - [x] 1.4 Tests filter-options + match (Indicadores y/o agenda)
@@ -25,6 +25,12 @@
 
 ## Phase 4: Docs y verificación
 
-- [x] 4.1 Nota `docs/runbook.md` (filtros payload; día/mes; tops; impacto Agenda)
+- [x] 4.1 Nota `docs/runbook.md` (filtros payload; día/mes; tops; impacto Agenda; medico_responsable_equipo)
 - [x] 4.2 Correr tests backend tocados
 - [ ] 4.3 Smoke UI: filtros, día/mes, torta, tops
+
+## Phase 5: Sync Ocupación — fuente medico (Q8)
+
+- [x] 5.1 `_raw_to_model`: `medico` ← `medico_responsable_equipo`; split solo tipo/especialidad_agenda
+- [x] 5.2 Tests map_row / medico null sin responsable
+- [x] 5.3 Delta + stable spec § Split; decisions Q8; proposal/design/tasks

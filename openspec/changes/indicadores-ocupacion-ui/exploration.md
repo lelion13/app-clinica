@@ -24,9 +24,11 @@ Stable spec § Indicadores ocupación (archive `2026-10-03-indicadores-ocupacion
 - `frontend/src/pages/IndicadoresOcupacionPage.jsx`
 - `backend/app/services/distribucion/indicadores_ocupacion.py`
 - `backend/app/services/distribucion/agenda_ocupacion.py` (filter-options + match especialidad/medico en events)
+- `backend/app/services/distribucion/horarios_activos.py` (sync: medico ← medico_responsable_equipo)
 - `backend/app/schemas/distribucion.py`
 - `backend/app/api/routers/distribucion.py`
 - `backend/tests/test_indicadores_ocupacion.py` (+ filter-options / agenda match tests)
+- `backend/tests/test_distribucion_horarios_activos.py`
 - `frontend` Agenda ocupación (consume mismos filter-options / match)
 - `docs/runbook.md`
 - `openspec/specs/distribucion/spec.md` (merge on archive)
