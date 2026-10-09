@@ -57,6 +57,8 @@ class ModuloCreateRequest(BaseModel):
     descripcion: str = Field(min_length=2, max_length=200)
     comentario: str | None = Field(default=None, max_length=500)
     valor: Decimal = Field(ge=0)
+    # Required in Param UI; optional so Excel import (out of scope for horas) can leave NULL.
+    horas: int | None = Field(default=None, ge=1)
     produccion: bool = False
     tipo_dia: TipoDiaLiteral = "semana"
     servicio_ids: list[int] = Field(min_length=1)
@@ -66,6 +68,7 @@ class ModuloUpdateRequest(BaseModel):
     descripcion: str = Field(min_length=2, max_length=200)
     comentario: str | None = Field(default=None, max_length=500)
     valor: Decimal = Field(ge=0)
+    horas: int = Field(ge=1)
     produccion: bool = False
     tipo_dia: TipoDiaLiteral = "semana"
 
@@ -79,6 +82,7 @@ class ModuloResponse(BaseModel):
     descripcion: str
     comentario: str | None
     valor: Decimal
+    horas: int | None = None
     produccion: bool = False
     tipo_dia: TipoDiaLiteral = "semana"
     servicio_ids: list[int] = []

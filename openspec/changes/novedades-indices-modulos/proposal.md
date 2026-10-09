@@ -2,60 +2,60 @@
 
 ## Intent
 
-Dar a **admin** una pantalla **Índices** bajo Novedades para ver, por **período**, contadores agregados de actividad de módulos/novedades/producción — por servicio y por profesional — sin export y sin inventar horas de módulo desde la descripción.
+Dar a **admin** una pantalla **Índices** bajo Novedades con contadores por **período** (servicio y profesional), y estructurar **`horas` en el catálogo de módulos** para que Índices sume duración de módulos cargados + horas de novedades — sin parsear la descripción.
 
 ## Scope
 
 ### In Scope
 - Menú Novedades: ítem **Índices** al final; visible solo `admin`; ruta `/novedades/indices`.
-- API/UI solo `admin` (403/oculto para otros roles).
+- API/UI Índices solo `admin`.
 - Selector de período (abierto o cerrado); sin período → sin datos.
-- Sección **Por servicio**: horas (novedades netas), monto (cargas + ajustes con `servicio_id`), profesionales distintos con cargas, cantidad de asignaciones de módulo. Sin producción por servicio.
-- Sección **Por profesional**: horas (novedades netas), cantidad de módulos, producción monto + cantidad (mismas reglas CH).
+- Sección **Por servicio**: horas (módulos + novedades), monto (cargas + ajustes con `servicio_id`), profesionales, cantidad de asignaciones. Sin producción por servicio.
+- Sección **Por profesional**: horas (módulos + novedades), cantidad de módulos, producción monto + cantidad (reglas CH).
+- Catálogo **módulo.horas**: entero ≥ 1; obligatorio en alta y edición; migración deja existentes en NULL.
 - Filas solo con actividad; orden por nombre A→Z.
-- Soft-deleted cargas/ajustes excluidos (comportamiento estándar).
 
 ### Out of Scope
-- Horas derivadas de duración de módulo / parseo de descripción.
-- Export Excel/CSV.
+- Parseo de horas desde descripción del módulo.
+- Export Excel/CSV de Índices.
 - Producción atribuida a servicio.
-- Roles `rrhh` / `jefe_medico`.
-- Atributo estructurado `horas` en catálogo de módulos (posible change futuro).
+- Roles `rrhh` / `jefe_medico` en Índices.
+- Columna `horas` en plantilla/import Excel de módulos (deferred).
 
 ## Approach
 
-1. Backend endpoint(s) agregados por `periodo_id` reutilizando fuentes de grilla CH / cargas / bonos snapshot.
-2. Página React mobile-first con selector de período + dos tablas apiladas.
-3. Wire navigation + route guard admin-only.
+1. Migration nullable `horas` on `novedades_modulo`; wire Param create/edit + schemas.
+2. Índices aggregation: assignments contribute `coalesce(modulo.horas, 0)` + net novedad hours.
+3. Admin page + navigation.
 
 ## Affected Areas
 
 | Area | Impact |
 |------|--------|
-| `frontend/.../navigation` + Home/Router | New item + route |
-| `frontend` page Índices | New |
-| `backend` router + service índices | New |
+| Alembic + `NovedadesModulo` | New column |
+| schemas/masters/Param UI módulos | Modified |
+| `indices` service + page | New/Modified |
+| `docs/runbook.md` | Note |
 | `openspec/specs/novedades/spec.md` | Delta on archive |
-| `docs/runbook.md` | Short note |
 
 ## Risks
 
 | Risk | Likelihood | Mitigation |
 |------|------------|------------|
-| Confundir “horas” con duración de módulo | Med | Copy UI: “Horas (novedades)” |
-| Monto por servicio ≠ total CH del profesional | Med | Spec/runbook explícitos |
-| Cantidad producción mal definida | Med | Reusar valorización/filtros CH |
+| Módulos legacy sin horas | Med | NULL → 0 en Índices; obligar en próxima edición |
+| Confundir horas módulo vs novedad | Low | Labels claros en UI Índices |
 
 ## Rollback Plan
 
-Quitar ruta/menú y endpoints; sin migración de datos prevista.
+Revert migration/code; Índices/menú se quitan con el revert.
 
 ## Dependencies
 
-- Períodos, cargas, ajustes, snapshot bonos/prácticas/internaciones, reglas elegibilidad bonos CH.
+- Períodos, cargas, ajustes, snapshot producción CH, ABM módulos Param.
 
 ## Success Criteria
 
-- [ ] Solo admin ve y llama Índices.
-- [ ] Métricas coinciden con las definiciones de `decisions.md` para un período de prueba.
-- [ ] Sin período no muestra filas inventadas.
+- [ ] Solo admin ve/llama Índices.
+- [ ] Alta/edición módulo exige `horas` entero ≥ 1.
+- [ ] Índices Horas = módulos (coalesce) + novedades netas.
+- [ ] Existentes migran con `horas` NULL.

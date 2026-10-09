@@ -9,7 +9,14 @@ from fastapi import HTTPException, status
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
-from app.models.novedades import NovedadesAjusteCapital, NovedadesPeriodo, NovedadesProfesional, NovedadesServicio
+from app.models.novedades import (
+    NovedadesAjusteCapital,
+    NovedadesAsignacionModulo,
+    NovedadesModulo,
+    NovedadesPeriodo,
+    NovedadesProfesional,
+    NovedadesServicio,
+)
 from app.schemas.novedades import (
     IndicesProfesionalRow,
     IndicesResponse,
@@ -34,7 +41,7 @@ def _require_periodo(db: Session, periodo_id: int) -> NovedadesPeriodo:
 
 
 def signed_horas(tipo: str | None, horas: Decimal | None) -> Decimal:
-    """Net hours contribution for a novedad row (modules contribute 0)."""
+    """Net hours contribution for a novedad row (module rows contribute 0 here)."""
     if horas is None:
         return Decimal("0")
     qty = Decimal(horas)
@@ -44,6 +51,13 @@ def signed_horas(tipo: str | None, horas: Decimal | None) -> Decimal:
     if tipo_key == "modulo_asignado":
         return Decimal("0")
     return qty
+
+
+def modulo_horas_contrib(catalog_horas: int | None) -> Decimal:
+    """Catalog module hours for one assignment; NULL → 0."""
+    if catalog_horas is None:
+        return Decimal("0")
+    return Decimal(int(catalog_horas))
 
 
 def _produccion_cantidad(row) -> int:
@@ -83,6 +97,27 @@ def build_indices(db: Session, *, periodo_id: int) -> IndicesResponse:
             svc_modulos[sid] += 1
             prof_modulos[pid] += 1
 
+    # Module catalog hours per assignment (NULL → 0)
+    assign_rows = list(
+        db.execute(
+            select(
+                NovedadesAsignacionModulo.servicio_id,
+                NovedadesAsignacionModulo.professional_id,
+                NovedadesModulo.horas,
+            )
+            .join(NovedadesModulo, NovedadesModulo.id == NovedadesAsignacionModulo.modulo_id)
+            .where(
+                NovedadesAsignacionModulo.periodo_id == periodo_id,
+                NovedadesAsignacionModulo.deleted_at.is_(None),
+                NovedadesModulo.deleted_at.is_(None),
+            )
+        ).all()
+    )
+    for sid, pid, catalog_horas in assign_rows:
+        contrib = modulo_horas_contrib(catalog_horas)
+        svc_horas[sid] += contrib
+        prof_horas[pid] += contrib
+
     ajustes = list(
         db.execute(
             select(NovedadesAjusteCapital).where(
@@ -104,7 +139,6 @@ def build_indices(db: Session, *, periodo_id: int) -> IndicesResponse:
         for s in db.execute(select(NovedadesServicio).where(NovedadesServicio.id.in_(missing_sids))).scalars().all():
             svc_names[s.id] = s.nombre
 
-    # Activity = ≥1 carga (módulo o novedad), not ajustes alone
     active_svc_ids = set(svc_profs)
     por_servicio = [
         IndicesServicioRow(
@@ -119,11 +153,9 @@ def build_indices(db: Session, *, periodo_id: int) -> IndicesResponse:
     ]
     por_servicio.sort(key=lambda r: (r.servicio_nombre or "").casefold())
 
-    # Professional rows: reuse CH producción (monto + eligibility) + hours/modulos from cargas
     ch_rows = build_capital_humano_rows(db, periodo_id=periodo_id, include_bonos=True)
     ch_by_pid = {r.professional_id: r for r in ch_rows}
 
-    # Include CH-only producción professionals and carga professionals
     prof_ids = set(prof_has_carga) | {
         r.professional_id
         for r in ch_rows
@@ -152,7 +184,6 @@ def build_indices(db: Session, *, periodo_id: int) -> IndicesResponse:
         ch = ch_by_pid.get(pid)
         prod_monto = Decimal(ch.monto_bonos) if ch else Decimal("0")
         prod_qty = _produccion_cantidad(ch) if ch else 0
-        # Skip empty ghosts (no cargas and no producción)
         if pid not in prof_has_carga and prod_monto == 0 and prod_qty == 0:
             continue
         por_profesional.append(

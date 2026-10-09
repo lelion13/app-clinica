@@ -103,6 +103,7 @@ def _modulo_response(db: Session, item) -> ModuloResponse:
         descripcion=item.descripcion,
         comentario=item.comentario,
         valor=item.valor,
+        horas=getattr(item, "horas", None),
         produccion=bool(getattr(item, "produccion", False)),
         tipo_dia=getattr(item, "tipo_dia", None) or "semana",
         servicio_ids=masters_service.list_modulo_servicio_ids(db, item.id),
@@ -264,6 +265,11 @@ def modulos_create(
     db: Session = Depends(get_db),
     user: User = Depends(require_admin_or_rrhh),
 ) -> ModuloResponse:
+    if payload.horas is None:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail=[{"type": "missing", "loc": ["body", "horas"], "msg": "Field required", "input": None}],
+        )
     item = masters_service.create_modulo(db, payload, actor_id=user.id)
     return _modulo_response(db, item)
 

@@ -185,6 +185,7 @@ def create_modulo(
         descripcion=payload.descripcion.strip(),
         comentario=(payload.comentario or "").strip() or None,
         valor=Decimal(payload.valor),
+        horas=int(payload.horas) if payload.horas is not None else None,
         produccion=bool(payload.produccion),
         tipo_dia=str(payload.tipo_dia or "semana"),
         created_at=now,
@@ -211,6 +212,7 @@ def update_modulo(db: Session, modulo_id: int, payload: ModuloUpdateRequest, act
     item.descripcion = payload.descripcion.strip()
     item.comentario = (payload.comentario or "").strip() or None
     item.valor = Decimal(payload.valor)
+    item.horas = int(payload.horas)
     item.produccion = bool(payload.produccion)
     item.tipo_dia = str(payload.tipo_dia or "semana")
     item.updated_at = datetime.utcnow()

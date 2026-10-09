@@ -56,6 +56,8 @@ class NovedadesModulo(AuditMixin, Base):
     descripcion: Mapped[str] = mapped_column(String(200), nullable=False)
     comentario: Mapped[str | None] = mapped_column(String(500), nullable=True)
     valor: Mapped[Decimal] = mapped_column(Numeric(12, 2), nullable=False)
+    # Catalog duration in hours; NULL for legacy until edited. Create/update require ≥ 1.
+    horas: Mapped[int | None] = mapped_column(Integer, nullable=True)
     produccion: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
     tipo_dia: Mapped[str] = mapped_column(String(20), nullable=False, default="semana")
 
