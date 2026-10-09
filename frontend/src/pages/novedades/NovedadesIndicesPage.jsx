@@ -79,8 +79,8 @@ export function NovedadesIndicesPage() {
       <div style={uiStyles.pageSection}>
         <h1 style={uiStyles.sectionTitle}>Índices</h1>
         <p style={{ ...uiStyles.helpText, marginBottom: 12 }}>
-          Contadores por período: servicio (horas de novedades, monto, profesionales, módulos) y profesional (horas,
-          módulos, producción). Solo admin.
+          Contadores por período: servicio (horas = módulos + novedades, monto, profesionales, módulos) y profesional
+          (mismas horas, módulos, producción). Solo admin.
         </p>
         <div style={{ display: "flex", gap: 8, flexWrap: "wrap", alignItems: "center" }}>
           <select
@@ -113,7 +113,7 @@ export function NovedadesIndicesPage() {
               <thead>
                 <tr>
                   <th style={thStyle}>Servicio</th>
-                  <th style={thStyle}>Horas (novedades)</th>
+                  <th style={thStyle}>Horas</th>
                   <th style={thStyle}>Monto</th>
                   <th style={thStyle}>Profesionales</th>
                   <th style={thStyle}>Módulos</th>
@@ -148,7 +148,7 @@ export function NovedadesIndicesPage() {
                 <tr>
                   <th style={thStyle}>Legajo</th>
                   <th style={thStyle}>Profesional</th>
-                  <th style={thStyle}>Horas (novedades)</th>
+                  <th style={thStyle}>Horas</th>
                   <th style={thStyle}>Módulos</th>
                   <th style={thStyle}>Producción (monto)</th>
                   <th style={thStyle}>Producción (cant.)</th>

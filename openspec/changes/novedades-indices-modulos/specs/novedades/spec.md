@@ -45,6 +45,36 @@ Export (Excel/CSV) is out of scope.
 - WHEN admin lo selecciona
 - THEN MUST calcular métricas de ese período
 
+### Requirement: Horas en catálogo de módulos
+
+Each Novedades **módulo** MUST have an integer attribute **`horas`**: the number of hours the module includes.
+
+Migration MUST add the column as **nullable** and leave existing modules with `horas=NULL` (empty).
+
+**Create** (`POST /modulos` and Param **Nuevo módulo**) and **Update** (`PUT /modulos/{id}` and Param edit) MUST require `horas` as an integer **≥ 1**. Missing, non-integer, or &lt; 1 MUST be rejected (422). The Param UI MUST expose the field and MUST NOT allow save without a valid value on create or edit.
+
+Bulk Excel import/template for modules is **out of scope** for this change (MUST NOT be required to add `horas` to import in this change).
+
+#### Scenario: Migración deja vacíos
+
+- GIVEN módulos existentes antes del change
+- WHEN corre la migración
+- THEN `horas` MUST ser NULL en esos registros
+
+#### Scenario: Alta exige horas
+
+- GIVEN `rrhh`/`admin` en Nuevo módulo
+- WHEN intenta guardar sin `horas` o con 0
+- THEN MUST rechazarse
+- AND el módulo MUST NOT crearse
+
+#### Scenario: Edición exige horas
+
+- GIVEN módulo con `horas` NULL
+- WHEN admin edita y guarda sin completar horas válidas
+- THEN MUST rechazarse
+- AND al guardar con horas=4 MUST persistirse 4
+
 ### Requirement: Índices por servicio
 
 For the selected period, each service row with activity MUST expose:
@@ -52,7 +82,7 @@ For the selected period, each service row with activity MUST expose:
 | Column | Definition |
 |--------|------------|
 | Servicio | Service name |
-| Horas | Net sum of novedad `horas` in that service: types `hora_extra` and `hora_extra_por_ausencia` add; `horas_a_descontar` subtracts. Module assignments MUST NOT contribute hours. |
+| Horas | Sum of catalog `módulo.horas` for each module **assignment** in that service (`NULL` → 0) **plus** net sum of novedad `horas` in that service (`hora_extra` / `hora_extra_por_ausencia` add; `horas_a_descontar` subtracts). |
 | Monto | Sum of carga `valor` (module assignments + novedades) for that `servicio_id` **plus** sum of Capital Humano adjustments with the same non-null `servicio_id`. MUST NOT include producción/bonos. MUST NOT include adjustments with `servicio_id` null. |
 | Profesionales | Count of distinct professionals with ≥1 carga (módulo or novedad) in that service/period. |
 | Módulos | Count of module **assignments** (carga rows) in that service/period. |
@@ -61,11 +91,17 @@ Producción MUST NOT be shown as a service metric (omit column or show — only;
 
 A service has activity if it has ≥1 carga in the period (modules and/or novedades). Services with only null-service adjustments MUST NOT appear solely for that reason.
 
-#### Scenario: Horas netas novedades
+#### Scenario: Horas módulos + novedades
 
-- GIVEN servicio con novedad 4h extra y 1h a descontar en el período
+- GIVEN servicio con 2 asignaciones de un módulo con `horas=3`, y novedad 4h extra y 1h a descontar
 - WHEN se calcula Índices
-- THEN Horas MUST ser 3
+- THEN Horas MUST ser 3+3+4−1 = 9
+
+#### Scenario: Módulo sin horas cuenta 0
+
+- GIVEN asignación de módulo con `horas` NULL y novedad 2h extra
+- WHEN se calcula Horas del servicio
+- THEN MUST ser 2
 
 #### Scenario: Monto sin producción ni ajuste global
 
@@ -88,7 +124,7 @@ For the selected period, each professional row with activity MUST expose:
 | Column | Definition |
 |--------|------------|
 | Profesional | Display name (and legajo MAY be shown) |
-| Horas | Net sum of that professional’s novedad `horas` across services (same sign rules as por servicio). |
+| Horas | Sum of catalog `módulo.horas` for that professional’s module assignments (`NULL` → 0) **plus** net sum of that professional’s novedad `horas` (same sign rules as por servicio). |
 | Módulos | Count of module assignments for that professional in the period. |
 | Producción (monto) | Same ARS total as Capital Humano producción for that professional/period (eligible bonos + prácticas + internaciones under existing CH eligibility rules). |
 | Producción (cantidad) | Sum of quantities of those same eligible producción items. |
@@ -109,3 +145,23 @@ Monto total CH and “profesionales” count are out of scope for this section.
 - GIVEN mismos snapshots/tarifas que Capital Humano para el período
 - WHEN se muestra Producción (monto) en Índices
 - THEN MUST coincidir con el monto de producción de la grilla CH para ese profesional
+
+#### Scenario: Horas profesional con módulo
+
+- GIVEN profesional con una asignación de módulo `horas=5` y novedad 2h a descontar
+- WHEN se calcula Horas
+- THEN MUST ser 5−2 = 3
+
+## MODIFIED Requirements
+
+### Requirement: Servicios y módulos
+
+(Previously: módulos fields include descripción, comentario, valor, produccion, tipo_dia; create/update without `horas`.)
+
+In addition to existing module fields, modules MUST expose **`horas`** as defined in Requirement “Horas en catálogo de módulos”. Create and update of modules MUST validate and persist `horas` (integer ≥ 1). List/detail API responses MUST include `horas` (nullable for legacy rows until edited).
+
+#### Scenario: API expone horas
+
+- GIVEN módulo creado con horas=8
+- WHEN se lista módulos
+- THEN la respuesta MUST incluir `horas: 8`
