@@ -17,6 +17,7 @@ export const NOVEDADES_ITEMS = [
   { label: "Mis profesionales", path: "/novedades/mis-profesionales", roles: ["admin", "rrhh", "jefe_medico"] },
   { label: "Capital Humano", path: "/novedades/xls", roles: ["admin", "rrhh"] },
   { label: "Parametrización", path: "/novedades/parametrizacion", roles: ["admin", "rrhh"] },
+  { label: "Índices", path: "/novedades/indices", roles: ["admin"] },
 ];
 
 export const USERS_NAV_ITEM = {
