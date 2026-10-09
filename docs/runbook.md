@@ -169,6 +169,10 @@
   - Mismo Excel/headers/roles/período cerrado/todo-o-nada/waterfill; lote independiente (`ajuste_mas_menos_lote_id`) — puede coexistir con descuento.
   - `Monto` negativo → descuenta (mismo tope que descontar); positivo/`+`/sin signo → suma (waterfill **sin** tope).
   - Comentario con importe firmado; Anular solo el lote Ajuste +/-.
+- Cambio `novedades-indices-modulos` (rama `feature/novedades-indices-modulos`):
+  - Menú Novedades → **Índices** (solo `admin`) al final; ruta `/novedades/indices`.
+  - Contadores por período: por servicio (horas novedades netas, monto cargas+ajustes con servicio, profesionales, módulos) y por profesional (horas, módulos, producción monto+cantidad como CH).
+  - Sin migración DB; sin export.
 
 ## Roles (panel)
 - `admin`: distribución + novedades (todo) + usuarios

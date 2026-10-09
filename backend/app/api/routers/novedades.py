@@ -6,7 +6,7 @@ from pydantic import BaseModel
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
-from app.api.deps import require_admin_or_jefe, require_admin_or_rrhh, require_novedades_reader
+from app.api.deps import require_admin, require_admin_or_jefe, require_admin_or_rrhh, require_novedades_reader
 from app.db.session import get_db
 from app.models.novedades import NOVEDAD_TIPO_LABELS, NovedadTipo, PeriodoEstado
 from app.models.user import User, UserRole
@@ -21,6 +21,7 @@ from app.schemas.novedades import (
     BonoOpcionResponse,
     CapitalHumanoGridResponse,
     GridRowResponse,
+    IndicesResponse,
     SoloBonoRowResponse,
     JefeServicioCreateRequest,
     JefeServicioResponse,
@@ -62,6 +63,7 @@ from app.services.novedades import cargas as cargas_service
 from app.services.novedades import bonos_import as bonos_import_service
 from app.services.novedades import capital_humano as capital_humano_service
 from app.services.novedades import export_xls
+from app.services.novedades import indices as indices_service
 from app.services.novedades import importe_descontar as importe_descontar_service
 from app.services.novedades import ajuste_mas_menos as ajuste_mas_menos_service
 from app.services.novedades import masters as masters_service
@@ -717,6 +719,16 @@ def capital_humano_list(
     return capital_humano_service.build_capital_humano_grid(
         db, periodo_id=periodo_id, servicio_id=servicio_id, q=q
     )
+
+
+@router.get("/indices", response_model=IndicesResponse)
+def indices_get(
+    periodo_id: int = Query(...),
+    db: Session = Depends(get_db),
+    user: User = Depends(require_admin),
+) -> IndicesResponse:
+    _ = user
+    return indices_service.build_indices(db, periodo_id=periodo_id)
 
 
 @router.post(

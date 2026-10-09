@@ -467,3 +467,28 @@ class AjusteMasMenosImportResponse(BaseModel):
 
 class AjusteMasMenosAnularResponse(BaseModel):
     deleted: int
+
+
+class IndicesServicioRow(BaseModel):
+    servicio_id: int
+    servicio_nombre: str
+    horas: Decimal
+    monto: Decimal
+    profesionales: int
+    modulos: int
+
+
+class IndicesProfesionalRow(BaseModel):
+    professional_id: int
+    legajo: str | None = None
+    professional_name: str
+    horas: Decimal
+    modulos: int
+    produccion_monto: Decimal
+    produccion_cantidad: int
+
+
+class IndicesResponse(BaseModel):
+    periodo_id: int
+    por_servicio: list[IndicesServicioRow] = Field(default_factory=list)
+    por_profesional: list[IndicesProfesionalRow] = Field(default_factory=list)
