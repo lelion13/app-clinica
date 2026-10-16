@@ -50,7 +50,9 @@ function ModalShell({ title, error, onCancel, onAccept, acceptLabel = "Aceptar",
     <div role="presentation" style={overlayStyle} onClick={() => !busy && onCancel?.()}>
       <div role="dialog" aria-modal="true" onClick={(e) => e.stopPropagation()} style={modalStyle}>
         <h2 style={{ marginTop: 0, marginBottom: 12, fontSize: "1.15rem" }}>{title}</h2>
-        {error ? <p style={{ color: uiTheme.colors.danger, fontSize: 13 }}>{error}</p> : null}
+        {error ? (
+          <p style={{ color: uiTheme.colors.danger, fontSize: 13, whiteSpace: "pre-wrap" }}>{error}</p>
+        ) : null}
         <div style={{ marginBottom: 16 }}>{children}</div>
         <div style={{ display: "flex", gap: 8, justifyContent: "flex-end", flexWrap: "wrap" }}>
           <button type="button" style={uiStyles.buttonSecondary} onClick={onCancel} disabled={busy}>
@@ -253,7 +255,16 @@ export function ConsultingRoomsPage() {
     try {
       const data = await apiRequestWithRefresh(`/consulting-rooms/${room.id}/id-agendas`);
       const items = Array.isArray(data?.items) ? data.items : [];
-      setAgendaDraft(items.map((a) => ({ id_agenda: a.id_agenda, label: a.label, confirm_move: false })));
+      setAgendaDraft(
+        items.map((a) => ({
+          id_agenda: a.id_agenda,
+          label: a.label,
+          weekday: a.weekday ?? null,
+          weekdays: Array.isArray(a.weekdays) ? a.weekdays : [],
+          confirm_move: false,
+          is_new: false,
+        }))
+      );
     } catch (err) {
       setAgendaDraft([]);
       setModalError(err.message || "No se pudieron cargar agendas");
@@ -317,23 +328,28 @@ export function ConsultingRoomsPage() {
 
   const onSelectAgenda = (item, roomId) => {
     setModalError("");
-    if (agendaDraft.some((a) => a.id_agenda === item.id_agenda)) return;
+    // Si ya está full en este room (fila sin weekday), no duplicar
+    if (agendaDraft.some((a) => a.id_agenda === item.id_agenda && a.weekday == null && !a.is_new)) {
+      return;
+    }
+    if (agendaDraft.some((a) => a.id_agenda === item.id_agenda && a.is_new)) return;
 
-    const currentId = item.current_room_id != null ? Number(item.current_room_id) : null;
-    if (currentId && currentId === Number(roomId)) {
-      setAgendaDraft((prev) => [...prev, { id_agenda: item.id_agenda, label: item.label, confirm_move: false }]);
+    if (item.current_room_id != null && Number(item.current_room_id) === Number(roomId)) {
+      setModalError("Esta agenda ya está completa en este consultorio");
       return;
     }
-    if (currentId && currentId !== Number(roomId)) {
-      const code = item.current_room_code || currentId;
-      const ok = window.confirm(
-        `El id_agenda ${item.id_agenda} ya está en el consultorio ${code}. ¿Moverlo a este consultorio?`
-      );
-      if (!ok) return;
-      setAgendaDraft((prev) => [...prev, { id_agenda: item.id_agenda, label: item.label, confirm_move: true }]);
-      return;
-    }
-    setAgendaDraft((prev) => [...prev, { id_agenda: item.id_agenda, label: item.label, confirm_move: false }]);
+
+    setAgendaDraft((prev) => [
+      ...prev,
+      {
+        id_agenda: item.id_agenda,
+        label: `${item.label} (días pendientes)`,
+        weekday: null,
+        weekdays: [],
+        confirm_move: false,
+        is_new: true,
+      },
+    ]);
   };
 
   const acceptAgendas = async () => {
@@ -344,12 +360,23 @@ export function ConsultingRoomsPage() {
       await apiRequestWithRefresh(`/consulting-rooms/${activeRoom.id}/id-agendas`, {
         method: "PUT",
         body: JSON.stringify({
-          items: agendaDraft.map((a) => ({ id_agenda: a.id_agenda, confirm_move: Boolean(a.confirm_move) })),
+          items: agendaDraft.map((a) => ({
+            id_agenda: a.id_agenda,
+            confirm_move: false,
+            weekday: a.weekday ?? null,
+            weekdays: a.is_new ? [] : Array.isArray(a.weekdays) ? a.weekdays : [],
+          })),
         }),
       });
       resetModalState();
     } catch (err) {
-      setModalError(err.message || "No se pudieron guardar las agendas");
+      const detail = err?.detail;
+      if (detail && typeof detail === "object" && Array.isArray(detail.conflicts)) {
+        const lines = detail.conflicts.map((c) => c.message || JSON.stringify(c));
+        setModalError([detail.message || err.message, ...lines].filter(Boolean).join("\n"));
+      } else {
+        setModalError(err.message || "No se pudieron guardar las agendas");
+      }
     } finally {
       setBusy(false);
     }
@@ -581,7 +608,8 @@ export function ConsultingRoomsPage() {
           busy={busy}
         >
           <p style={{ margin: "0 0 10px", fontSize: 13, color: uiTheme.colors.textMuted }}>
-            Buscá el médico, asociá o quitá agendas. Los cambios se guardan al Aceptar.
+            Asociar completa solo los días aún en Sin consultorio. Si la agenda está parcial, cada día es una
+            fila. Los cambios se guardan al Aceptar (todo-o-nada si hay conflicto).
           </p>
           <AgendaTypeahead onSelect={onSelectAgenda} roomId={activeRoom.id} />
           <ul style={{ listStyle: "none", margin: "12px 0 0", padding: 0 }}>
@@ -590,7 +618,7 @@ export function ConsultingRoomsPage() {
             ) : (
               agendaDraft.map((a) => (
                 <li
-                  key={a.id_agenda}
+                  key={`${a.id_agenda}-${a.weekday ?? "full"}-${a.is_new ? "new" : "cur"}`}
                   style={{
                     display: "flex",
                     justifyContent: "space-between",
@@ -600,16 +628,15 @@ export function ConsultingRoomsPage() {
                     fontSize: 13,
                   }}
                 >
-                  <span>
-                    {a.label}
-                    {a.confirm_move ? (
-                      <span style={{ color: uiTheme.colors.textMuted }}> (mover)</span>
-                    ) : null}
-                  </span>
+                  <span>{a.label}</span>
                   <button
                     type="button"
                     style={uiStyles.buttonSecondary}
-                    onClick={() => setAgendaDraft((prev) => prev.filter((x) => x.id_agenda !== a.id_agenda))}
+                    onClick={() =>
+                      setAgendaDraft((prev) =>
+                        prev.filter((x) => !(x.id_agenda === a.id_agenda && x.weekday === a.weekday && x.is_new === a.is_new))
+                      )
+                    }
                   >
                     Quitar
                   </button>

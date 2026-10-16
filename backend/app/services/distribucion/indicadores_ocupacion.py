@@ -147,9 +147,9 @@ def compute_indicadores(
     rooms = list(db.execute(q).scalars().all())
     room_ids = [r.id for r in rooms]
 
-    agenda_rooms = room_agenda_map_service.agenda_to_room_map(db)
+    agenda_wd_rooms = room_agenda_map_service.agenda_weekday_to_room_map(db)
     room_agendas: dict[int, set[int]] = {}
-    for id_agenda, rid in agenda_rooms.items():
+    for (id_agenda, _wd), rid in agenda_wd_rooms.items():
         room_agendas.setdefault(rid, set()).add(id_agenda)
 
     hours_rows: list[RoomOperatingHour] = []
@@ -225,7 +225,8 @@ def compute_indicadores(
             id_agenda = fields["id_agenda"]
             if id_agenda is None:
                 continue
-            mapped_room = agenda_rooms.get(id_agenda)
+            js_wd = (py_weekday + 1) % 7
+            mapped_room = agenda_wd_rooms.get((id_agenda, js_wd))
             if mapped_room is None or mapped_room not in pie_room_ids:
                 continue
             if not _match_especialidad(fields["especialidad"], especialidad):

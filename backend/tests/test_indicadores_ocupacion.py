@@ -95,7 +95,7 @@ def test_hours_between():
 def test_room_without_agenda_zero_occupied(monkeypatch):
     rooms = [_room()]
     hours = [_hour(1, 4, "08:00:00", "12:00:00")]
-    monkeypatch.setattr(service.room_agenda_map_service, "agenda_to_room_map", lambda _db: {})
+    monkeypatch.setattr(service.room_agenda_map_service, "agenda_weekday_to_room_map", lambda _db: {})
     result = service.compute_indicadores(FakeDB(rooms, hours, []), date_str="2026-08-06")
     assert result.enabled_hours == 4.0
     assert result.occupied_hours == 0.0
@@ -107,7 +107,7 @@ def test_room_without_agenda_zero_occupied(monkeypatch):
 
 def test_room_without_hours_listed(monkeypatch):
     rooms = [_room()]
-    monkeypatch.setattr(service.room_agenda_map_service, "agenda_to_room_map", lambda _db: {10: 1})
+    monkeypatch.setattr(service.room_agenda_map_service, "agenda_weekday_to_room_map", lambda _db: {(10, 4): 1})
     result = service.compute_indicadores(FakeDB(rooms, [], []), date_str="2026-08-06")
     assert result.enabled_hours == 0.0
     assert result.occupancy_percent is None
@@ -119,7 +119,7 @@ def test_percent_can_exceed_100(monkeypatch):
     rooms = [_room()]
     hours = [_hour(1, 4, "08:00:00", "11:00:00")]  # 3h enabled
     row = _ocup_row(hora_desde="09:00:00", hora_hasta="13:00:00")  # 4h sync
-    monkeypatch.setattr(service.room_agenda_map_service, "agenda_to_room_map", lambda _db: {10: 1})
+    monkeypatch.setattr(service.room_agenda_map_service, "agenda_weekday_to_room_map", lambda _db: {(10, 4): 1})
     result = service.compute_indicadores(FakeDB(rooms, hours, [row]), date_str="2026-08-06")
     assert result.enabled_hours == 3.0
     assert result.occupied_hours == 4.0
@@ -134,7 +134,7 @@ def test_medico_filter_does_not_reduce_enabled(monkeypatch):
     b = _ocup_row(id_agenda=11, medico="OTRO", hora_desde="10:00:00", hora_hasta="11:00:00")
     b.id = 2
     b.payload = {**b.payload, "id_agenda": 11}
-    monkeypatch.setattr(service.room_agenda_map_service, "agenda_to_room_map", lambda _db: {10: 1, 11: 1})
+    monkeypatch.setattr(service.room_agenda_map_service, "agenda_weekday_to_room_map", lambda _db: {(10, 4): 1, (11, 4): 1})
     full = service.compute_indicadores(FakeDB(rooms, hours, [a, b]), date_str="2026-08-06")
     filtered = service.compute_indicadores(
         FakeDB(rooms, hours, [a, b]), date_str="2026-08-06", medico="APECECHEA"
@@ -153,7 +153,7 @@ def test_especialidad_filter_ignores_especialidad_agenda(monkeypatch):
         hora_desde="09:00:00",
         hora_hasta="10:00:00",
     )
-    monkeypatch.setattr(service.room_agenda_map_service, "agenda_to_room_map", lambda _db: {10: 1})
+    monkeypatch.setattr(service.room_agenda_map_service, "agenda_weekday_to_room_map", lambda _db: {(10, 4): 1})
     by_agenda = service.compute_indicadores(
         FakeDB(rooms, hours, [row]), date_str="2026-08-06", especialidad="TRAUMA"
     )
@@ -171,7 +171,7 @@ def test_tops_and_empty_labels(monkeypatch):
     b = _ocup_row(id_agenda=11, especialidad="", medico="", hora_desde="10:00:00", hora_hasta="11:00:00")
     b.id = 2
     b.payload = {**b.payload, "id_agenda": 11, "especialidad": "", "medico_responsable_equipo": ""}
-    monkeypatch.setattr(service.room_agenda_map_service, "agenda_to_room_map", lambda _db: {10: 1, 11: 1})
+    monkeypatch.setattr(service.room_agenda_map_service, "agenda_weekday_to_room_map", lambda _db: {(10, 4): 1, (11, 4): 1})
     result = service.compute_indicadores(FakeDB(rooms, hours, [a, b]), date_str="2026-08-06")
     assert result.occupied_hours == 2.0
     labels_esp = {t.label: t for t in result.top_especialidad}
@@ -190,7 +190,7 @@ def test_month_sums_weekdays(monkeypatch):
     rooms = [_room()]
     hours = [_hour(1, 4, "08:00:00", "12:00:00")]  # 4h each Thursday
     row = _ocup_row(hora_desde="09:00:00", hora_hasta="10:00:00")  # 1h per Thursday occurrence
-    monkeypatch.setattr(service.room_agenda_map_service, "agenda_to_room_map", lambda _db: {10: 1})
+    monkeypatch.setattr(service.room_agenda_map_service, "agenda_weekday_to_room_map", lambda _db: {(10, 4): 1})
     result = service.compute_indicadores(
         FakeDB(rooms, hours, [row]), period="month", month_str="2026-08"
     )

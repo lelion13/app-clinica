@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import re
 from datetime import date, datetime, time, timedelta
 from zoneinfo import ZoneInfo
 
@@ -178,18 +179,30 @@ def _payload_fields(row: OcupacionHorarioActivo) -> dict:
     }
 
 
+def _room_code_sort_key(code: str) -> tuple:
+    """Numeric order by number in code (C1, C2, C10); codes without digits last."""
+    text = (code or "").strip()
+    m = re.search(r"(\d+)", text)
+    if m:
+        return (0, int(m.group(1)), text.casefold())
+    return (1, 0, text.casefold())
+
+
 def _rooms_for_location(db: Session, location_id: int | None) -> list[ConsultingRoom]:
-    q = select(ConsultingRoom).where(ConsultingRoom.deleted_at.is_(None)).order_by(ConsultingRoom.code)
+    q = select(ConsultingRoom).where(ConsultingRoom.deleted_at.is_(None))
     if location_id is not None:
         q = q.where(ConsultingRoom.location_id == location_id)
-    return list(db.execute(q).scalars().all())
+    rooms = list(db.execute(q).scalars().all())
+    rooms.sort(key=lambda r: _room_code_sort_key(r.code))
+    return rooms
 
 
 def _build_resources(rooms: list[ConsultingRoom]) -> list[AgendaResourceColumn]:
-    cols = [
+    # Sin consultorio primero (sticky izq. en UI cuando tiene ítems)
+    cols = [AgendaResourceColumn(id="unassigned", title="Sin consultorio", room_id=None)]
+    cols.extend(
         AgendaResourceColumn(id=str(room.id), title=room.code, room_id=room.id) for room in rooms
-    ]
-    cols.append(AgendaResourceColumn(id="unassigned", title="Sin consultorio", room_id=None))
+    )
     return cols
 
 
@@ -308,7 +321,7 @@ def list_agenda_events(
         location_tipo_required = _as_str(loc.tipo)
 
     labels = _location_labels(db)
-    agenda_rooms = room_agenda_map_service.agenda_to_room_map(db)
+    agenda_wd_rooms = room_agenda_map_service.agenda_weekday_to_room_map(db)
     rooms = _rooms_for_location(db, location_id)
     room_by_id = {r.id: r for r in rooms}
     room_code_by_id = _room_code_map(db)
@@ -348,7 +361,10 @@ def list_agenda_events(
             continue
 
         id_agenda = fields["id_agenda"]
-        mapped_room_id = agenda_rooms.get(id_agenda) if id_agenda is not None else None
+        js_weekday = (weekday + 1) % 7
+        mapped_room_id = (
+            agenda_wd_rooms.get((id_agenda, js_weekday)) if id_agenda is not None else None
+        )
         # Si filtramos por location, solo eventos de rooms de esa location o unassigned
         if location_id is not None and mapped_room_id is not None and mapped_room_id not in room_by_id:
             continue

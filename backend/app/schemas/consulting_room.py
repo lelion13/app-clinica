@@ -47,6 +47,14 @@ class RoomOperatingHourResponse(BaseModel):
 class RoomIdAgendaItem(BaseModel):
     id_agenda: int
     label: str
+    weekday: int | None = Field(
+        default=None,
+        description="JS weekday 0–6 si es fila parcial; null si la agenda está completa en este room",
+    )
+    weekdays: list[int] = Field(
+        default_factory=list,
+        description="Weekdays de esta fila en el room (uno o varios si full)",
+    )
 
 
 class RoomIdAgendaListResponse(BaseModel):
@@ -56,11 +64,19 @@ class RoomIdAgendaListResponse(BaseModel):
 class RoomIdAgendaCreateRequest(BaseModel):
     id_agenda: int
     confirm_move: bool = False
+    weekday: int | None = Field(default=None, ge=0, le=6)
 
 
 class RoomIdAgendaReplaceItem(BaseModel):
     id_agenda: int
     confirm_move: bool = False
+    weekday: int | None = Field(
+        default=None,
+        ge=0,
+        le=6,
+        description="null = fila full (todos los weekdays listados en weekdays o pendientes al agregar)",
+    )
+    weekdays: list[int] = Field(default_factory=list)
 
 
 class RoomIdAgendaReplaceRequest(BaseModel):

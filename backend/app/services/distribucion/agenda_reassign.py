@@ -1,4 +1,4 @@
-"""Reassign / unassign id_agenda → room with hours + overlap validation (Agenda DnD)."""
+"""Reassign / unassign (id_agenda, weekday) → room with hours + overlap validation (Agenda DnD)."""
 
 from __future__ import annotations
 
@@ -115,11 +115,16 @@ def _other_agenda_intervals_on_room(
     room_id: int,
     *,
     exclude_id_agenda: int,
+    exclude_weekday: int,
 ) -> dict[int, list[tuple[int, int, int]]]:
-    """js_weekday → (start, end, other_id_agenda) for agendas mapped to room."""
+    """js_weekday → (start, end, other_id_agenda) for agendas mapped to room that weekday."""
     maps = list(db.execute(select(ConsultingRoomIdAgenda)).scalars().all())
-    room_agendas = {m.id_agenda for m in maps if m.room_id == room_id and m.id_agenda != exclude_id_agenda}
-    if not room_agendas:
+    mapped_keys = {
+        (m.id_agenda, int(m.weekday))
+        for m in maps
+        if m.room_id == room_id and not (m.id_agenda == exclude_id_agenda and int(m.weekday) == exclude_weekday)
+    }
+    if not mapped_keys:
         return {}
 
     rows = db.execute(select(OcupacionHorarioActivo)).scalars().all()
@@ -127,7 +132,7 @@ def _other_agenda_intervals_on_room(
     for row in rows:
         fields = agenda_svc._payload_fields(row)
         id_ag = fields["id_agenda"]
-        if id_ag is None or id_ag not in room_agendas:
+        if id_ag is None:
             continue
         py_wd = agenda_svc._weekday_from_dia(fields["dia"])
         if py_wd is None:
@@ -137,63 +142,72 @@ def _other_agenda_intervals_on_room(
         if h_desde is None or h_hasta is None or h_hasta <= h_desde:
             continue
         js_wd = _py_weekday_to_js(py_wd)
+        if (int(id_ag), js_wd) not in mapped_keys:
+            continue
         by_wd[js_wd].append((_time_to_minutes(h_desde), _time_to_minutes(h_hasta), int(id_ag)))
     return by_wd
 
 
-def _validate_assign(db: Session, id_agenda: int, room_id: int) -> None:
+def validate_assign_weekday(db: Session, id_agenda: int, room_id: int, weekday: int) -> None:
+    """Validate hours + overlap for a single JS weekday. Raises HTTPException on failure."""
+    if weekday < 0 or weekday > 6:
+        raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail="weekday inválido")
+
     agenda_by_wd = _intervals_for_id_agenda(db, id_agenda)
-    if not agenda_by_wd:
+    intervals = agenda_by_wd.get(weekday)
+    if not intervals:
         raise HTTPException(
             status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
             detail={
-                "message": "La agenda no tiene bloques con día/hora válidos en el sync",
+                "message": f"La agenda no tiene bloques válidos el {WEEKDAY_JS_LABEL.get(weekday, weekday)}",
                 "id_agenda": id_agenda,
+                "weekday": weekday,
                 "code": "no_sync_blocks",
             },
         )
 
     hours_by_wd = _hours_for_room(db, room_id)
-    others_by_wd = _other_agenda_intervals_on_room(db, room_id, exclude_id_agenda=id_agenda)
+    others_by_wd = _other_agenda_intervals_on_room(
+        db, room_id, exclude_id_agenda=id_agenda, exclude_weekday=weekday
+    )
     conflicts: list[dict] = []
+    box_hours = hours_by_wd.get(weekday, [])
+    others = others_by_wd.get(weekday, [])
 
-    for js_wd, intervals in sorted(agenda_by_wd.items()):
-        box_hours = hours_by_wd.get(js_wd, [])
-        others = others_by_wd.get(js_wd, [])
-        for start, end, dia_label in intervals:
-            if not _interval_covered(start, end, box_hours):
+    for start, end, dia_label in intervals:
+        if not _interval_covered(start, end, box_hours):
+            conflicts.append(
+                {
+                    "type": "outside_hours",
+                    "weekday": weekday,
+                    "dia": dia_label,
+                    "hora_desde": _fmt_hm(start),
+                    "hora_hasta": _fmt_hm(end),
+                    "message": (
+                        f"Fuera del horario del consultorio el {dia_label} "
+                        f"({_fmt_hm(start)}–{_fmt_hm(end)})"
+                    ),
+                }
+            )
+            continue
+        for o_start, o_end, other_id in others:
+            if _intervals_overlap(start, end, o_start, o_end):
                 conflicts.append(
                     {
-                        "type": "outside_hours",
-                        "weekday": js_wd,
+                        "type": "overlap",
+                        "weekday": weekday,
                         "dia": dia_label,
                         "hora_desde": _fmt_hm(start),
                         "hora_hasta": _fmt_hm(end),
+                        "conflict_id_agenda": other_id,
+                        "conflict_hora_desde": _fmt_hm(o_start),
+                        "conflict_hora_hasta": _fmt_hm(o_end),
                         "message": (
-                            f"Fuera del horario del consultorio el {dia_label} "
-                            f"({_fmt_hm(start)}–{_fmt_hm(end)})"
+                            f"Solapa con agenda {other_id} el {dia_label} "
+                            f"({_fmt_hm(start)}–{_fmt_hm(end)} vs {_fmt_hm(o_start)}–{_fmt_hm(o_end)})"
                         ),
                     }
                 )
-                continue
-            for o_start, o_end, other_id in others:
-                if _intervals_overlap(start, end, o_start, o_end):
-                    conflicts.append(
-                        {
-                            "type": "overlap",
-                            "weekday": js_wd,
-                            "dia": dia_label,
-                            "hora_desde": _fmt_hm(start),
-                            "hora_hasta": _fmt_hm(end),
-                            "conflict_id_agenda": other_id,
-                            "conflict_hora_desde": _fmt_hm(o_start),
-                            "conflict_hora_hasta": _fmt_hm(o_end),
-                            "message": (
-                                f"Solapa con agenda {other_id} el {dia_label} "
-                                f"({_fmt_hm(start)}–{_fmt_hm(end)} vs {_fmt_hm(o_start)}–{_fmt_hm(o_end)})"
-                            ),
-                        }
-                    )
 
     if conflicts:
         raise HTTPException(
@@ -201,6 +215,7 @@ def _validate_assign(db: Session, id_agenda: int, room_id: int) -> None:
             detail={
                 "message": conflicts[0]["message"],
                 "id_agenda": id_agenda,
+                "weekday": weekday,
                 "target_room_id": room_id,
                 "code": "validation_failed",
                 "conflicts": conflicts,
@@ -212,6 +227,7 @@ def reassign_agenda(
     db: Session,
     *,
     id_agenda: int,
+    weekday: int,
     target_room_id: int | None,
     actor_id: int,
     confirm_move: bool = False,
@@ -219,9 +235,14 @@ def reassign_agenda(
 ) -> AgendaReassignResponse:
     if id_agenda <= 0:
         raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail="id_agenda inválido")
+    if weekday < 0 or weekday > 6:
+        raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail="weekday inválido")
 
     existing = db.execute(
-        select(ConsultingRoomIdAgenda).where(ConsultingRoomIdAgenda.id_agenda == id_agenda)
+        select(ConsultingRoomIdAgenda).where(
+            ConsultingRoomIdAgenda.id_agenda == id_agenda,
+            ConsultingRoomIdAgenda.weekday == weekday,
+        )
     ).scalar_one_or_none()
 
     # --- Unassign ---
@@ -230,8 +251,9 @@ def reassign_agenda(
             raise HTTPException(
                 status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
                 detail={
-                    "message": "Confirmá la desasignación del consultorio",
+                    "message": "Confirmá la desasignación del consultorio para este día",
                     "id_agenda": id_agenda,
+                    "weekday": weekday,
                     "requires_confirm_unassign": True,
                     "code": "requires_confirm_unassign",
                 },
@@ -239,13 +261,17 @@ def reassign_agenda(
         if existing:
             db.delete(existing)
             db.commit()
-        return AgendaReassignResponse(id_agenda=id_agenda, room_id=None, room_code=None)
+        return AgendaReassignResponse(
+            id_agenda=id_agenda, weekday=weekday, room_id=None, room_code=None
+        )
 
     # --- Assign / move ---
     room = map_svc._ensure_room(db, target_room_id)
 
     if existing and existing.room_id == target_room_id:
-        return AgendaReassignResponse(id_agenda=id_agenda, room_id=room.id, room_code=room.code)
+        return AgendaReassignResponse(
+            id_agenda=id_agenda, weekday=weekday, room_id=room.id, room_code=room.code
+        )
 
     if existing and existing.room_id != target_room_id and not confirm_move:
         other = db.execute(
@@ -255,8 +281,12 @@ def reassign_agenda(
         raise HTTPException(
             status_code=status.HTTP_409_CONFLICT,
             detail={
-                "message": f"Esta agenda está en {code}. ¿Moverla a {room.code}?",
+                "message": (
+                    f"Esta agenda el {WEEKDAY_JS_LABEL.get(weekday, weekday)} está en {code}. "
+                    f"¿Moverla a {room.code}?"
+                ),
                 "id_agenda": id_agenda,
+                "weekday": weekday,
                 "current_room_id": existing.room_id,
                 "current_room_code": code,
                 "target_room_id": room.id,
@@ -266,7 +296,7 @@ def reassign_agenda(
             },
         )
 
-    _validate_assign(db, id_agenda, target_room_id)
+    validate_assign_weekday(db, id_agenda, target_room_id, weekday)
 
     now = datetime.utcnow()
     if existing:
@@ -277,6 +307,7 @@ def reassign_agenda(
         db.add(
             ConsultingRoomIdAgenda(
                 id_agenda=id_agenda,
+                weekday=weekday,
                 room_id=target_room_id,
                 created_at=now,
                 updated_at=now,
@@ -285,4 +316,6 @@ def reassign_agenda(
             )
         )
     db.commit()
-    return AgendaReassignResponse(id_agenda=id_agenda, room_id=room.id, room_code=room.code)
+    return AgendaReassignResponse(
+        id_agenda=id_agenda, weekday=weekday, room_id=room.id, room_code=room.code
+    )
