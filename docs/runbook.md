@@ -169,10 +169,10 @@
   - Mismo Excel/headers/roles/período cerrado/todo-o-nada/waterfill; lote independiente (`ajuste_mas_menos_lote_id`) — puede coexistir con descuento.
   - `Monto` negativo → descuenta (mismo tope que descontar); positivo/`+`/sin signo → suma (waterfill **sin** tope).
   - Comentario con importe firmado; Anular solo el lote Ajuste +/-.
-- Cambio `novedades-indices-modulos` (rama `feature/novedades-indices-modulos`; rev `0031_modulo_horas`):
-  - Menú Novedades → **Índices** (solo `admin`) al final; ruta `/novedades/indices`.
+- Archivado `2026-10-14-novedades-indices-modulos` (rev `0031_modulo_horas`):
+  - Menú Novedades → **Índices** (solo `admin`) al final; ruta `/novedades/indices`; `GET /novedades/indices`.
   - Contadores por período: por servicio/profesional — **Horas** = Σ `módulo.horas` por asignación (NULL→0) + novedades netas; monto (cargas+ajustes con servicio); módulos; producción CH en por-profesional.
-  - Catálogo módulos: campo **horas** (entero ≥ 1) obligatorio en alta/edición; migración deja existentes en NULL. Import Excel módulos sin cambio en este change.
+  - Catálogo módulos: campo **horas** (entero ≥ 1) obligatorio en alta/edición; migración deja existentes en NULL. Import Excel módulos sin columna horas (queda NULL).
   - Tras deploy: `alembic upgrade head` (0031).
 
 ## Roles (panel)
