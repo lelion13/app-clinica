@@ -195,6 +195,7 @@ export function AgendaOcupacionPage() {
   const [confirmUnassign, setConfirmUnassign] = useState(null);
   const [errorModal, setErrorModal] = useState(null);
   const suppressClickRef = useRef(false);
+  const scrollRef = useRef(null);
 
   useEffect(() => {
     safeLoad("/locations", setLocations, setError);
@@ -260,6 +261,14 @@ export function AgendaOcupacionPage() {
     return map;
   }, [events, resources]);
 
+  const weekdayJs = useMemo(() => {
+    try {
+      return new Date(`${day}T12:00:00`).getDay();
+    } catch {
+      return 0;
+    }
+  }, [day]);
+
   const dayLabel = useMemo(() => {
     try {
       return new Date(`${day}T12:00:00`).toLocaleDateString("es-AR", {
@@ -273,8 +282,10 @@ export function AgendaOcupacionPage() {
     }
   }, [day]);
 
+  const unassignedHasItems = (eventsByResource.unassigned || []).length > 0;
+
   const doReassign = useCallback(
-    async ({ id_agenda, target_room_id, confirm_move = false, confirm_unassign = false }) => {
+    async ({ id_agenda, weekday, target_room_id, confirm_move = false, confirm_unassign = false }) => {
       setBusy(true);
       setError("");
       try {
@@ -282,6 +293,7 @@ export function AgendaOcupacionPage() {
           method: "POST",
           body: JSON.stringify({
             id_agenda,
+            weekday,
             target_room_id,
             confirm_move,
             confirm_unassign,
@@ -293,6 +305,7 @@ export function AgendaOcupacionPage() {
         if (err?.status === 409 && err?.detail?.requires_confirm_move) {
           setConfirmMove({
             id_agenda,
+            weekday,
             target_room_id,
             current_room_code: err.detail.current_room_code,
             target_room_code: err.detail.target_room_code,
@@ -308,6 +321,15 @@ export function AgendaOcupacionPage() {
     },
     [loadEvents]
   );
+
+  const handleEdgeAutoScroll = useCallback((clientX) => {
+    const el = scrollRef.current;
+    if (!el) return;
+    const rect = el.getBoundingClientRect();
+    const edge = 56;
+    if (clientX - rect.left < edge) el.scrollLeft -= 18;
+    else if (rect.right - clientX < edge) el.scrollLeft += 18;
+  }, []);
 
   const handleDropOnResource = useCallback(
     async (res, rawIdAgenda) => {
@@ -327,13 +349,13 @@ export function AgendaOcupacionPage() {
       if (alreadyHere) return;
 
       if (isUnassigned) {
-        setConfirmUnassign({ id_agenda });
+        setConfirmUnassign({ id_agenda, weekday: weekdayJs });
         return;
       }
 
-      await doReassign({ id_agenda, target_room_id, confirm_move: false });
+      await doReassign({ id_agenda, weekday: weekdayJs, target_room_id, confirm_move: false });
     },
-    [doReassign, events]
+    [doReassign, events, weekdayJs]
   );
 
   const stickyHeaderBase = {
@@ -464,6 +486,10 @@ export function AgendaOcupacionPage() {
       </div>
 
       <div
+        ref={scrollRef}
+        onDragOver={(e) => {
+          handleEdgeAutoScroll(e.clientX);
+        }}
         style={{
           flex: 1,
           minHeight: 0,
@@ -492,11 +518,27 @@ export function AgendaOcupacionPage() {
           >
             HORA
           </div>
-          {displayResources.map((res) => (
-            <div key={`h-${res.id}`} style={stickyHeaderBase}>
-              {res.title}
-            </div>
-          ))}
+          {displayResources.map((res) => {
+            const stickyCol = unassignedHasItems && res.id === "unassigned";
+            return (
+              <div
+                key={`h-${res.id}`}
+                style={{
+                  ...stickyHeaderBase,
+                  ...(stickyCol
+                    ? {
+                        position: "sticky",
+                        left: HOUR_COL_PX,
+                        zIndex: 4,
+                        boxShadow: "2px 0 4px rgba(0,0,0,0.06)",
+                      }
+                    : null),
+                }}
+              >
+                {res.title}
+              </div>
+            );
+          })}
 
           <div
             style={{
@@ -536,6 +578,7 @@ export function AgendaOcupacionPage() {
           {displayResources.map((res) => {
             const canDrop = res.id !== "_empty";
             const isOver = dragOverId === res.id;
+            const stickyCol = unassignedHasItems && res.id === "unassigned";
             return (
               <div
                 key={res.id}
@@ -545,6 +588,7 @@ export function AgendaOcupacionPage() {
                         e.preventDefault();
                         e.dataTransfer.dropEffect = "move";
                         setDragOverId(res.id);
+                        handleEdgeAutoScroll(e.clientX);
                       }
                     : undefined
                 }
@@ -566,12 +610,15 @@ export function AgendaOcupacionPage() {
                     : undefined
                 }
                 style={{
-                  position: "relative",
+                  position: stickyCol ? "sticky" : "relative",
+                  left: stickyCol ? HOUR_COL_PX : undefined,
+                  zIndex: stickyCol ? 1 : undefined,
                   height: gridHeight,
                   borderRight: `1px solid ${uiTheme.colors.border}`,
                   boxSizing: "border-box",
                   outline: isOver ? `2px solid ${uiTheme.colors.primary}` : "none",
                   outlineOffset: -2,
+                  boxShadow: stickyCol ? "2px 0 4px rgba(0,0,0,0.06)" : undefined,
                   background:
                     res.id === "unassigned"
                       ? "repeating-linear-gradient(135deg, transparent, transparent 6px, rgba(0,0,0,0.03) 6px, rgba(0,0,0,0.03) 12px)"
@@ -679,6 +726,7 @@ export function AgendaOcupacionPage() {
                   setConfirmMove(null);
                   await doReassign({
                     id_agenda: payload.id_agenda,
+                    weekday: payload.weekday ?? weekdayJs,
                     target_room_id: payload.target_room_id,
                     confirm_move: true,
                   });
@@ -694,7 +742,7 @@ export function AgendaOcupacionPage() {
               `Esta agenda está en ${confirmMove.current_room_code}. ¿Moverla a ${confirmMove.target_room_code}?`}
           </p>
           <p style={{ margin: "8px 0 0", fontSize: 12, color: uiTheme.colors.textMuted }}>
-            Se reasignan todos los días de la agenda (id {confirmMove.id_agenda}).
+            Solo se mueve el día del calendario (id {confirmMove.id_agenda}).
           </p>
         </ModalShell>
       ) : null}
@@ -717,6 +765,7 @@ export function AgendaOcupacionPage() {
                   setConfirmUnassign(null);
                   await doReassign({
                     id_agenda: payload.id_agenda,
+                    weekday: payload.weekday ?? weekdayJs,
                     target_room_id: null,
                     confirm_unassign: true,
                   });
@@ -728,8 +777,8 @@ export function AgendaOcupacionPage() {
           }
         >
           <p style={{ margin: 0, fontSize: 13, lineHeight: 1.45 }}>
-            ¿Quitar el consultorio de esta agenda (id {confirmUnassign.id_agenda})? Pasará a{" "}
-            <strong>Sin consultorio</strong> en todos los días.
+            ¿Quitar el consultorio de esta agenda (id {confirmUnassign.id_agenda}) solo para el día del
+            calendario? Ese día pasará a <strong>Sin consultorio</strong>; los demás días no se tocan.
           </p>
         </ModalShell>
       ) : null}

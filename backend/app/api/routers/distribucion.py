@@ -62,6 +62,7 @@ def ocupacion_agenda_reassign(
     return agenda_reassign_service.reassign_agenda(
         db,
         id_agenda=payload.id_agenda,
+        weekday=payload.weekday,
         target_room_id=payload.target_room_id,
         actor_id=user.id,
         confirm_move=payload.confirm_move,

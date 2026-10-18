@@ -90,6 +90,7 @@ class AgendaFilterOptionsResponse(BaseModel):
 
 class AgendaReassignRequest(BaseModel):
     id_agenda: int
+    weekday: int = Field(ge=0, le=6, description="0=domingo … 6=sábado (JS Date.getDay)")
     target_room_id: int | None = None
     confirm_move: bool = False
     confirm_unassign: bool = False
@@ -97,6 +98,7 @@ class AgendaReassignRequest(BaseModel):
 
 class AgendaReassignResponse(BaseModel):
     id_agenda: int
+    weekday: int
     room_id: int | None = None
     room_code: str | None = None
 

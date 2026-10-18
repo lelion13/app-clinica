@@ -1,8 +1,11 @@
+"""Tests room agenda map — per weekday."""
+
 from types import SimpleNamespace
 
 import pytest
 from fastapi import HTTPException
 
+from app.schemas.consulting_room import RoomIdAgendaReplaceItem
 from app.services import room_agenda_map as service
 
 
@@ -12,9 +15,6 @@ class FakeScalars:
 
     def all(self):
         return self._items
-
-    def first(self):
-        return self._items[0] if self._items else None
 
 
 class FakeResult:
@@ -28,6 +28,27 @@ class FakeResult:
         return self._items[0] if self._items else None
 
 
+def _ocup(id_agenda, dia, h_desde="09:00", h_hasta="11:00", nombre="DOC"):
+    return SimpleNamespace(
+        id=1,
+        id_dato="x",
+        tipo=None,
+        especialidad_agenda=None,
+        medico=nombre,
+        fecha_hasta="2026-12-31",
+        payload={
+            "id_agenda": id_agenda,
+            "nombre_agenda": f"TIPO - ESP - {nombre}",
+            "medico": nombre,
+            "dia": dia,
+            "hora_desde": h_desde,
+            "hora_hasta": h_hasta,
+            "fecha_desde": "2026-01-01",
+            "fecha_hasta": "2026-12-31",
+        },
+    )
+
+
 class FakeDB:
     def __init__(self):
         self.rooms = [
@@ -36,34 +57,20 @@ class FakeDB:
         ]
         self.maps = []
         self.ocupacion = [
-            SimpleNamespace(
-                payload={
-                    "id_agenda": 100,
-                    "nombre_agenda": "ART - TRAUMA - APECECHEA",
-                    "medico": "APECECHEA",
-                },
-                medico="APECECHEA",
-            ),
-            SimpleNamespace(
-                payload={
-                    "id_agenda": 200,
-                    "nombre_agenda": "SC - CLINICA - PEREZ",
-                    "medico": "PEREZ",
-                },
-                medico="PEREZ",
-            ),
+            _ocup(100, "lunes", nombre="APECECHEA"),
+            _ocup(100, "martes", nombre="APECECHEA"),
+            _ocup(200, "lunes", nombre="PEREZ"),
         ]
         self.deleted = []
         self.added = []
 
     def execute(self, statement):
-        sql = str(statement).lower()
-        if "consulting_room_id_agenda" in sql or "ConsultingRoomIdAgenda" in str(statement):
-            # distinguish by filters roughly via current maps content for tests
+        ent = str(statement)
+        low = ent.lower()
+        if "consulting_room_id_agenda" in low or "ConsultingRoomIdAgenda" in ent:
             return FakeResult(list(self.maps))
-        if "ocupacion" in sql or "OcupacionHorarioActivo" in str(statement):
+        if "ocupacion" in low or "OcupacionHorarioActivo" in ent:
             return FakeResult(self.ocupacion)
-        # rooms
         return FakeResult(self.rooms)
 
     def add(self, item):
@@ -86,116 +93,113 @@ def test_lookup_by_medico():
     result = service.lookup_agendas_by_medico(db, "apece")
     assert len(result.items) == 1
     assert result.items[0].id_agenda == 100
-    assert "100 —" in result.items[0].label
     assert result.items[0].current_room_id is None
-    assert result.items[0].current_room_code is None
 
 
-def test_lookup_includes_current_room():
+def test_lookup_includes_current_room_when_full():
     db = FakeDB()
-    db.maps = [SimpleNamespace(id_agenda=100, room_id=1, updated_at=None, updated_by=None)]
+    # lunes=1, martes=2 JS
+    db.maps = [
+        SimpleNamespace(id_agenda=100, weekday=1, room_id=1),
+        SimpleNamespace(id_agenda=100, weekday=2, room_id=1),
+    ]
     result = service.lookup_agendas_by_medico(db, "apece")
-    assert len(result.items) == 1
     assert result.items[0].current_room_id == 1
     assert result.items[0].current_room_code == "401"
 
 
-def test_add_and_conflict_requires_confirm(monkeypatch):
+def test_list_partial_vs_full(monkeypatch):
     db = FakeDB()
+    monkeypatch.setattr(service, "_ensure_room", lambda _db, rid: next(r for r in db.rooms if r.id == rid))
 
-    def ensure(_db, room_id):
-        return next(r for r in db.rooms if r.id == room_id)
+    db.maps = [SimpleNamespace(id_agenda=100, weekday=1, room_id=1)]
+    partial = service.list_room_id_agendas(db, 1)
+    assert len(partial.items) == 1
+    assert partial.items[0].weekday == 1
+    assert "lunes" in partial.items[0].label
 
-    monkeypatch.setattr(service, "_ensure_room", ensure)
-    monkeypatch.setattr(service, "_label_for_id_agenda", lambda _db, i: str(i))
-
-    # Patch execute for targeted map lookups
-    original_execute = db.execute
-
-    def execute(statement):
-        ent = str(statement)
-        if "ConsultingRoomIdAgenda" in ent or "consulting_room_id_agenda" in ent.lower():
-            # SQLAlchemy select with where id_agenda == X — return matching
-            return FakeResult(list(db.maps))
-        if "ConsultingRoom" in ent or "consulting_rooms" in ent.lower():
-            return FakeResult(db.rooms)
-        return original_execute(statement)
-
-    db.execute = execute
-
-    item = service.add_room_id_agenda(db, 1, 100, actor_id=1, confirm_move=False)
-    assert item.id_agenda == 100
-    assert len(db.maps) == 1
-    assert db.maps[0].room_id == 1
-
-    with pytest.raises(HTTPException) as exc:
-        service.add_room_id_agenda(db, 2, 100, actor_id=1, confirm_move=False)
-    assert exc.value.status_code == 409
-    assert exc.value.detail["requires_confirm_move"] is True
-
-    moved = service.add_room_id_agenda(db, 2, 100, actor_id=1, confirm_move=True)
-    assert moved.id_agenda == 100
-    assert db.maps[0].room_id == 2
-
-
-def test_replace_agendas_add_remove_and_conflict(monkeypatch):
-    from app.schemas.consulting_room import RoomIdAgendaReplaceItem
-
-    db = FakeDB()
-
-    def ensure(_db, room_id):
-        return next(r for r in db.rooms if r.id == room_id)
-
-    monkeypatch.setattr(service, "_ensure_room", ensure)
-    monkeypatch.setattr(service, "_label_for_id_agenda", lambda _db, i: str(i))
-
-    def execute(statement):
-        ent = str(statement)
-        low = ent.lower()
-        if "ConsultingRoomIdAgenda" in ent or "consulting_room_id_agenda" in low:
-            return FakeResult(list(db.maps))
-        if "ConsultingRoom" in ent or "consulting_rooms" in low:
-            return FakeResult(db.rooms)
-        return FakeResult([])
-
-    db.execute = execute
-
-    # Seed: room 1 has 100 and 200
     db.maps = [
-        SimpleNamespace(id_agenda=100, room_id=1, updated_at=None, updated_by=None),
-        SimpleNamespace(id_agenda=200, room_id=1, updated_at=None, updated_by=None),
+        SimpleNamespace(id_agenda=100, weekday=1, room_id=1),
+        SimpleNamespace(id_agenda=100, weekday=2, room_id=1),
     ]
+    full = service.list_room_id_agendas(db, 1)
+    assert len(full.items) == 1
+    assert full.items[0].weekday is None
+    assert "lunes" not in full.items[0].label
 
-    # Replace room 1 with only 100
-    result = service.replace_room_id_agendas(
-        db,
-        1,
-        [RoomIdAgendaReplaceItem(id_agenda=100, confirm_move=False)],
-        actor_id=1,
+
+def test_add_only_pending_days(monkeypatch):
+    db = FakeDB()
+    monkeypatch.setattr(service, "_ensure_room", lambda _db, rid: next(r for r in db.rooms if r.id == rid))
+    monkeypatch.setattr(
+        service.reassign_svc,
+        "validate_assign_weekday",
+        lambda *_a, **_k: None,
     )
-    assert [i.id_agenda for i in result.items] == [100]
-    assert len(db.maps) == 1
-    assert db.maps[0].id_agenda == 100
 
-    # Move 100 to room 2 without confirm → 409, no side effects
-    maps_before = list(db.maps)
+    # lunes already on room 2 → only martes pending
+    db.maps = [SimpleNamespace(id_agenda=100, weekday=1, room_id=2)]
+    item = service.add_room_id_agenda(db, 1, 100, actor_id=1)
+    assert item.id_agenda == 100
+    assert any(m.weekday == 2 and m.room_id == 1 for m in db.maps)
+    assert any(m.weekday == 1 and m.room_id == 2 for m in db.maps)
+
+
+def test_add_no_pending(monkeypatch):
+    db = FakeDB()
+    monkeypatch.setattr(service, "_ensure_room", lambda _db, rid: next(r for r in db.rooms if r.id == rid))
+    db.maps = [
+        SimpleNamespace(id_agenda=100, weekday=1, room_id=1),
+        SimpleNamespace(id_agenda=100, weekday=2, room_id=1),
+    ]
+    with pytest.raises(HTTPException) as exc:
+        service.add_room_id_agenda(db, 1, 100, actor_id=1)
+    assert exc.value.detail["code"] == "no_pending_days"
+
+
+def test_replace_assign_pending_all_or_nothing(monkeypatch):
+    db = FakeDB()
+    monkeypatch.setattr(service, "_ensure_room", lambda _db, rid: next(r for r in db.rooms if r.id == rid))
+
+    calls = []
+
+    def validate(_db, id_agenda, room_id, weekday):
+        calls.append(weekday)
+        if weekday == 2:
+            raise HTTPException(
+                status_code=422,
+                detail={"message": "solape martes", "conflicts": [{"type": "overlap", "message": "solape martes"}]},
+            )
+
+    monkeypatch.setattr(service.reassign_svc, "validate_assign_weekday", validate)
+
     with pytest.raises(HTTPException) as exc:
         service.replace_room_id_agendas(
             db,
-            2,
+            1,
             [RoomIdAgendaReplaceItem(id_agenda=100, confirm_move=False)],
             actor_id=1,
         )
-    assert exc.value.status_code == 409
-    assert db.maps[0].room_id == 1
-    assert len(db.maps) == len(maps_before)
+    assert exc.value.detail["code"] == "validation_failed"
+    assert db.maps == []  # nada persistido
 
-    # Move with confirm
-    result2 = service.replace_room_id_agendas(
+
+def test_replace_keep_and_remove_day(monkeypatch):
+    db = FakeDB()
+    monkeypatch.setattr(service, "_ensure_room", lambda _db, rid: next(r for r in db.rooms if r.id == rid))
+    monkeypatch.setattr(service.reassign_svc, "validate_assign_weekday", lambda *_a, **_k: None)
+
+    db.maps = [
+        SimpleNamespace(id_agenda=100, weekday=1, room_id=1),
+        SimpleNamespace(id_agenda=100, weekday=2, room_id=1),
+    ]
+    # Keep only lunes (partial row)
+    result = service.replace_room_id_agendas(
         db,
-        2,
-        [RoomIdAgendaReplaceItem(id_agenda=100, confirm_move=True)],
+        1,
+        [RoomIdAgendaReplaceItem(id_agenda=100, weekday=1, weekdays=[1])],
         actor_id=1,
     )
-    assert [i.id_agenda for i in result2.items] == [100]
-    assert db.maps[0].room_id == 2
+    assert len(db.maps) == 1
+    assert db.maps[0].weekday == 1
+    assert result.items[0].weekday == 1

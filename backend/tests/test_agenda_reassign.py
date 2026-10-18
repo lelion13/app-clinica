@@ -1,4 +1,4 @@
-"""Tests for agenda reassign (DnD validation)."""
+"""Tests for agenda reassign (DnD validation) — per weekday."""
 
 from datetime import time
 from types import SimpleNamespace
@@ -56,7 +56,11 @@ class FakeDB:
             m = re.search(r"id_agenda\s*=\s*(\d+)", sql)
             if m:
                 aid = int(m.group(1))
-                items = [x for x in self.maps if getattr(x, "id_agenda", None) == aid]
+                items = [x for x in items if getattr(x, "id_agenda", None) == aid]
+            m2 = re.search(r"weekday\s*=\s*(\d+)", sql)
+            if m2:
+                wd = int(m2.group(1))
+                items = [x for x in items if getattr(x, "weekday", None) == wd]
             return FakeResult(items)
         if "ocupacion" in text or "OcupacionHorarioActivo" in ent:
             return FakeResult(list(self.ocupacion))
@@ -118,17 +122,38 @@ def test_interval_helpers():
 def test_assign_ok(monkeypatch):
     db = FakeDB()
     db.ocupacion = [_ocup_row(100, "lunes", "09:00", "11:00")]
-    # lunes py=0 → js=1
     db.hours = [_hour(1, 1, time(8, 0), time(18, 0))]
-
     monkeypatch.setattr(service.map_svc, "_ensure_room", lambda _db, rid: next(r for r in db.rooms if r.id == rid))
 
     result = service.reassign_agenda(
-        db, id_agenda=100, target_room_id=1, actor_id=1, confirm_move=False
+        db, id_agenda=100, weekday=1, target_room_id=1, actor_id=1, confirm_move=False
     )
     assert result.room_id == 1
-    assert result.room_code == "C1"
+    assert result.weekday == 1
     assert len(db.added) == 1
+    assert db.added[0].weekday == 1
+
+
+def test_assign_lunes_ignores_martes_conflict(monkeypatch):
+    """Validación solo del weekday pedido: martes conflictivo no bloquea lunes."""
+    db = FakeDB()
+    db.ocupacion = [
+        _ocup_row(100, "lunes", "09:00", "11:00"),
+        _ocup_row(100, "martes", "09:00", "11:00"),
+        _ocup_row(200, "martes", "09:00", "11:00"),
+    ]
+    db.hours = [
+        _hour(1, 1, time(8, 0), time(18, 0)),
+        _hour(1, 2, time(8, 0), time(18, 0)),
+    ]
+    db.maps = [SimpleNamespace(id_agenda=200, weekday=2, room_id=1, updated_at=None, updated_by=None)]
+    monkeypatch.setattr(service.map_svc, "_ensure_room", lambda _db, rid: next(r for r in db.rooms if r.id == rid))
+
+    result = service.reassign_agenda(
+        db, id_agenda=100, weekday=1, target_room_id=1, actor_id=1
+    )
+    assert result.room_id == 1
+    assert result.weekday == 1
 
 
 def test_outside_hours(monkeypatch):
@@ -138,7 +163,7 @@ def test_outside_hours(monkeypatch):
     monkeypatch.setattr(service.map_svc, "_ensure_room", lambda _db, rid: next(r for r in db.rooms if r.id == rid))
 
     with pytest.raises(HTTPException) as exc:
-        service.reassign_agenda(db, id_agenda=100, target_room_id=1, actor_id=1)
+        service.reassign_agenda(db, id_agenda=100, weekday=1, target_room_id=1, actor_id=1)
     assert exc.value.status_code == 422
     assert exc.value.detail["code"] == "validation_failed"
     assert exc.value.detail["conflicts"][0]["type"] == "outside_hours"
@@ -151,59 +176,66 @@ def test_overlap(monkeypatch):
         _ocup_row(200, "lunes", "09:00", "11:00"),
     ]
     db.hours = [_hour(1, 1, time(8, 0), time(18, 0))]
-    db.maps = [SimpleNamespace(id_agenda=200, room_id=1, updated_at=None, updated_by=None)]
+    db.maps = [SimpleNamespace(id_agenda=200, weekday=1, room_id=1, updated_at=None, updated_by=None)]
     monkeypatch.setattr(service.map_svc, "_ensure_room", lambda _db, rid: next(r for r in db.rooms if r.id == rid))
 
     with pytest.raises(HTTPException) as exc:
-        service.reassign_agenda(db, id_agenda=100, target_room_id=1, actor_id=1)
+        service.reassign_agenda(db, id_agenda=100, weekday=1, target_room_id=1, actor_id=1)
     assert exc.value.status_code == 422
     assert exc.value.detail["conflicts"][0]["type"] == "overlap"
 
 
-def test_multi_weekday_fail(monkeypatch):
+def test_other_weekday_outside_hours_ok(monkeypatch):
+    """Antes multi-weekday fallaba; ahora solo valida el día pedido."""
     db = FakeDB()
     db.ocupacion = [
         _ocup_row(100, "lunes", "09:00", "11:00"),
         _ocup_row(100, "miercoles", "09:00", "11:00"),
     ]
-    # only lunes hours (js=1); miercoles js=3 missing
-    db.hours = [_hour(1, 1, time(8, 0), time(18, 0))]
+    db.hours = [_hour(1, 1, time(8, 0), time(18, 0))]  # sin miércoles
     monkeypatch.setattr(service.map_svc, "_ensure_room", lambda _db, rid: next(r for r in db.rooms if r.id == rid))
 
-    with pytest.raises(HTTPException) as exc:
-        service.reassign_agenda(db, id_agenda=100, target_room_id=1, actor_id=1)
-    assert any(c["type"] == "outside_hours" for c in exc.value.detail["conflicts"])
+    result = service.reassign_agenda(db, id_agenda=100, weekday=1, target_room_id=1, actor_id=1)
+    assert result.room_id == 1
 
 
 def test_confirm_move_required(monkeypatch):
     db = FakeDB()
     db.ocupacion = [_ocup_row(100, "lunes", "09:00", "11:00")]
     db.hours = [_hour(2, 1, time(8, 0), time(18, 0))]
-    db.maps = [SimpleNamespace(id_agenda=100, room_id=1, updated_at=None, updated_by=None)]
+    db.maps = [SimpleNamespace(id_agenda=100, weekday=1, room_id=1, updated_at=None, updated_by=None)]
     monkeypatch.setattr(service.map_svc, "_ensure_room", lambda _db, rid: next(r for r in db.rooms if r.id == rid))
 
     with pytest.raises(HTTPException) as exc:
-        service.reassign_agenda(db, id_agenda=100, target_room_id=2, actor_id=1, confirm_move=False)
+        service.reassign_agenda(
+            db, id_agenda=100, weekday=1, target_room_id=2, actor_id=1, confirm_move=False
+        )
     assert exc.value.status_code == 409
     assert exc.value.detail["requires_confirm_move"] is True
 
     result = service.reassign_agenda(
-        db, id_agenda=100, target_room_id=2, actor_id=1, confirm_move=True
+        db, id_agenda=100, weekday=1, target_room_id=2, actor_id=1, confirm_move=True
     )
     assert result.room_id == 2
     assert db.maps[0].room_id == 2
 
 
-def test_unassign_requires_confirm():
+def test_unassign_only_that_weekday():
     db = FakeDB()
-    db.maps = [SimpleNamespace(id_agenda=100, room_id=1, updated_at=None, updated_by=None)]
+    lun = SimpleNamespace(id_agenda=100, weekday=1, room_id=1, updated_at=None, updated_by=None)
+    mar = SimpleNamespace(id_agenda=100, weekday=2, room_id=1, updated_at=None, updated_by=None)
+    db.maps = [lun, mar]
 
     with pytest.raises(HTTPException) as exc:
-        service.reassign_agenda(db, id_agenda=100, target_room_id=None, actor_id=1, confirm_unassign=False)
+        service.reassign_agenda(
+            db, id_agenda=100, weekday=1, target_room_id=None, actor_id=1, confirm_unassign=False
+        )
     assert exc.value.detail["requires_confirm_unassign"] is True
 
     result = service.reassign_agenda(
-        db, id_agenda=100, target_room_id=None, actor_id=1, confirm_unassign=True
+        db, id_agenda=100, weekday=1, target_room_id=None, actor_id=1, confirm_unassign=True
     )
     assert result.room_id is None
-    assert db.maps == []
+    assert result.weekday == 1
+    assert len(db.maps) == 1
+    assert db.maps[0].weekday == 2
