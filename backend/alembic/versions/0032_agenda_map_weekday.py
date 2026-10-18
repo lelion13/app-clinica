@@ -5,6 +5,9 @@ Revises: 0031_modulo_horas
 Create Date: 2026-10-16
 
 Note: revision id MUST be <=32 chars (alembic_version.version_num).
+
+Fix: drop PK on id_agenda *before* expanding to multiple weekdays per agenda
+(otherwise UniqueViolation on second INSERT for the same id_agenda).
 """
 
 from __future__ import annotations
@@ -19,7 +22,6 @@ down_revision = "0031_modulo_horas"
 branch_labels = None
 depends_on = None
 
-# Python weekday (Mon=0) → JS weekday (Sun=0), same as agenda_reassign
 DIA_TO_PY = {
     "lunes": 0,
     "martes": 1,
@@ -72,6 +74,14 @@ def upgrade() -> None:
     if "weekday" not in cols:
         op.add_column("consulting_room_id_agenda", sa.Column("weekday", sa.Integer(), nullable=True))
 
+    # PK must allow multiple rows per id_agenda before we expand
+    insp = sa.inspect(conn)
+    pk = insp.get_pk_constraint("consulting_room_id_agenda")
+    pk_name = pk.get("name") if pk else None
+    pk_cols = list(pk.get("constrained_columns") or []) if pk else []
+    if pk_name and pk_cols == ["id_agenda"]:
+        op.drop_constraint(pk_name, "consulting_room_id_agenda", type_="primary")
+
     sync_wds = _weekdays_from_sync(conn)
     legacy = conn.execute(
         sa.text(
@@ -85,7 +95,6 @@ def upgrade() -> None:
         for id_agenda, room_id, created_at, updated_at, created_by, updated_by in legacy:
             weekdays = sorted(sync_wds.get(int(id_agenda)) or set())
             if not weekdays:
-                # Sin días en sync: no conservar mapa huérfano
                 continue
             for wd in weekdays:
                 conn.execute(
@@ -105,15 +114,16 @@ def upgrade() -> None:
                     },
                 )
 
-    # Filas ya con weekday (re-run) o recién insertadas: NOT NULL + PK compuesta
     conn.execute(sa.text("DELETE FROM consulting_room_id_agenda WHERE weekday IS NULL"))
     op.alter_column("consulting_room_id_agenda", "weekday", existing_type=sa.Integer(), nullable=False)
 
+    insp = sa.inspect(conn)
     pk = insp.get_pk_constraint("consulting_room_id_agenda")
     pk_name = pk.get("name") if pk else None
     pk_cols = list(pk.get("constrained_columns") or []) if pk else []
-    if pk_name and pk_cols != ["id_agenda", "weekday"]:
-        op.drop_constraint(pk_name, "consulting_room_id_agenda", type_="primary")
+    if pk_cols != ["id_agenda", "weekday"]:
+        if pk_name:
+            op.drop_constraint(pk_name, "consulting_room_id_agenda", type_="primary")
         op.create_primary_key(
             "consulting_room_id_agenda_pkey",
             "consulting_room_id_agenda",
