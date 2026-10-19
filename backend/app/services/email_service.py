@@ -16,17 +16,21 @@ def smtp_configured() -> bool:
     return bool(settings.smtp_host and settings.smtp_from)
 
 
-def send_email(*, to_email: str, subject: str, body_text: str) -> None:
+def send_email(*, to_email: str, subject: str, body_text: str, body_html: str | None = None) -> None:
     if not smtp_configured():
         raise EmailNotConfiguredError("SMTP no configurado")
 
-    signed_body = body_text.rstrip() + "\n\nDepartamento de Tecnologia y Modernizacion.\n"
+    signature = "\n\nDepartamento de Tecnologia y Modernizacion.\n"
+    signed_body = body_text.rstrip() + signature
 
     msg = EmailMessage()
     msg["Subject"] = subject
     msg["From"] = settings.smtp_from
     msg["To"] = to_email
     msg.set_content(signed_body)
+    if body_html:
+        signed_html = body_html.rstrip() + "<p>Departamento de Tecnologia y Modernizacion.</p>"
+        msg.add_alternative(signed_html, subtype="html")
 
     context = ssl.create_default_context()
     if settings.smtp_secure:

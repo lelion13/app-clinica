@@ -34,6 +34,8 @@ from app.schemas.novedades import (
     AjusteMasMenosAnularResponse,
     AjusteMasMenosImportResponse,
     AjusteMasMenosStatusResponse,
+    LiquidacionMailStartResponse,
+    LiquidacionMailStatusResponse,
     ModuloCreateRequest,
     ModuloImportResponse,
     ModuloResponse,
@@ -66,6 +68,7 @@ from app.services.novedades import export_xls
 from app.services.novedades import indices as indices_service
 from app.services.novedades import importe_descontar as importe_descontar_service
 from app.services.novedades import ajuste_mas_menos as ajuste_mas_menos_service
+from app.services.novedades import liquidacion_mail as liquidacion_mail_service
 from app.services.novedades import masters as masters_service
 from app.services.novedades import modulos_import as modulos_import_service
 from app.services.novedades import produccion_tarifas as produccion_tarifas_service
@@ -850,6 +853,34 @@ def capital_humano_ajuste_mas_menos_anular(
     user: User = Depends(require_admin_or_rrhh),
 ) -> AjusteMasMenosAnularResponse:
     return ajuste_mas_menos_service.anular_ajuste_mas_menos(db, periodo_id, actor_id=user.id)
+
+
+@router.get("/capital-humano/mail-liquidacion/status", response_model=LiquidacionMailStatusResponse)
+def capital_humano_mail_liquidacion_status(
+    periodo_id: int = Query(...),
+    db: Session = Depends(get_db),
+    user: User = Depends(require_admin_or_rrhh),
+) -> LiquidacionMailStatusResponse:
+    _ = user
+    return liquidacion_mail_service.get_mail_status(db, periodo_id=periodo_id)
+
+
+@router.post("/capital-humano/mail-liquidacion", response_model=LiquidacionMailStartResponse)
+def capital_humano_mail_liquidacion_start(
+    periodo_id: int = Query(...),
+    db: Session = Depends(get_db),
+    user: User = Depends(require_admin_or_rrhh),
+) -> LiquidacionMailStartResponse:
+    return liquidacion_mail_service.start_mail_lot(db, periodo_id=periodo_id, user=user)
+
+
+@router.post("/capital-humano/mail-liquidacion/retry-failed", response_model=LiquidacionMailStatusResponse)
+def capital_humano_mail_liquidacion_retry_failed(
+    periodo_id: int = Query(...),
+    db: Session = Depends(get_db),
+    user: User = Depends(require_admin_or_rrhh),
+) -> LiquidacionMailStatusResponse:
+    return liquidacion_mail_service.retry_failed(db, periodo_id=periodo_id, user=user)
 
 
 @router.get("/export.xlsx")

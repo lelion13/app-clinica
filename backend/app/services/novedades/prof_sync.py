@@ -20,12 +20,20 @@ def _as_str(value) -> str | None:
     return s or None
 
 
-def _normalize_row(raw: dict) -> tuple[str, str, str | None, str | None] | None:
-    """Returns (codprof, full_name, codprov, legajo) or None if unusable."""
+def _normalize_mail(raw: dict) -> str | None:
+    mail = _as_str(raw.get("MAIL") if "MAIL" in raw else raw.get("mail"))
+    if not mail:
+        return None
+    return mail[:255]
+
+
+def _normalize_row(raw: dict) -> tuple[str, str, str | None, str | None, str | None] | None:
+    """Returns (codprof, full_name, codprov, legajo, email) or None if unusable."""
     codprof = _as_str(raw.get("CODPROF") if "CODPROF" in raw else raw.get("codprof"))
     nombres = _as_str(raw.get("NOMBRES") if "NOMBRES" in raw else raw.get("nombres"))
     codprov = _as_str(raw.get("CODPROV") if "CODPROV" in raw else raw.get("codprov"))
     legajo = _as_str(raw.get("LEGAJO") if "LEGAJO" in raw else raw.get("legajo"))
+    email = _normalize_mail(raw)
     if not codprof or not nombres:
         return None
     return (
@@ -33,6 +41,7 @@ def _normalize_row(raw: dict) -> tuple[str, str, str | None, str | None] | None:
         nombres[:200],
         (codprov[:40] if codprov else None),
         (legajo[:40] if legajo else None),
+        email,
     )
 
 
@@ -197,7 +206,7 @@ def sync_novedades_professionals(
             skipped += 1
             errors.append(f"fila {idx}: CODPROF/NOMBRES faltantes")
             continue
-        codprof, full_name, codprov, legajo = normalized
+        codprof, full_name, codprov, legajo, email = normalized
         if codprof in seen:
             skipped += 1
             errors.append(f"fila {idx}: CODPROF duplicado en respuesta ({codprof})")
@@ -211,6 +220,7 @@ def sync_novedades_professionals(
                 full_name=full_name,
                 codprov=codprov,
                 legajo=legajo,
+                email=email,
                 is_active=True,
                 es_especialista=False,
                 created_at=now,
@@ -233,6 +243,9 @@ def sync_novedades_professionals(
             changed = True
         if row.legajo != legajo:
             row.legajo = legajo
+            changed = True
+        if getattr(row, "email", None) != email:
+            row.email = email
             changed = True
         if not row.is_active:
             row.is_active = True

@@ -176,6 +176,12 @@
   - Contadores por período: por servicio/profesional — **Horas** = Σ `módulo.horas` por asignación (NULL→0) + novedades netas; monto (cargas+ajustes con servicio); módulos; producción CH en por-profesional.
   - Catálogo módulos: campo **horas** (entero ≥ 1) obligatorio en alta/edición; migración deja existentes en NULL. Import Excel módulos sin columna horas (queda NULL).
   - Tras deploy: `alembic upgrade head` (0031).
+- Cambio `novedades-capital-humano-mail-liquidacion` (rama `medicos`; rev `0034_liquidacion_mail`):
+  - Sync profesionales: campo Integrando **`MAIL`** → `novedades_profesional.email`.
+  - Capital Humano (período **cerrado**, `admin`/`rrhh`): **Enviar liquidaciones por mail** → modal N → lote + worker throttled (`MAIL_LIQUIDACION_DELAY_SECONDS`, default 3).
+  - Un mail por fila CH: Total general + detalle (cargas/producción/ajustes); sin PDF/CC. Bloquea si falta algún mail válido.
+  - Contadores pending/sent/failed; **Reintentar fallidos**; lote 100% OK bloquea reenvío del período.
+  - Tras deploy: `alembic upgrade head` (0034) + sync profesionales para cargar mails.
 
 ## Roles (panel)
 - `admin`: distribución + novedades (todo) + usuarios
@@ -194,6 +200,7 @@
   - `APP_PUBLIC_URL` (ej. `https://clinica.lionapp.cloud`)
   - `SMTP_HOST`, `SMTP_PORT`, `SMTP_USER`, `SMTP_PASS`, `SMTP_FROM`, `SMTP_SECURE`
   - `SMTP_SECURE=false` → STARTTLS (típico puerto 587); `true` → TLS implícito (típico 465)
+  - `MAIL_LIQUIDACION_DELAY_SECONDS` (default 3): pausa entre mails de liquidación CH
 - Migración: `0023_password_reset` (`alembic upgrade head` tras deploy).
 - Archive SDD: `openspec/changes/archive/2026-08-20-usuarios-abm-email-reset/`
 

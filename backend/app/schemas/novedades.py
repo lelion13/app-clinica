@@ -496,3 +496,30 @@ class IndicesResponse(BaseModel):
     periodo_id: int
     por_servicio: list[IndicesServicioRow] = Field(default_factory=list)
     por_profesional: list[IndicesProfesionalRow] = Field(default_factory=list)
+
+
+class LiquidacionMailMissingProfessional(BaseModel):
+    professional_id: int
+    legajo: str | None = None
+    professional_name: str
+    email: str | None = None
+
+
+class LiquidacionMailStatusResponse(BaseModel):
+    periodo_id: int
+    lote_id: int | None = None
+    pending: int = 0
+    sent: int = 0
+    failed: int = 0
+    total: int = 0
+    locked: bool = False
+    can_start: bool = False
+    can_retry_failed: bool = False
+    worker_running: bool = False
+
+
+class LiquidacionMailStartResponse(BaseModel):
+    lote_id: int
+    periodo_id: int
+    total: int
+    status: LiquidacionMailStatusResponse
