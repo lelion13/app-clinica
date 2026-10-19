@@ -28,4 +28,4 @@
 ## Phase 5: Docs / verify
 
 - [x] 5.1 Nota `docs/runbook.md` (mapa por día; divergencia AO vs Consultorios)
-- [ ] 5.2 Smoke: lunes→C1 deja martes pendiente; Consultorios completa; orden C1…Cn; scroll+drag
+- [x] 5.2 Smoke: migración VPS OK tras fix PK; feature en prod (usuario 2026-10-19)

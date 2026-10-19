@@ -43,7 +43,7 @@ class Settings(BaseSettings):
     model_config = SettingsConfigDict(env_file=".env", extra="ignore")
 
     app_name: str = "app-clinica"
-    # Wall-clock for consulting rooms / bookings (must match how hours are entered in the UI).
+    # Wall-clock for consulting rooms / occupancy (must match how hours are entered in the UI).
     business_tz: str = Field(default="America/Argentina/Buenos_Aires", validation_alias="BUSINESS_TIMEZONE")
     database_url: str = "postgresql+psycopg://app_clinica:app_clinica@db:5432/app_clinica"
     jwt_secret: str = "change_me_super_secret"
