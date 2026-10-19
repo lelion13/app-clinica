@@ -21,4 +21,4 @@
 ## Phase 3: Docs / verify
 
 - [x] 3.1 Sync delta a spec estable + runbook (backup pre-deploy)
-- [ ] 3.2 Smoke: Ocupación, Agenda ocupación, Indicadores, Profesionales, Consultorios; redirects; 404 APIs
+- [x] 3.2 Smoke OK (usuario 2026-10-19)
