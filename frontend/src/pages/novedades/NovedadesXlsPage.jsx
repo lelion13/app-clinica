@@ -149,6 +149,11 @@ export function NovedadesXlsPage() {
   const [parcialExpandedId, setParcialExpandedId] = useState(null);
   const [parcialDownloading, setParcialDownloading] = useState(false);
 
+  const [mailStatus, setMailStatus] = useState(null);
+  const [mailBusy, setMailBusy] = useState(false);
+  const [mailConfirmOpen, setMailConfirmOpen] = useState(false);
+  const [mailMissing, setMailMissing] = useState(null);
+
   const selectedPeriodo = useMemo(
     () => periodos.find((p) => String(p.id) === String(periodoId)) || null,
     [periodos, periodoId]
@@ -310,6 +315,92 @@ export function NovedadesXlsPage() {
     };
     loadAjusteStatus();
   }, [periodoId, periodoClosed, rows]);
+
+  const loadMailStatus = async (pid = periodoId) => {
+    if (!pid || !periodoClosed) {
+      setMailStatus(null);
+      return;
+    }
+    try {
+      const st = await apiRequestWithRefresh(
+        `/novedades/capital-humano/mail-liquidacion/status?periodo_id=${pid}`
+      );
+      setMailStatus(st || null);
+    } catch {
+      setMailStatus(null);
+    }
+  };
+
+  useEffect(() => {
+    loadMailStatus(periodoId);
+  }, [periodoId, periodoClosed, rows]);
+
+  useEffect(() => {
+    if (!mailStatus?.worker_running || !periodoId || !periodoClosed) return undefined;
+    const timer = setInterval(() => {
+      loadMailStatus(periodoId);
+    }, 4000);
+    return () => clearInterval(timer);
+  }, [mailStatus?.worker_running, periodoId, periodoClosed]);
+
+  const openMailConfirm = () => {
+    if (!periodoId || !periodoClosed || mailBusy) return;
+    if (mailStatus?.locked) {
+      setError("El período ya tiene un lote de mails completo; no se puede reenviar");
+      return;
+    }
+    if (mailStatus?.lote_id && !mailStatus?.can_start) {
+      setError("Ya existe un lote para este período; usá Reintentar fallidos si corresponde");
+      return;
+    }
+    setMailMissing(null);
+    setMailConfirmOpen(true);
+  };
+
+  const confirmMailStart = async () => {
+    if (!periodoId || !periodoClosed) return;
+    setMailBusy(true);
+    setError("");
+    try {
+      const res = await apiRequestWithRefresh(
+        `/novedades/capital-humano/mail-liquidacion?periodo_id=${periodoId}`,
+        { method: "POST" }
+      );
+      setMailConfirmOpen(false);
+      setMailStatus(res?.status || null);
+      setInfo(`Lote encolado: ${res?.total ?? 0} destinatarios. El envío continúa en segundo plano.`);
+      await loadMailStatus(periodoId);
+    } catch (err) {
+      const detail = err.detail;
+      if (detail && typeof detail === "object" && detail.code === "missing_emails") {
+        setMailConfirmOpen(false);
+        setMailMissing(Array.isArray(detail.missing_emails) ? detail.missing_emails : []);
+        setError(detail.message || err.message || "Hay profesionales sin mail válido");
+      } else {
+        setError(err.message || "Error al iniciar el envío");
+      }
+    } finally {
+      setMailBusy(false);
+    }
+  };
+
+  const retryMailFailed = async () => {
+    if (!periodoId || !periodoClosed || mailBusy) return;
+    setMailBusy(true);
+    setError("");
+    try {
+      const st = await apiRequestWithRefresh(
+        `/novedades/capital-humano/mail-liquidacion/retry-failed?periodo_id=${periodoId}`,
+        { method: "POST" }
+      );
+      setMailStatus(st || null);
+      setInfo("Reintento de fallidos encolado");
+    } catch (err) {
+      setError(err.message || "Error al reintentar fallidos");
+    } finally {
+      setMailBusy(false);
+    }
+  };
 
   const onImporteDescontarClick = () => {
     if (!periodoId || !periodoClosed || descuentoBusy) return;
@@ -729,6 +820,85 @@ export function NovedadesXlsPage() {
       ) : null}
       <AlertModal open={Boolean(error)} title="Atención" message={error} onClose={() => setError("")} />
       <AlertModal open={Boolean(info)} title="Listo" message={info} onClose={() => setInfo("")} />
+      {mailConfirmOpen ? (
+        <div
+          role="dialog"
+          style={{
+            position: "fixed",
+            inset: 0,
+            background: "rgba(0,0,0,0.45)",
+            display: "grid",
+            placeItems: "center",
+            zIndex: 80,
+            padding: 16,
+          }}
+          onClick={() => !mailBusy && setMailConfirmOpen(false)}
+        >
+          <div
+            style={{ ...uiStyles.pageSection, maxWidth: 440, width: "100%" }}
+            onClick={(e) => e.stopPropagation()}
+          >
+            <h3 style={{ marginTop: 0 }}>Enviar liquidaciones por mail</h3>
+            <p style={uiStyles.helpText}>
+              Se encolará un mail por cada profesional del listado de Capital Humano del período
+              seleccionado ({rows.length} destinatario{rows.length === 1 ? "" : "s"}).
+              El envío es gradual para no saturar el servidor de correo.
+            </p>
+            <div style={{ display: "flex", gap: 8, justifyContent: "flex-end", marginTop: 16 }}>
+              <button
+                type="button"
+                style={uiStyles.buttonSecondary}
+                disabled={mailBusy}
+                onClick={() => setMailConfirmOpen(false)}
+              >
+                Cancelar
+              </button>
+              <button type="button" style={uiStyles.buttonPrimary} disabled={mailBusy} onClick={confirmMailStart}>
+                {mailBusy ? "Encolando…" : "Confirmar envío"}
+              </button>
+            </div>
+          </div>
+        </div>
+      ) : null}
+      {mailMissing ? (
+        <div
+          role="dialog"
+          style={{
+            position: "fixed",
+            inset: 0,
+            background: "rgba(0,0,0,0.45)",
+            display: "grid",
+            placeItems: "center",
+            zIndex: 80,
+            padding: 16,
+          }}
+          onClick={() => setMailMissing(null)}
+        >
+          <div
+            style={{ ...uiStyles.pageSection, maxWidth: 560, width: "100%", maxHeight: "80vh", overflow: "auto" }}
+            onClick={(e) => e.stopPropagation()}
+          >
+            <h3 style={{ marginTop: 0 }}>Faltan mails válidos</h3>
+            <p style={uiStyles.helpText}>
+              El lote está bloqueado hasta que todos los profesionales del listado tengan mail
+              (sincronizá desde Mis profesionales cuando Integrando exponga MAIL).
+            </p>
+            <ul style={{ margin: "12px 0", paddingLeft: 18 }}>
+              {mailMissing.map((p) => (
+                <li key={p.professional_id}>
+                  {p.legajo || "—"} · {p.professional_name}
+                  {p.email ? ` (${p.email})` : ""}
+                </li>
+              ))}
+            </ul>
+            <div style={{ display: "flex", justifyContent: "flex-end" }}>
+              <button type="button" style={uiStyles.buttonSecondary} onClick={() => setMailMissing(null)}>
+                Cerrar
+              </button>
+            </div>
+          </div>
+        </div>
+      ) : null}
 
       {descuentoErrors ? (
         <div
@@ -1002,6 +1172,48 @@ export function NovedadesXlsPage() {
         >
           Descargar liquidación
         </button>
+        <button
+          type="button"
+          style={uiStyles.buttonPrimary}
+          onClick={openMailConfirm}
+          disabled={
+            !periodoId ||
+            !periodoClosed ||
+            mailBusy ||
+            Boolean(mailStatus?.locked) ||
+            Boolean(mailStatus && !mailStatus.can_start)
+          }
+          title={
+            !periodoId
+              ? "Seleccioná un período"
+              : !periodoClosed
+                ? "Solo disponible para períodos cerrados"
+                : mailStatus?.locked
+                  ? "Lote completo: no se puede reenviar"
+                  : "Enviar liquidación por mail a cada profesional"
+          }
+        >
+          {mailBusy ? "Procesando…" : "Enviar liquidaciones por mail"}
+        </button>
+        {mailStatus?.lote_id ? (
+          <span style={{ ...uiStyles.helpText, alignSelf: "center" }}>
+            Mails: {mailStatus.sent}/{mailStatus.total} enviados
+            {mailStatus.pending ? ` · ${mailStatus.pending} pendientes` : ""}
+            {mailStatus.failed ? ` · ${mailStatus.failed} fallidos` : ""}
+            {mailStatus.worker_running ? " · enviando…" : ""}
+            {mailStatus.locked ? " · completo" : ""}
+          </span>
+        ) : null}
+        {mailStatus?.can_retry_failed ? (
+          <button
+            type="button"
+            style={uiStyles.buttonSecondary}
+            onClick={retryMailFailed}
+            disabled={mailBusy}
+          >
+            Reintentar fallidos
+          </button>
+        ) : null}
         <button
           type="button"
           style={uiStyles.buttonSecondary}

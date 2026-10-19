@@ -142,6 +142,10 @@ class Settings(BaseSettings):
     # false = STARTTLS (typical 587); true = implicit TLS/SSL (typical 465).
     # Empty env value is treated as false (avoids crash on SMTP_SECURE=).
     smtp_secure: OptionalBool = Field(default=False, validation_alias="SMTP_SECURE")
+    # Delay between liquidación mails (spam / rate-limit mitigation).
+    mail_liquidacion_delay_seconds: float = Field(
+        default=3.0, validation_alias="MAIL_LIQUIDACION_DELAY_SECONDS"
+    )
     password_reset_ttl_minutes: int = Field(default=60, validation_alias="PASSWORD_RESET_TTL_MINUTES")
     password_reset_cooldown_seconds: int = Field(
         default=60, validation_alias="PASSWORD_RESET_COOLDOWN_SECONDS"
