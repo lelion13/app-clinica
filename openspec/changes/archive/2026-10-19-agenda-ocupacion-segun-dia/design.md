@@ -63,3 +63,13 @@ Indicadores (si usan mapa): contar ocupación solo si existe mapa para el weekda
 - Consultorios assign parcial OK / conflicto all-or-nothing.
 - Unassign un día vs full.
 - Events resource_id por weekday.
+
+## Learned (prod migration)
+
+**Síntoma (VPS):** `alembic upgrade head` en `0032` → `UniqueViolation` PK `consulting_room_id_agenda_pkey` Key `(id_agenda)=(10929)` al insertar el 2º weekday.
+
+**Causa:** se expandían N filas por agenda con la PK antigua aún en solo `id_agenda`.
+
+**Fix:** en `upgrade()`, dropear PK `id_agenda` **antes** del DELETE/INSERT de expansión; luego `weekday NOT NULL` + PK `(id_agenda, weekday)`.
+
+**Regla:** migraciones que cambian cardinalidad de clave (1 fila → N) MUST relajar/reemplazar la constraint única **antes** de insertar las filas nuevas.

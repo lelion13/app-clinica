@@ -2,7 +2,7 @@
 
 ## Purpose
 
-Dominio de distribución de consultorios: sync de ocupación (horarios activos), materialización de agenda ocupación, mapeo `id_agenda` → consultorio, vínculo ubicación↔ocupación `(id_dominio, tipo)`, UI de grillas, e indicadores/estadísticas de ocupación.
+Dominio de distribución de consultorios: sync de ocupación (horarios activos), materialización de agenda ocupación, mapeo `(id_agenda, weekday)` → consultorio, vínculo ubicación↔ocupación `(id_dominio, tipo)`, UI de grillas e indicadores de ocupación.
 
 ## Traceability (source of truth vs archives)
 
@@ -10,14 +10,14 @@ Dominio de distribución de consultorios: sync de ocupación (horarios activos),
 |-----------|---------------------|----------------|
 | Sync Ocupación `/ocupacion`, env, tabla, split `nombre_agenda`, filtros/indicadores grilla sync | § Sync y Ocupación | `2026-08-06-distribucion-ocupacion` |
 | API `agenda/events` + `filter-options` (materialización) | § Agenda API | `2026-08-06-agenda-ocupacion-sync` |
-| Mapeo `id_agenda`→room + columnas consultorio / Sin consultorio | § Mapeo | `2026-08-06-mapeo-agenda-consultorio` (+ UI/batch `2026-10-03-consultorios-ui`) |
+| Mapeo `(id_agenda, weekday)`→room + columnas / Sin consultorio | § Mapeo | `2026-08-06-mapeo-agenda-consultorio` + `2026-10-03-consultorios-ui` + `2026-10-19-agenda-ocupacion-segun-dia` |
 | `locations.tipo` + unique par + filtro location dominio+tipo | § Ubicaciones | `2026-08-06-locations-tipo` |
-| UI Agenda ocupación (planilla, filtros, modal, DnD reassign) | § UI Agenda | `2026-08-06-agenda-ocupacion-ui` + `2026-10-05-agenda-ocupacion-dnd` |
-| UI Consultorios (grilla, modales, horarios, sin menú Horarios) | § UI Consultorios | `2026-10-03-consultorios-ui` |
+| UI Agenda ocupación (planilla, filtros, modal, DnD por día) | § UI Agenda | `2026-08-06-agenda-ocupacion-ui` + `2026-10-05-agenda-ocupacion-dnd` + `2026-10-19-agenda-ocupacion-segun-dia` |
+| UI Consultorios (grilla, modales, horarios, Agendas por día) | § UI Consultorios | `2026-10-03-consultorios-ui` + `2026-10-19-agenda-ocupacion-segun-dia` |
 | Indicadores ocupación (sync, Día\|Mes, torta, tops; filtros payload; medico sync) | § Indicadores ocupación | `2026-10-03-indicadores-ocupacion` + `2026-10-05-indicadores-ocupacion-ui` |
-| Estadística (asignaciones semanales, rango) | § Estadística | `2026-10-03-dashboard-estadisticas` |
+| Retiro Ocupación semanal / Agenda bookings / Estadística | § Retiro obsoletas | `limpiar-ui-obsoleta` (rev `0033_drop_bookings_weekly`) |
 
-**Regla anti-ambigüedad:** si un archive antiguo dice FullCalendar/popover/multi-select, PK=`id_dato`, o “Estadística = bookings”, **prevalece esta spec estable**. Los deltas archivados son histórico.
+**Regla anti-ambigüedad:** si un archive antiguo habla de Ocupación semanal, Agenda `/agenda` (bookings), Estadística `/estadisticas`, FullCalendar o PK=`id_dato`, **prevalece esta spec estable**. Los deltas archivados son histórico.
 
 ---
 
@@ -25,13 +25,15 @@ Dominio de distribución de consultorios: sync de ocupación (horarios activos),
 
 ### Requirement: Menú Ocupación
 
-El sistema MUST mostrar un ítem **Ocupación** bajo Distribución, path `/ocupacion`, visible para `admin` y `operador`. **Ocupación semanal** MUST permanecer como ítem distinto.
+El sistema MUST mostrar un ítem **Ocupación** bajo Distribución, path `/ocupacion`, visible para `admin` y `operador`.
 
-#### Scenario: Operador ve ambos ítems
+El menú Distribución MUST NOT mostrar **Ocupación semanal**, **Agenda** (reservas `/agenda`) ni **Estadística**.
+
+#### Scenario: Operador ve Ocupación sin las obsoletas
 
 - **Given** usuario `operador`
 - **When** abre el menú Distribución
-- **Then** ve **Ocupación semanal** y **Ocupación** como entradas distintas
+- **Then** ve **Ocupación** y NO ve Ocupación semanal, Agenda ni Estadística
 
 ### Requirement: Persistencia y sync de horarios activos
 
@@ -130,33 +132,33 @@ Filas sin `dia`/horas válidas MUST NOT generar eventos.
 
 ### Requirement: Mapeo id_agenda → consultorio
 
-El sistema MUST persistir `id_agenda` → `room_id` con `id_agenda` único (rev `0015`).
+El sistema MUST persistir el mapeo **`(id_agenda, weekday)` → `room_id`** (rev `0032_agenda_map_weekday`; legado 1:1 en `0015`), donde `weekday` es 0–6 (mismo convenio JS que `room_operating_hours`). Un mismo `id_agenda` MAY tener distintos rooms por weekday. Weekdays sin fila MUST tratarse como Sin consultorio.
 
-MUST listar/agregar/quitar desde ficha **Consultorios** (JWT admin|operador), vía modal Agendas con draft hasta Aceptar. `PUT /api/v1/consulting-rooms/{room_id}/id-agendas` MUST replace atómico (todo-o-nada). Si un ítem ya está en otro room y `confirm_move` es false, MUST 409 sin aplicar el batch. Endpoints unitarios POST/DELETE MAY permanecer.
+Migración desde 1:1: cada fila legada MUST expandirse a todos los weekdays sync parseables de ese `id_agenda` (mismo `room_id`). La migración MUST dropear la PK `id_agenda` **antes** de insertar múltiples weekdays (si no → UniqueViolation).
 
-MUST ofrecer lookup typeahead por médico desde snapshot sync; label `id_agenda — nombre_agenda`. Cada ítem del lookup MUST incluir `current_room_id` / `current_room_code` (null si no mapeado a room activo).
+MUST listar/agregar/quitar desde ficha **Consultorios** (JWT admin|operador), modal Agendas draft hasta Aceptar. `PUT .../id-agendas` MUST: asignar solo weekdays aún Sin consultorio (no pisar otros rooms); todo-o-nada con validación horario/solape; listar full = una fila nombre, parcial = una fila por día `{nombre} - {día}`; unassign full = todos los días en ese room, parcial = un weekday. Endpoints unitarios POST/DELETE MAY permanecer (`DELETE` con `weekday` opcional).
 
-`GET .../agenda/events` MUST resolver `resource_id` = id de room o `unassigned`.
+MUST ofrecer lookup typeahead por médico; label `id_agenda — nombre_agenda`. `current_room_id`/`current_room_code` solo si **todos** los weekdays sync están en el mismo room activo; si no, null.
 
-La asociación agenda↔consultorio MUST NOT validar contra `room_operating_hours` (son independientes).
+`GET .../agenda/events` MUST resolver `resource_id` con el mapa del **weekday del evento**. Indicadores MUST usar el mismo criterio por weekday.
 
-#### Scenario: Sin mapeo
+#### Scenario: Sin mapeo ese día
 
-- **Given** fila con `id_agenda` sin mapeo
-- **When** events del día
+- **Given** lunes mapeado a C1 y martes sin fila
+- **When** events de un martes
 - **Then** `resource_id` = `unassigned`
 
-#### Scenario: Move con confirmación
+#### Scenario: Migración expand
 
-- **Given** id_agenda en room A
-- **When** PUT batch a room B con ese ítem y `confirm_move=true`
-- **Then** queda solo en B
+- **Given** mapa legado Pérez→C1 y sync lunes+martes
+- **When** corre `0032`
+- **Then** filas (Pérez, lunes)→C1 y (Pérez, martes)→C1
 
-#### Scenario: Lookup muestra room actual
+#### Scenario: Lookup room completo
 
-- **Given** agenda 100 asociada al room código `C3`
-- **When** lookup encuentra esa agenda
-- **Then** el ítem incluye `current_room_id` y `current_room_code=C3`
+- **Given** agenda 100 con todos sus días sync en room `C3`
+- **When** lookup
+- **Then** `current_room_code=C3`
 
 ### Requirement: UI Consultorios — grilla y modales
 
@@ -165,6 +167,8 @@ La asociación agenda↔consultorio MUST NOT validar contra `room_operating_hour
 **Agregar** MUST abrir modal ubicación + código. Modales Agregar/Editar/Agendas/Horarios MUST ser draft hasta **Aceptar**; **Cancelar** MUST NOT persistir. Solo un modal abierto a la vez.
 
 **Editar** MUST `PATCH` ubicación y código. **Horarios** MUST permitir uno o más días (checkboxes) para la misma franja, lista con **Modificar** y **Eliminar**, y `PUT /api/v1/consulting-rooms/{room_id}/hours` replace atómico (`start_time < end_time`, weekday 0–6). Endpoints unitarios de hours MAY permanecer.
+
+Modal **Agendas** MUST seguir las reglas de mapeo por weekday (assign solo pendientes, labels full/parcial, unassign por día o full, conflicto modal todo-o-nada).
 
 El menú MUST NOT mostrar **Horarios consultorio**; la ruta `/horarios-consultorio` MUST NOT existir. La gestión de franjas MUST ser el modal Horarios en `/consultorios`.
 
@@ -179,6 +183,12 @@ El menú MUST NOT mostrar **Horarios consultorio**; la ruta `/horarios-consultor
 - **Given** usuario `operador`
 - **When** abre el menú Distribución
 - **Then** NO ve **Horarios consultorio** y sí ve **Consultorios**
+
+#### Scenario: Assign no pisa otro room
+
+- **Given** lunes en C2; martes Sin consultorio
+- **When** assign a C1 desde Consultorios
+- **Then** solo el martes pasa a C1; el lunes permanece en C2
 
 #### Scenario: Reemplazar franjas
 
@@ -200,21 +210,21 @@ Filtro agenda por `location_id` MUST aplicar **id_dominio y tipo** de esa locati
 
 ### Requirement: UI Agenda ocupación
 
-Menú **Agenda ocupación** `/agenda-ocupacion` (`admin`/`operador`). MUST NOT sync (sync solo en Ocupación). `/agenda` (bookings) intacta.
+Menú **Agenda ocupación** `/agenda-ocupacion` (`admin`/`operador`). MUST NOT sync (sync solo en Ocupación). Las rutas legacy `/agenda`, `/ocupacion-semanal` y `/estadisticas` MUST redirigir a Home.
 
-MUST mostrar grilla día × consultorios (+ **Sin consultorio**), horas alineadas (sin drift box-model), full-bleed + altura viewport, scroll interno, cabecera sticky, columnas ≥160px.
+MUST mostrar grilla día × consultorios (+ **Sin consultorio**), horas alineadas, full-bleed + altura viewport, scroll interno, cabecera sticky, columnas ≥160px.
 
-Filtros en **una fila** de selects (un valor o vacío=Todos): Ubicación, Día (+ nav), Tipo, Especialidad, Médico — vía `filter-options` / `events`. Sin consultorio respeta los mismos filtros.
+Columnas de consultorios MUST ordenarse por número en `code` (C1…C10); códigos sin número al final. Si no caben: scroll horizontal; durante drag cerca del borde, auto-scroll H. **Sin consultorio** MUST ser sticky a la izquierda si tiene ítems; si vacía, scroll con el resto.
 
-Click bloque → modal centrado + overlay; cierra Esc / overlay / Cerrar.
+Filtros en **una fila** de selects: Ubicación, Día (+ nav), Tipo, Especialidad, Médico. Solo agendas con bloque sync el weekday del calendario.
 
-Respecto del mapeo agenda↔consultorio, la UI MUST permitir drag-and-drop horizontal entre columnas (ver requisitos Reassign / Validación / Confirmaciones / Feedback). MUST NOT permitir drag vertical ni resize que altere horarios del sync.
+Click bloque → modal; Esc / overlay / Cerrar. DnD horizontal (ver Reassign); MUST NOT drag vertical / resize de horas sync.
 
 #### Scenario: Filtros en una fila
 
 - **Given** desktop
 - **When** abre Agenda ocupación
-- **Then** filtros en una banda compacta (sin listas checkbox altas)
+- **Then** filtros en una banda compacta
 
 #### Scenario: Cierre modal
 
@@ -230,31 +240,35 @@ Respecto del mapeo agenda↔consultorio, la UI MUST permitir drag-and-drop horiz
 
 ### Requirement: Reassign agenda via Agenda ocupación (DnD)
 
-El sistema MUST permitir reasignar el mapeo persistente `id_agenda` → `room_id` desde Agenda ocupación mediante DnD horizontal. Persistencia al soltar vía `POST /api/v1/distribucion/ocupacion/agenda/reassign` (JWT `admin`|`operador`).
+El sistema MUST reasignar **solo el weekday del día del calendario** vía DnD. `POST /api/v1/distribucion/ocupacion/agenda/reassign` (JWT `admin`|`operador`) MUST incluir `weekday`. Otras filas `(id_agenda, otros weekdays)` MUST permanecer intactas. Solo columnas visibles son destinos.
 
-Movimientos: Sin consultorio ↔ consultorio y entre consultorios. Solo columnas visibles son destinos.
+#### Scenario: Asignar solo el lunes
 
-#### Scenario: Asignar desde Sin consultorio
+- **Given** agenda lunes+martes Sin consultorio; calendario lunes; C1 válido
+- **When** drop en C1
+- **Then** solo lunes en C1; martes sigue Sin consultorio
 
-- **Given** bloque unassigned y room destino válido (horario + sin solape en todos los weekdays)
-- **When** drop en esa columna
-- **Then** mapeo persistido; todas las ocurrencias de esa agenda pasan al room
+#### Scenario: Desasignar solo el día
+
+- **Given** lunes y martes en C1; calendario lunes
+- **When** drop a Sin consultorio
+- **Then** se borra solo el mapa del lunes
 
 ### Requirement: Validación horario box y sin solape (path reassign)
 
-Al asignar/mover (`target_room_id` no null), el backend MUST validar **todos** los weekdays con bloques sync parseables de ese `id_agenda`: cobertura en `room_operating_hours` y sin solape con otras agendas del room (half-open; excluir propio `id_agenda`). Fallo → no persistir + error detallado.
+Al asignar/mover en AO, el backend MUST validar **únicamente el weekday reasignado**: cobertura `room_operating_hours` y sin solape ese weekday (half-open; excluir `(id_agenda, weekday)`). Fallo → no persistir + error detallado.
 
-Esta validación MUST aplicar al path reassign/DnD. El modal Agendas en Consultorios MAY seguir sin estas reglas.
+El path Consultorios Agendas MUST aplicar la misma validación al asignar días pendientes (todo-o-nada).
 
-#### Scenario: Un weekday falla, otros OK
+#### Scenario: Martes conflictivo no bloquea lunes
 
-- **Given** agenda OK el lunes en pantalla pero solapa el jueves en el room destino
-- **When** reassign
-- **Then** se rechaza (validación multi-weekday)
+- **Given** lunes OK en C1 y solape el martes en C1
+- **When** reassign del lunes a C1
+- **Then** el lunes se acepta
 
 ### Requirement: Confirmaciones robo y desasignar
 
-Robo de otro room: UI confirm + `confirm_move`; sin confirm → 409. Desasignar (Sin consultorio): UI confirm + `confirm_unassign`; sin validar horario/solape.
+Robo: si `(id_agenda, weekday)` está en otro room → UI confirm + `confirm_move`; sin confirm → 409. Desasignar en AO: UI confirm + `confirm_unassign`; sin validar horario/solape; solo ese weekday.
 
 ### Requirement: Feedback de rechazo DnD
 
@@ -262,7 +276,7 @@ Fallo de validación → modal con motivo detallado; bloque permanece en columna
 
 ### Requirement: Menú Indicadores ocupación
 
-El sistema MUST mostrar **Indicadores ocupación** → `/indicadores-ocupacion` (`admin`/`operador`). MUST coexistir con **Estadística**; MUST NOT alterar el cálculo de Estadística.
+El sistema MUST mostrar **Indicadores ocupación** → `/indicadores-ocupacion` (`admin`/`operador`). MUST NOT depender de Estadística ni de `weekly-assignments` / `/stats`.
 
 ### Requirement: API e UI Indicadores ocupación (sync)
 
@@ -296,21 +310,20 @@ UI `/indicadores-ocupacion`: control Día|Mes, selects ubicación/consultorio/es
 - **When** tops
 - **Then** solo las mapeadas (que entran a la torta) aportan horas a los tops
 
-### Requirement: Menú Estadística
+### Requirement: Retiro de Ocupación semanal, Agenda bookings y Estadística
 
-El sistema MUST mostrar **Estadística** → `/estadisticas` (`admin`/`operador`), coexistiendo con Indicadores ocupación.
+El sistema MUST NOT exponer UI ni API de Ocupación semanal (`/ocupacion-semanal`, `/api/v1/weekly-assignments`), Agenda reservas (`/agenda`, `/api/v1/bookings`) ni Estadística (`/estadisticas`, `/api/v1/stats`).
 
-### Requirement: API e UI Estadística (asignaciones semanales)
+Las rutas FE legacy MUST redirigir a `/`. Las tablas exclusivas `bookings` y `room_weekly_assignments` MUST eliminarse (rev `0033_drop_bookings_weekly`). MUST NOT eliminar `professionals`, consultorios ni `room_operating_hours`.
 
-`GET /api/v1/stats/summary` MUST aceptar rango `start_date`/`end_date` y filtros (ubicaciones, rooms, profesionales, especialidades).
+#### Scenario: Redirect legacy
 
-- **Denominador:** horas `room_operating_hours` en el rango para rooms incluidos.
-- **Numerador:** horas de `room_weekly_assignments` proyectadas por ocurrencias de weekday en el rango (NO bookings puntuales; NO sync externo). Especialidad MUST filtrar numerador sin reducir denominador.
+- **Given** usuario autenticado
+- **When** navega a `/estadisticas` o `/agenda` o `/ocupacion-semanal`
+- **Then** termina en Home
 
-UI `/estadisticas`: rango + filtros + torta/KPIs/series.
+#### Scenario: API ausente
 
-#### Scenario: Distinto de Indicadores
-
-- **Given** mismo día y mismos rooms
-- **When** se consulta Estadística vs Indicadores ocupación
-- **Then** las fuentes de numerador son independientes (weekly assignments vs sync mapeado)
+- **Given** JWT válido
+- **When** GET `/api/v1/stats/summary` o `/api/v1/bookings` o `/api/v1/weekly-assignments`
+- **Then** 404 (ruta no montada)

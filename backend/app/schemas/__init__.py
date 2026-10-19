@@ -1,5 +1,4 @@
 from app.schemas.auth import LoginRequest, MeResponse
-from app.schemas.booking import BookingCreateRequest, BookingResponse, BookingUpdateRequest
 from app.schemas.consulting_room import (
     ConsultingRoomCreateRequest,
     ConsultingRoomResponse,
@@ -12,7 +11,6 @@ from app.schemas.location import LocationCreateRequest, LocationResponse, Locati
 from app.schemas.professional import ProfessionalResponse, ProfessionalSyncResponse
 from app.schemas.setup import BootstrapAdminRequest
 from app.schemas.user import UserCreateRequest, UserResponse, UserUpdateRequest
-from app.schemas.weekly_assignment import WeeklyAssignmentCreateRequest, WeeklyAssignmentResponse
 
 __all__ = [
     "LoginRequest",
@@ -32,10 +30,4 @@ __all__ = [
     "RoomOperatingHourResponse",
     "ProfessionalResponse",
     "ProfessionalSyncResponse",
-    "BookingCreateRequest",
-    "BookingUpdateRequest",
-    "BookingResponse",
-    "WeeklyAssignmentCreateRequest",
-    "WeeklyAssignmentResponse",
 ]
-

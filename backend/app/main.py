@@ -7,16 +7,13 @@ from fastapi.responses import Response
 
 from app.api.routers.auth import router as auth_router
 from app.api.routers.backup import router as backup_router
-from app.api.routers.bookings import router as bookings_router
 from app.api.routers.consulting_rooms import router as consulting_rooms_router
 from app.api.routers.distribucion import router as distribucion_router
 from app.api.routers.locations import router as locations_router
 from app.api.routers.novedades import router as novedades_router
 from app.api.routers.professionals import router as professionals_router
 from app.api.routers.setup import router as setup_router
-from app.api.routers.stats import router as stats_router
 from app.api.routers.users import router as users_router
-from app.api.routers.weekly_assignments import router as weekly_assignments_router
 from app.core.config import settings
 from app.services import scheduler_service
 
@@ -68,9 +65,6 @@ app.include_router(users_router, prefix="/api/v1/users", tags=["users"])
 app.include_router(locations_router, prefix="/api/v1/locations", tags=["locations"])
 app.include_router(consulting_rooms_router, prefix="/api/v1/consulting-rooms", tags=["consulting-rooms"])
 app.include_router(professionals_router, prefix="/api/v1/professionals", tags=["professionals"])
-app.include_router(bookings_router, prefix="/api/v1/bookings", tags=["bookings"])
-app.include_router(stats_router, prefix="/api/v1/stats", tags=["stats"])
-app.include_router(weekly_assignments_router, prefix="/api/v1/weekly-assignments", tags=["weekly-assignments"])
 app.include_router(distribucion_router, prefix="/api/v1/distribucion", tags=["distribucion"])
 app.include_router(novedades_router, prefix="/api/v1/novedades", tags=["novedades"])
 app.include_router(backup_router, prefix="/api/v1/backups", tags=["backups"])

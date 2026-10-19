@@ -1,5 +1,4 @@
 from app.services.auth_service import authenticate_user, decode_token, issue_tokens
-from app.services.booking_service import create_booking, delete_booking, list_bookings, update_booking
 from app.services.consulting_room_service import (
     create_room,
     create_room_hour,
@@ -41,9 +40,4 @@ __all__ = [
     "delete_room_hour",
     "list_professionals",
     "sync_professionals_from_external",
-    "list_bookings",
-    "create_booking",
-    "update_booking",
-    "delete_booking",
 ]
-
