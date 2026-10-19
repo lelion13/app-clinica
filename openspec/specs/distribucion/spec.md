@@ -15,7 +15,7 @@ Dominio de distribución de consultorios: sync de ocupación (horarios activos),
 | UI Agenda ocupación (planilla, filtros, modal, DnD por día) | § UI Agenda | `2026-08-06-agenda-ocupacion-ui` + `2026-10-05-agenda-ocupacion-dnd` + `2026-10-19-agenda-ocupacion-segun-dia` |
 | UI Consultorios (grilla, modales, horarios, Agendas por día) | § UI Consultorios | `2026-10-03-consultorios-ui` + `2026-10-19-agenda-ocupacion-segun-dia` |
 | Indicadores ocupación (sync, Día\|Mes, torta, tops; filtros payload; medico sync) | § Indicadores ocupación | `2026-10-03-indicadores-ocupacion` + `2026-10-05-indicadores-ocupacion-ui` |
-| Retiro Ocupación semanal / Agenda bookings / Estadística | § Retiro obsoletas | `limpiar-ui-obsoleta` (rev `0033_drop_bookings_weekly`) |
+| Retiro Ocupación semanal / Agenda bookings / Estadística | § Retiro obsoletas | `2026-10-19-limpiar-ui-obsoleta` (rev `0033_drop_bookings_weekly`) |
 
 **Regla anti-ambigüedad:** si un archive antiguo habla de Ocupación semanal, Agenda `/agenda` (bookings), Estadística `/estadisticas`, FullCalendar o PK=`id_dato`, **prevalece esta spec estable**. Los deltas archivados son histórico.
 
