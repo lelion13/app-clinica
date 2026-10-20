@@ -768,11 +768,18 @@ export function IndicadoresOcupacionPage() {
             <div style={metricGrid}>
               {[
                 ["Total turnos", resumenAgg.total_turnos],
-                ["Pendientes", `${resumenAgg.turnos_pendientes} (${resumenAgg.porcentaje_pendientes}%)`],
-                ["Confirmados", `${resumenAgg.turnos_confirmados} (${resumenAgg.porcentaje_confirmados}%)`],
-                ["Cancelados", `${resumenAgg.turnos_cancelados} (${resumenAgg.porcentaje_cancelados}%)`],
-                ["Atendidos", `${resumenAgg.turnos_atendidos} (${resumenAgg.porcentaje_atendidos}%)`],
-                ["Ausentes", `${resumenAgg.turnos_ausentes} (${resumenAgg.porcentaje_ausentes}%)`],
+                ["Asignados", resumenAgg.asignados],
+                ["En espera", resumenAgg.en_espera],
+                ["Presentes", resumenAgg.presentes],
+                ["Atendidos", resumenAgg.atendidos],
+                ["Ausentes", `${resumenAgg.ausentes} (${resumenAgg.pct_ausentismo}%)`],
+                ["Cancelados", `${resumenAgg.cancelados} (${resumenAgg.pct_cancelados}%)`],
+                ["Cancel. paciente", `${resumenAgg.cancelados_paciente} (${resumenAgg.pct_cancel_paciente}%)`],
+                ["Cancel. otros", `${resumenAgg.cancelados_otros} (${resumenAgg.pct_cancel_otros}%)`],
+                ["Reserva teléfono", resumenAgg.reserva_telefonico],
+                ["Reserva persona", resumenAgg.reserva_persona],
+                ["Reserva web", resumenAgg.reserva_web],
+                ["Reserva API", resumenAgg.reserva_api],
                 ["Espera promedio (días)", resumenAgg.espera_promedio_dias],
                 ["Horarios matched", resumenAgg.matched_rows],
               ].map(([label, value]) => (

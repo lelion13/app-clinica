@@ -162,21 +162,29 @@ class TurnosCsvStatsResponse(BaseModel):
 
 
 class TurnosResumenDetalleItem(BaseModel):
+    """Fila del endpoint externo `/is/turnos/resumen` (shape real)."""
+
     model_config = ConfigDict(extra="ignore")
 
     turno_horario_id: int | None = None
     total_turnos: int | float = 0
-    turnos_pendientes: int | float = 0
-    turnos_confirmados: int | float = 0
-    turnos_cancelados: int | float = 0
-    turnos_atendidos: int | float = 0
-    turnos_ausentes: int | float = 0
-    porcentaje_pendientes: int | float = 0
-    porcentaje_confirmados: int | float = 0
-    porcentaje_cancelados: int | float = 0
-    porcentaje_atendidos: int | float = 0
-    porcentaje_ausentes: int | float = 0
     espera_promedio_dias: int | float = 0
+    asignados: int | float = 0
+    en_espera: int | float = 0
+    presentes: int | float = 0
+    atendidos: int | float = 0
+    ausentes: int | float = 0
+    cancelados: int | float = 0
+    reserva_telefonico: int | float = 0
+    reserva_persona: int | float = 0
+    reserva_web: int | float = 0
+    reserva_api: int | float = 0
+    cancelados_paciente: int | float = 0
+    cancelados_otros: int | float = 0
+    pct_cancelados: int | float = 0
+    pct_cancel_paciente: int | float = 0
+    pct_cancel_otros: int | float = 0
+    pct_ausentismo: int | float = 0
 
 
 class TurnosResumenResponse(BaseModel):

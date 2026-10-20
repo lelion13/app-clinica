@@ -18,7 +18,8 @@ def test_fetch_rejects_inverted_range():
     assert exc.value.status_code == 422
 
 
-def test_fetch_ok(monkeypatch):
+def test_fetch_ok_array_root(monkeypatch):
+    """El API real responde un array de filas (no wrapper con detalle)."""
     monkeypatch.setattr(
         service.settings,
         "distribucion_turnos_resumen_url",
@@ -33,25 +34,24 @@ def test_fetch_ok(monkeypatch):
             return None
 
         def json(self):
-            return {
-                "fecha_desde": "2026-10-01",
-                "fecha_hasta": "2026-10-31",
-                "total_turnos": 40,
-                "detalle": [
-                    {
-                        "turno_horario_id": 10,
-                        "total_turnos": 10,
-                        "turnos_confirmados": 2,
-                        "espera_promedio_dias": 2,
-                    },
-                    {
-                        "turno_horario_id": 20,
-                        "total_turnos": 30,
-                        "turnos_confirmados": 6,
-                        "espera_promedio_dias": 4,
-                    },
-                ],
-            }
+            return [
+                {
+                    "turno_horario_id": 10,
+                    "total_turnos": 10,
+                    "atendidos": 2,
+                    "ausentes": 3,
+                    "cancelados": 1,
+                    "espera_promedio_dias": 2,
+                },
+                {
+                    "turno_horario_id": 20,
+                    "total_turnos": 30,
+                    "atendidos": 6,
+                    "ausentes": 4,
+                    "cancelados": 2,
+                    "espera_promedio_dias": 4,
+                },
+            ]
 
     class FakeClient:
         def __init__(self, *args, **kwargs):
@@ -77,7 +77,48 @@ def test_fetch_ok(monkeypatch):
     assert result.total_turnos == 40
     assert len(result.detalle) == 2
     assert result.detalle[0].turno_horario_id == 10
-    assert result.detalle[1].turnos_confirmados == 6
+    assert result.detalle[1].atendidos == 6
+    assert result.detalle[0].ausentes == 3
+
+
+def test_fetch_ok_wrapped_detalle(monkeypatch):
+    monkeypatch.setattr(
+        service.settings,
+        "distribucion_turnos_resumen_url",
+        "https://example.test/is/turnos/resumen",
+    )
+    monkeypatch.setattr(service.settings, "novedades_prof_sync_token", "secret-token")
+
+    class FakeResponse:
+        def raise_for_status(self):
+            return None
+
+        def json(self):
+            return {
+                "fecha_desde": "2026-10-01",
+                "fecha_hasta": "2026-10-31",
+                "total_turnos": 5,
+                "detalle": [{"turno_horario_id": 1, "total_turnos": 5, "presentes": 2}],
+            }
+
+    class FakeClient:
+        def __init__(self, *args, **kwargs):
+            pass
+
+        def __enter__(self):
+            return self
+
+        def __exit__(self, *args):
+            return False
+
+        def get(self, *args, **kwargs):
+            return FakeResponse()
+
+    monkeypatch.setattr(service.httpx, "Client", FakeClient)
+    result = service.fetch_turnos_resumen(fecha_desde="2026-10-01", fecha_hasta="2026-10-31")
+    assert result.fecha_desde == "2026-10-01"
+    assert result.total_turnos == 5
+    assert result.detalle[0].presentes == 2
 
 
 def test_fetch_upstream_error_hides_token(monkeypatch):
