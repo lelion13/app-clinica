@@ -30,8 +30,7 @@ def test_fetch_ok_array_root(monkeypatch):
     captured = {}
 
     class FakeResponse:
-        def raise_for_status(self):
-            return None
+        status_code = 200
 
         def json(self):
             return [
@@ -90,8 +89,7 @@ def test_fetch_ok_wrapped_detalle(monkeypatch):
     monkeypatch.setattr(service.settings, "novedades_prof_sync_token", "secret-token")
 
     class FakeResponse:
-        def raise_for_status(self):
-            return None
+        status_code = 200
 
         def json(self):
             return {
@@ -146,6 +144,41 @@ def test_fetch_upstream_error_hides_token(monkeypatch):
     with pytest.raises(HTTPException) as exc:
         service.fetch_turnos_resumen(fecha_desde="2026-10-01", fecha_hasta="2026-10-01")
     assert exc.value.status_code == 502
+    assert "secret-token" not in str(exc.value.detail)
+
+
+def test_fetch_upstream_http_status(monkeypatch):
+    monkeypatch.setattr(
+        service.settings,
+        "distribucion_turnos_resumen_url",
+        "https://example.test/is/turnos/resumen",
+    )
+    monkeypatch.setattr(service.settings, "novedades_prof_sync_token", "secret-token")
+
+    class FakeResponse:
+        status_code = 403
+
+        def json(self):
+            return {"error": "forbidden"}
+
+    class FakeClient:
+        def __init__(self, *args, **kwargs):
+            pass
+
+        def __enter__(self):
+            return self
+
+        def __exit__(self, *args):
+            return False
+
+        def get(self, *args, **kwargs):
+            return FakeResponse()
+
+    monkeypatch.setattr(service.httpx, "Client", FakeClient)
+    with pytest.raises(HTTPException) as exc:
+        service.fetch_turnos_resumen(fecha_desde="2026-10-01", fecha_hasta="2026-10-01")
+    assert exc.value.status_code == 502
+    assert "HTTP 403" in str(exc.value.detail)
     assert "secret-token" not in str(exc.value.detail)
 
 
