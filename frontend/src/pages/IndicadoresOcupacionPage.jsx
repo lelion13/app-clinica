@@ -3,6 +3,7 @@ import { Cell, Pie, PieChart, ResponsiveContainer, Tooltip } from "recharts";
 
 import {
   aggregateTurnosResumen,
+  computeCantidadTurnosMax,
   filterOccupancyForIndicadores,
   monthDateRange,
   occupancyHorarioIds,
@@ -327,6 +328,11 @@ export function IndicadoresOcupacionPage() {
     if (!resumenRaw) return null;
     return aggregateTurnosResumen(resumenRaw.detalle, horarioIds);
   }, [resumenRaw, horarioIds]);
+
+  const cantidadTurnosMax = useMemo(
+    () => computeCantidadTurnosMax(filteredOccupancy, { period, day, month }),
+    [filteredOccupancy, period, day, month]
+  );
 
   const onImportFile = async (event) => {
     const file = event.target.files?.[0];
@@ -760,7 +766,7 @@ export function IndicadoresOcupacionPage() {
           <p style={{ color: uiTheme.colors.danger, fontSize: 13, margin: 0 }}>{resumenError}</p>
         ) : null}
         {!resumenLoading && !resumenError && resumenAgg ? (
-          resumenAgg.matched_rows === 0 && resumenAgg.total_turnos === 0 ? (
+          resumenAgg.matched_rows === 0 && resumenAgg.total_turnos === 0 && cantidadTurnosMax === 0 ? (
             <p style={{ fontSize: 13, color: uiTheme.colors.textMuted, margin: 0 }}>
               Sin filas de resumen para el filtro actual (revisá ids en Ocupación tras Actualizar).
             </p>
@@ -768,6 +774,7 @@ export function IndicadoresOcupacionPage() {
             <div style={metricGrid}>
               {[
                 ["Total turnos", resumenAgg.total_turnos],
+                ["Cantidad turnos max", cantidadTurnosMax],
                 ["Asignados", resumenAgg.asignados],
                 ["En espera", resumenAgg.en_espera],
                 ["Presentes", resumenAgg.presentes],

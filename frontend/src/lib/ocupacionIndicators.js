@@ -164,7 +164,7 @@ export function filterOccupancyForIndicadores(items, { location, roomAgendaIds, 
 
 /**
  * Agrega detalle de turnos-resumen (shape API real) para ids en scope.
- * Contadores = suma; % desde totales; espera ponderada por total_turnos.
+ * Contadores = suma; Total turnos excluye cancelados; espera ponderada por total API.
  * pct_cancel_paciente/otros se recalculan sobre cancelados (no sobre total).
  */
 export function aggregateTurnosResumen(detalle, horarioIds) {
@@ -190,10 +190,11 @@ export function aggregateTurnosResumen(detalle, horarioIds) {
     cancelados_otros: 0,
   };
   let esperaWeighted = 0;
+  let rawTotal = 0;
 
   for (const row of rows) {
     const total = asNonNegFinite(row.total_turnos);
-    sums.total_turnos += total;
+    rawTotal += total;
     for (const key of Object.keys(sums)) {
       if (key === "total_turnos") continue;
       sums[key] += asNonNegFinite(row[key]);
@@ -201,18 +202,21 @@ export function aggregateTurnosResumen(detalle, horarioIds) {
     esperaWeighted += asNonNegFinite(row.espera_promedio_dias) * total;
   }
 
-  const pctOfTotal = (part) =>
+  // Total visible: sin cancelados.
+  sums.total_turnos = Math.max(0, rawTotal - sums.cancelados);
+
+  const pctOfActive = (part) =>
     sums.total_turnos > 0 ? Math.round((part / sums.total_turnos) * 10000) / 100 : 0;
+  const pctOfRaw = (part) => (rawTotal > 0 ? Math.round((part / rawTotal) * 10000) / 100 : 0);
   const pctOfCancel = (part) =>
     sums.cancelados > 0 ? Math.round((part / sums.cancelados) * 10000) / 100 : 0;
 
   return {
     matched_rows: rows.length,
     ...sums,
-    espera_promedio_dias:
-      sums.total_turnos > 0 ? Math.round((esperaWeighted / sums.total_turnos) * 100) / 100 : 0,
-    pct_cancelados: pctOfTotal(sums.cancelados),
-    pct_ausentismo: pctOfTotal(sums.ausentes),
+    espera_promedio_dias: rawTotal > 0 ? Math.round((esperaWeighted / rawTotal) * 100) / 100 : 0,
+    pct_cancelados: pctOfRaw(sums.cancelados),
+    pct_ausentismo: pctOfActive(sums.ausentes),
     pct_cancel_paciente: pctOfCancel(sums.cancelados_paciente),
     pct_cancel_otros: pctOfCancel(sums.cancelados_otros),
   };
@@ -232,4 +236,114 @@ export function monthDateRange(monthValue) {
     fecha_desde: `${year}-${mm}-01`,
     fecha_hasta: `${year}-${mm}-${String(lastDay).padStart(2, "0")}`,
   };
+}
+
+/** Python weekday: lunes=0 … domingo=6 (mismo convenio que sync ocupación). */
+const DIA_TO_PY_WEEKDAY = {
+  lunes: 0,
+  martes: 1,
+  miercoles: 2,
+  miércoles: 2,
+  jueves: 3,
+  viernes: 4,
+  sabado: 5,
+  sábado: 5,
+  domingo: 6,
+};
+
+function normDiaKey(dia) {
+  return String(dia ?? "")
+    .trim()
+    .toLowerCase()
+    .normalize("NFD")
+    .replace(/\p{M}/gu, "");
+}
+
+export function pyWeekdayFromDia(dia) {
+  const key = normDiaKey(dia);
+  if (!key) return null;
+  return Object.prototype.hasOwnProperty.call(DIA_TO_PY_WEEKDAY, key) ? DIA_TO_PY_WEEKDAY[key] : null;
+}
+
+function pyWeekdayFromISO(iso) {
+  const text = String(iso || "").slice(0, 10);
+  const d = new Date(`${text}T12:00:00`);
+  if (Number.isNaN(d.getTime())) return null;
+  const js = d.getDay(); // 0=domingo
+  return js === 0 ? 6 : js - 1;
+}
+
+function parseISODateLocal(iso) {
+  const text = String(iso || "").slice(0, 10);
+  const m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(text);
+  if (!m) return null;
+  const d = new Date(Number(m[1]), Number(m[2]) - 1, Number(m[3]));
+  return Number.isNaN(d.getTime()) ? null : d;
+}
+
+function listISODatesInclusive(fechaDesde, fechaHasta) {
+  const start = parseISODateLocal(fechaDesde);
+  const end = parseISODateLocal(fechaHasta);
+  if (!start || !end || end < start) return [];
+  const out = [];
+  const cur = new Date(start);
+  while (cur <= end) {
+    const y = cur.getFullYear();
+    const m = String(cur.getMonth() + 1).padStart(2, "0");
+    const d = String(cur.getDate()).padStart(2, "0");
+    out.push(`${y}-${m}-${d}`);
+    cur.setDate(cur.getDate() + 1);
+  }
+  return out;
+}
+
+/** Cupos teóricos de una franja: minutos(franja) / duracion_turno. */
+export function rowMaxTurnosPerSession(row) {
+  const from = parseTimeToMinutes(row?.hora_desde);
+  const to = parseTimeToMinutes(row?.hora_hasta);
+  const dur = Number(row?.duracion_turno);
+  if (from === null || to === null || !(to > from) || !Number.isFinite(dur) || !(dur > 0)) return 0;
+  return Math.floor((to - from) / dur);
+}
+
+function rowVigenteOnISO(row, iso) {
+  const day = parseISODateLocal(iso);
+  if (!day) return false;
+  const desde = parseISODateLocal(row?.fecha_desde);
+  const hasta = parseISODateLocal(row?.fecha_hasta);
+  if (!desde || !hasta) return false;
+  return day >= desde && day <= hasta;
+}
+
+/**
+ * Cantidad máxima de turnos del set de ocupación filtrado en el período.
+ * Día: 1 ocurrencia si el weekday del selector coincide y la fila está vigente.
+ * Mes: ocurrencias del weekday de la fila dentro del mes ∩ vigencia.
+ */
+export function computeCantidadTurnosMax(occupancyRows, { period, day, month } = {}) {
+  let dates = [];
+  if (period === "month") {
+    const range = monthDateRange(month);
+    if (!range) return 0;
+    dates = listISODatesInclusive(range.fecha_desde, range.fecha_hasta);
+  } else if (day) {
+    dates = [String(day).slice(0, 10)];
+  }
+  if (!dates.length) return 0;
+
+  let total = 0;
+  for (const row of occupancyRows || []) {
+    const perSession = rowMaxTurnosPerSession(row);
+    if (perSession <= 0) continue;
+    const rowWd = pyWeekdayFromDia(row?.dia);
+    if (rowWd === null) continue;
+    let occurrences = 0;
+    for (const iso of dates) {
+      if (pyWeekdayFromISO(iso) !== rowWd) continue;
+      if (!rowVigenteOnISO(row, iso)) continue;
+      occurrences += 1;
+    }
+    if (occurrences > 0) total += perSession * occurrences;
+  }
+  return total;
 }
