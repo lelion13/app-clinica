@@ -132,6 +132,15 @@ class Settings(BaseSettings):
         default=120.0,
         validation_alias="DISTRIBUCION_HORARIOS_ACTIVOS_TIMEOUT",
     )
+    # Proxy HTTP resumen de turnos (Indicadores ocupación). Mismo Bearer.
+    distribucion_turnos_resumen_url: str = Field(
+        default="",
+        validation_alias="DISTRIBUCION_TURNOS_RESUMEN_URL",
+    )
+    distribucion_turnos_resumen_timeout: float = Field(
+        default=60.0,
+        validation_alias="DISTRIBUCION_TURNOS_RESUMEN_TIMEOUT",
+    )
     # Public web origin for password-reset links (no trailing slash).
     app_public_url: str = Field(default="http://localhost:5173", validation_alias="APP_PUBLIC_URL")
     smtp_host: str = Field(default="", validation_alias="SMTP_HOST")

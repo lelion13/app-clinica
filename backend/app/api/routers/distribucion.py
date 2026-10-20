@@ -11,11 +11,13 @@ from app.schemas.distribucion import (
     HorariosActivosResponse,
     HorariosActivosSyncResponse,
     IndicadoresOcupacionResponse,
+    TurnosResumenResponse,
 )
 from app.services import room_agenda_map as room_agenda_map_service
 from app.services.distribucion import agenda_ocupacion as agenda_ocupacion_service
 from app.services.distribucion import horarios_activos as horarios_activos_service
 from app.services.distribucion import indicadores_ocupacion as indicadores_ocupacion_service
+from app.services.distribucion import turnos_resumen as turnos_resumen_service
 
 router = APIRouter()
 
@@ -75,6 +77,19 @@ def ocupacion_indicadores(
         room_id=room_id,
         especialidad=especialidad,
         medico=medico,
+    )
+
+
+@router.get("/ocupacion/indicadores/turnos-resumen", response_model=TurnosResumenResponse)
+def ocupacion_indicadores_turnos_resumen(
+    fecha_desde: str = Query(..., description="YYYY-MM-DD"),
+    fecha_hasta: str = Query(..., description="YYYY-MM-DD"),
+    user: User = Depends(require_operator_or_admin),
+) -> TurnosResumenResponse:
+    _ = user
+    return turnos_resumen_service.fetch_turnos_resumen(
+        fecha_desde=fecha_desde,
+        fecha_hasta=fecha_hasta,
     )
 
 

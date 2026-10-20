@@ -118,3 +118,112 @@ export function formatMetric(value, digits = 2) {
   const rounded = Number(value.toFixed(digits));
   return Number.isInteger(rounded) ? String(rounded) : String(rounded);
 }
+
+function asNonNegFinite(value) {
+  const n = Number(value);
+  if (!Number.isFinite(n) || n < 0) return 0;
+  return n;
+}
+
+/** Ids de horario remoto (payload `id`) del set filtrado de ocupación. */
+export function occupancyHorarioIds(items) {
+  const ids = new Set();
+  for (const row of items || []) {
+    const id = Number(row?.id);
+    if (Number.isFinite(id) && id > 0) ids.add(id);
+  }
+  return ids;
+}
+
+/**
+ * Filtra filas de ocupación según filtros de Indicadores (en memoria).
+ * location: id_dominio + tipo; roomAgendas: Set de id_agenda cuando hay consultorio.
+ */
+export function filterOccupancyForIndicadores(items, { location, roomAgendaIds, especialidad, medico } = {}) {
+  return (items || []).filter((row) => {
+    if (location) {
+      if (Number(row?.id_dominio) !== Number(location.id_dominio)) return false;
+      if (String(row?.tipo ?? "").trim() !== String(location.tipo ?? "").trim()) return false;
+    }
+    if (roomAgendaIds) {
+      const idAgenda = Number(row?.id_agenda);
+      if (!Number.isFinite(idAgenda) || !roomAgendaIds.has(idAgenda)) return false;
+    }
+    if (especialidad) {
+      const esp = String(row?.especialidad ?? "").trim();
+      const espAg = String(row?.especialidad_agenda ?? "").trim();
+      const sel = String(especialidad).trim();
+      if (esp !== sel && espAg !== sel) return false;
+    }
+    if (medico) {
+      if (String(row?.medico ?? "").trim() !== String(medico).trim()) return false;
+    }
+    return true;
+  });
+}
+
+/**
+ * Agrega detalle de turnos-resumen para ids en scope.
+ * Contadores = suma; % desde totales; espera ponderada por total_turnos.
+ */
+export function aggregateTurnosResumen(detalle, horarioIds) {
+  const idSet = horarioIds instanceof Set ? horarioIds : new Set(horarioIds || []);
+  const rows = (detalle || []).filter((row) => {
+    const id = Number(row?.turno_horario_id);
+    return Number.isFinite(id) && idSet.has(id);
+  });
+
+  let total_turnos = 0;
+  let turnos_pendientes = 0;
+  let turnos_confirmados = 0;
+  let turnos_cancelados = 0;
+  let turnos_atendidos = 0;
+  let turnos_ausentes = 0;
+  let esperaWeighted = 0;
+
+  for (const row of rows) {
+    const total = asNonNegFinite(row.total_turnos);
+    total_turnos += total;
+    turnos_pendientes += asNonNegFinite(row.turnos_pendientes);
+    turnos_confirmados += asNonNegFinite(row.turnos_confirmados);
+    turnos_cancelados += asNonNegFinite(row.turnos_cancelados);
+    turnos_atendidos += asNonNegFinite(row.turnos_atendidos);
+    turnos_ausentes += asNonNegFinite(row.turnos_ausentes);
+    esperaWeighted += asNonNegFinite(row.espera_promedio_dias) * total;
+  }
+
+  const pct = (part) => (total_turnos > 0 ? Math.round((part / total_turnos) * 10000) / 100 : 0);
+
+  return {
+    matched_rows: rows.length,
+    total_turnos,
+    turnos_pendientes,
+    turnos_confirmados,
+    turnos_cancelados,
+    turnos_atendidos,
+    turnos_ausentes,
+    porcentaje_pendientes: pct(turnos_pendientes),
+    porcentaje_confirmados: pct(turnos_confirmados),
+    porcentaje_cancelados: pct(turnos_cancelados),
+    porcentaje_atendidos: pct(turnos_atendidos),
+    porcentaje_ausentes: pct(turnos_ausentes),
+    espera_promedio_dias:
+      total_turnos > 0 ? Math.round((esperaWeighted / total_turnos) * 100) / 100 : 0,
+  };
+}
+
+/** Primer y último día del mes `YYYY-MM`. */
+export function monthDateRange(monthValue) {
+  const text = String(monthValue || "").trim();
+  const match = /^(\d{4})-(\d{2})$/.exec(text);
+  if (!match) return null;
+  const year = Number(match[1]);
+  const month = Number(match[2]);
+  if (month < 1 || month > 12) return null;
+  const lastDay = new Date(year, month, 0).getDate();
+  const mm = String(month).padStart(2, "0");
+  return {
+    fecha_desde: `${year}-${mm}-01`,
+    fecha_hasta: `${year}-${mm}-${String(lastDay).padStart(2, "0")}`,
+  };
+}

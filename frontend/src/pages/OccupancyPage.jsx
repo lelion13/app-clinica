@@ -11,6 +11,7 @@ import { apiRequestWithRefresh } from "../services/api";
 import { uiStyles, uiTheme } from "../ui/theme";
 
 const COLUMNS = [
+  { key: "id", label: "id" },
   { key: "id_dominio", label: "id_dominio" },
   { key: "tipo", label: "tipo" },
   { key: "especialidad_agenda", label: "especialidad_agenda" },

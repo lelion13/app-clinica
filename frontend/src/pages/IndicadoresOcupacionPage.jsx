@@ -1,6 +1,12 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { Cell, Legend, Pie, PieChart, ResponsiveContainer, Tooltip } from "recharts";
 
+import {
+  aggregateTurnosResumen,
+  filterOccupancyForIndicadores,
+  monthDateRange,
+  occupancyHorarioIds,
+} from "../lib/ocupacionIndicators";
 import { apiRequestWithRefresh } from "../services/api";
 import { safeLoad } from "../lib/apiHelpers";
 import { uiStyles, uiTheme } from "../ui/theme";
@@ -13,6 +19,10 @@ function todayISO() {
   const m = String(d.getMonth() + 1).padStart(2, "0");
   const day = String(d.getDate()).padStart(2, "0");
   return `${y}-${m}-${day}`;
+}
+
+function currentMonthISO() {
+  return todayISO().slice(0, 7);
 }
 
 const filterField = {
@@ -30,10 +40,18 @@ const filterSelect = {
   padding: "6px 8px",
 };
 
+const metricGrid = {
+  display: "grid",
+  gridTemplateColumns: "repeat(auto-fit, minmax(140px, 1fr))",
+  gap: 10,
+};
+
 export function IndicadoresOcupacionPage() {
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
+  const [periodMode, setPeriodMode] = useState("day");
   const [day, setDay] = useState(() => todayISO());
+  const [month, setMonth] = useState(() => currentMonthISO());
   const [locationId, setLocationId] = useState("");
   const [roomId, setRoomId] = useState("");
   const [especialidad, setEspecialidad] = useState("");
@@ -42,6 +60,13 @@ export function IndicadoresOcupacionPage() {
   const [rooms, setRooms] = useState([]);
   const [filterOptions, setFilterOptions] = useState({ especialidad: [], medico: [] });
   const [data, setData] = useState(null);
+
+  const [occupancyItems, setOccupancyItems] = useState([]);
+  const [roomAgendaIds, setRoomAgendaIds] = useState(null);
+
+  const [resumenRaw, setResumenRaw] = useState(null);
+  const [resumenLoading, setResumenLoading] = useState(false);
+  const [resumenError, setResumenError] = useState("");
 
   useEffect(() => {
     safeLoad("/locations", setLocations, setError);
@@ -57,6 +82,14 @@ export function IndicadoresOcupacionPage() {
         setError(err.message || "No se pudieron cargar opciones de filtro");
       }
     })();
+    (async () => {
+      try {
+        const occ = await apiRequestWithRefresh("/distribucion/ocupacion/horarios-activos");
+        setOccupancyItems(Array.isArray(occ?.items) ? occ.items : []);
+      } catch {
+        setOccupancyItems([]);
+      }
+    })();
   }, []);
 
   const roomsForSelect = useMemo(() => {
@@ -64,12 +97,14 @@ export function IndicadoresOcupacionPage() {
     return rooms.filter((r) => String(r.location_id) === String(locationId));
   }, [rooms, locationId]);
 
+  const pieDate = periodMode === "month" ? `${month}-01` : day;
+
   const load = useCallback(async () => {
-    if (!day) return;
+    if (!pieDate || pieDate.length < 10) return;
     setLoading(true);
     setError("");
     try {
-      const params = new URLSearchParams({ date: day });
+      const params = new URLSearchParams({ date: pieDate });
       if (locationId) params.set("location_id", locationId);
       if (roomId) params.set("room_id", roomId);
       if (especialidad) params.set("especialidad", especialidad);
@@ -82,7 +117,7 @@ export function IndicadoresOcupacionPage() {
     } finally {
       setLoading(false);
     }
-  }, [day, locationId, roomId, especialidad, medico]);
+  }, [pieDate, locationId, roomId, especialidad, medico]);
 
   useEffect(() => {
     load();
@@ -93,6 +128,90 @@ export function IndicadoresOcupacionPage() {
       setRoomId("");
     }
   }, [roomsForSelect, roomId]);
+
+  useEffect(() => {
+    if (!roomId) {
+      setRoomAgendaIds(null);
+      return undefined;
+    }
+    let cancelled = false;
+    (async () => {
+      try {
+        const data = await apiRequestWithRefresh(`/consulting-rooms/${roomId}/id-agendas`);
+        if (cancelled) return;
+        const ids = new Set(
+          (Array.isArray(data?.items) ? data.items : [])
+            .map((item) => Number(item.id_agenda))
+            .filter((id) => Number.isFinite(id) && id > 0)
+        );
+        setRoomAgendaIds(ids);
+      } catch {
+        if (!cancelled) setRoomAgendaIds(new Set());
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [roomId]);
+
+  const resumenRange = useMemo(() => {
+    if (periodMode === "month") return monthDateRange(month);
+    if (!day) return null;
+    return { fecha_desde: day, fecha_hasta: day };
+  }, [periodMode, day, month]);
+
+  useEffect(() => {
+    if (!resumenRange) return undefined;
+    let cancelled = false;
+    (async () => {
+      setResumenLoading(true);
+      setResumenError("");
+      try {
+        const params = new URLSearchParams({
+          fecha_desde: resumenRange.fecha_desde,
+          fecha_hasta: resumenRange.fecha_hasta,
+        });
+        const result = await apiRequestWithRefresh(
+          `/distribucion/ocupacion/indicadores/turnos-resumen?${params}`
+        );
+        if (!cancelled) setResumenRaw(result);
+      } catch (err) {
+        if (!cancelled) {
+          setResumenRaw(null);
+          setResumenError(err.message || "No se pudo cargar el resumen de turnos");
+        }
+      } finally {
+        if (!cancelled) setResumenLoading(false);
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [resumenRange]);
+
+  const selectedLocation = useMemo(
+    () => (locationId ? locations.find((loc) => String(loc.id) === String(locationId)) : null),
+    [locations, locationId]
+  );
+
+  const filteredOccupancy = useMemo(
+    () =>
+      filterOccupancyForIndicadores(occupancyItems, {
+        location: selectedLocation || null,
+        // Mientras cargan agendas del consultorio, no matchear todo el dominio.
+        roomAgendaIds: roomId ? roomAgendaIds ?? new Set() : null,
+        especialidad: especialidad || null,
+        medico: medico || null,
+      }),
+    [occupancyItems, selectedLocation, roomId, roomAgendaIds, especialidad, medico]
+  );
+
+  const horarioIds = useMemo(() => occupancyHorarioIds(filteredOccupancy), [filteredOccupancy]);
+
+  const resumenAgg = useMemo(() => {
+    if (!resumenRaw) return null;
+    return aggregateTurnosResumen(resumenRaw.detalle, horarioIds);
+  }, [resumenRaw, horarioIds]);
 
   const pieData = useMemo(() => {
     if (!data || !(data.enabled_hours > 0)) return [];
@@ -130,9 +249,27 @@ export function IndicadoresOcupacionPage() {
         }}
       >
         <label style={filterField}>
-          Día
-          <input type="date" value={day} onChange={(e) => setDay(e.target.value)} style={filterSelect} />
+          Período
+          <select
+            value={periodMode}
+            onChange={(e) => setPeriodMode(e.target.value)}
+            style={filterSelect}
+          >
+            <option value="day">Día</option>
+            <option value="month">Mes</option>
+          </select>
         </label>
+        {periodMode === "day" ? (
+          <label style={filterField}>
+            Día
+            <input type="date" value={day} onChange={(e) => setDay(e.target.value)} style={filterSelect} />
+          </label>
+        ) : (
+          <label style={filterField}>
+            Mes
+            <input type="month" value={month} onChange={(e) => setMonth(e.target.value)} style={filterSelect} />
+          </label>
+        )}
         <label style={filterField}>
           Ubicación
           <select
@@ -260,6 +397,59 @@ export function IndicadoresOcupacionPage() {
           Consultorios con horario pero sin agenda mapeada: {data.rooms_without_agenda} (aportan 0% al numerador).
         </p>
       ) : null}
+
+      <div
+        style={{
+          marginTop: 24,
+          padding: "14px 16px",
+          borderRadius: uiTheme.radius.md,
+          border: `1px solid ${uiTheme.colors.border}`,
+          background: uiTheme.colors.surface,
+        }}
+      >
+        <h2 style={{ margin: "0 0 6px", fontSize: "1.05rem", color: uiTheme.colors.text }}>
+          Resumen de turnos
+        </h2>
+        <p style={{ ...uiStyles.helpText, marginTop: 0, marginBottom: 12 }}>
+          Join por <code>turno_horario_id</code> = <code>id</code> de ocupación. Se descarga al cambiar día/mes;
+          ubicación/consultorio/especialidad/médico solo reclasifican en memoria.
+          {resumenRange
+            ? ` Rango: ${resumenRange.fecha_desde} → ${resumenRange.fecha_hasta}.`
+            : ""}
+        </p>
+
+        {resumenLoading ? (
+          <p style={{ fontSize: 13, color: uiTheme.colors.textMuted, margin: 0 }}>Cargando resumen…</p>
+        ) : null}
+        {resumenError ? (
+          <p style={{ color: uiTheme.colors.danger, fontSize: 13, margin: 0 }}>{resumenError}</p>
+        ) : null}
+        {!resumenLoading && !resumenError && resumenAgg ? (
+          resumenAgg.matched_rows === 0 && resumenAgg.total_turnos === 0 ? (
+            <p style={{ fontSize: 13, color: uiTheme.colors.textMuted, margin: 0 }}>
+              Sin filas de resumen para el filtro actual (revisá ids en Ocupación tras Actualizar).
+            </p>
+          ) : (
+            <div style={metricGrid}>
+              {[
+                ["Total turnos", resumenAgg.total_turnos],
+                ["Pendientes", `${resumenAgg.turnos_pendientes} (${resumenAgg.porcentaje_pendientes}%)`],
+                ["Confirmados", `${resumenAgg.turnos_confirmados} (${resumenAgg.porcentaje_confirmados}%)`],
+                ["Cancelados", `${resumenAgg.turnos_cancelados} (${resumenAgg.porcentaje_cancelados}%)`],
+                ["Atendidos", `${resumenAgg.turnos_atendidos} (${resumenAgg.porcentaje_atendidos}%)`],
+                ["Ausentes", `${resumenAgg.turnos_ausentes} (${resumenAgg.porcentaje_ausentes}%)`],
+                ["Espera promedio (días)", resumenAgg.espera_promedio_dias],
+                ["Horarios matched", resumenAgg.matched_rows],
+              ].map(([label, value]) => (
+                <div key={label} style={{ ...uiStyles.listCard, padding: 12 }}>
+                  <div style={{ fontSize: 11, color: uiTheme.colors.textMuted }}>{label}</div>
+                  <div style={{ fontSize: 18, fontWeight: 650 }}>{value}</div>
+                </div>
+              ))}
+            </div>
+          )
+        ) : null}
+      </div>
     </section>
   );
 }
