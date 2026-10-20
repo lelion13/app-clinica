@@ -27,6 +27,30 @@ def _parse_date_param(raw: str, *, field: str) -> date:
         ) from exc
 
 
+def _as_str(value) -> str | None:
+    if value is None:
+        return None
+    s = str(value).strip()
+    return s or None
+
+
+def _rows_from_payload(payload: object) -> list[dict]:
+    """Acepta array raíz o wrapper {detalle|items|data|results}."""
+    if isinstance(payload, list):
+        return [row for row in payload if isinstance(row, dict)]
+    if isinstance(payload, dict):
+        if "turno_horario_id" in payload:
+            return [payload]
+        for key in ("detalle", "items", "data", "results", "resumen"):
+            inner = payload.get(key)
+            if isinstance(inner, list):
+                return [row for row in inner if isinstance(row, dict)]
+    raise HTTPException(
+        status_code=status.HTTP_502_BAD_GATEWAY,
+        detail="Respuesta externa de resumen de turnos con formato no reconocido",
+    )
+
+
 def fetch_turnos_resumen(*, fecha_desde: str, fecha_hasta: str) -> TurnosResumenResponse:
     desde = _parse_date_param(fecha_desde, field="fecha_desde")
     hasta = _parse_date_param(fecha_hasta, field="fecha_hasta")
@@ -64,29 +88,28 @@ def fetch_turnos_resumen(*, fecha_desde: str, fecha_hasta: str) -> TurnosResumen
             detail="Error al consultar API externa de resumen de turnos",
         ) from exc
 
-    if not isinstance(payload, dict):
-        raise HTTPException(
-            status_code=status.HTTP_502_BAD_GATEWAY,
-            detail="Respuesta externa de resumen de turnos con formato no reconocido",
-        )
+    raw_rows = _rows_from_payload(payload)
+    detalle = [TurnosResumenDetalleItem.model_validate(row) for row in raw_rows]
+    total = sum(float(item.total_turnos or 0) for item in detalle)
 
-    raw_detalle = payload.get("detalle")
-    detalle: list[TurnosResumenDetalleItem] = []
-    if isinstance(raw_detalle, list):
-        for row in raw_detalle:
-            if isinstance(row, dict):
-                detalle.append(TurnosResumenDetalleItem.model_validate(row))
+    meta_desde = None
+    meta_hasta = None
+    if isinstance(payload, dict):
+        meta_desde = _as_str(payload.get("fecha_desde"))
+        meta_hasta = _as_str(payload.get("fecha_hasta"))
+        wrapped_total = payload.get("total_turnos")
+        has_list = any(
+            isinstance(payload.get(k), list) for k in ("detalle", "items", "data", "results", "resumen")
+        )
+        if wrapped_total is not None and has_list:
+            try:
+                total = float(wrapped_total)
+            except (TypeError, ValueError):
+                pass
 
     return TurnosResumenResponse(
-        fecha_desde=_as_str(payload.get("fecha_desde")) or desde.isoformat(),
-        fecha_hasta=_as_str(payload.get("fecha_hasta")) or hasta.isoformat(),
-        total_turnos=payload.get("total_turnos") or 0,
+        fecha_desde=meta_desde or desde.isoformat(),
+        fecha_hasta=meta_hasta or hasta.isoformat(),
+        total_turnos=total,
         detalle=detalle,
     )
-
-
-def _as_str(value) -> str | None:
-    if value is None:
-        return None
-    s = str(value).strip()
-    return s or None

@@ -163,8 +163,9 @@ export function filterOccupancyForIndicadores(items, { location, roomAgendaIds, 
 }
 
 /**
- * Agrega detalle de turnos-resumen para ids en scope.
+ * Agrega detalle de turnos-resumen (shape API real) para ids en scope.
  * Contadores = suma; % desde totales; espera ponderada por total_turnos.
+ * pct_cancel_paciente/otros se recalculan sobre cancelados (no sobre total).
  */
 export function aggregateTurnosResumen(detalle, horarioIds) {
   const idSet = horarioIds instanceof Set ? horarioIds : new Set(horarioIds || []);
@@ -173,42 +174,47 @@ export function aggregateTurnosResumen(detalle, horarioIds) {
     return Number.isFinite(id) && idSet.has(id);
   });
 
-  let total_turnos = 0;
-  let turnos_pendientes = 0;
-  let turnos_confirmados = 0;
-  let turnos_cancelados = 0;
-  let turnos_atendidos = 0;
-  let turnos_ausentes = 0;
+  const sums = {
+    total_turnos: 0,
+    asignados: 0,
+    en_espera: 0,
+    presentes: 0,
+    atendidos: 0,
+    ausentes: 0,
+    cancelados: 0,
+    reserva_telefonico: 0,
+    reserva_persona: 0,
+    reserva_web: 0,
+    reserva_api: 0,
+    cancelados_paciente: 0,
+    cancelados_otros: 0,
+  };
   let esperaWeighted = 0;
 
   for (const row of rows) {
     const total = asNonNegFinite(row.total_turnos);
-    total_turnos += total;
-    turnos_pendientes += asNonNegFinite(row.turnos_pendientes);
-    turnos_confirmados += asNonNegFinite(row.turnos_confirmados);
-    turnos_cancelados += asNonNegFinite(row.turnos_cancelados);
-    turnos_atendidos += asNonNegFinite(row.turnos_atendidos);
-    turnos_ausentes += asNonNegFinite(row.turnos_ausentes);
+    sums.total_turnos += total;
+    for (const key of Object.keys(sums)) {
+      if (key === "total_turnos") continue;
+      sums[key] += asNonNegFinite(row[key]);
+    }
     esperaWeighted += asNonNegFinite(row.espera_promedio_dias) * total;
   }
 
-  const pct = (part) => (total_turnos > 0 ? Math.round((part / total_turnos) * 10000) / 100 : 0);
+  const pctOfTotal = (part) =>
+    sums.total_turnos > 0 ? Math.round((part / sums.total_turnos) * 10000) / 100 : 0;
+  const pctOfCancel = (part) =>
+    sums.cancelados > 0 ? Math.round((part / sums.cancelados) * 10000) / 100 : 0;
 
   return {
     matched_rows: rows.length,
-    total_turnos,
-    turnos_pendientes,
-    turnos_confirmados,
-    turnos_cancelados,
-    turnos_atendidos,
-    turnos_ausentes,
-    porcentaje_pendientes: pct(turnos_pendientes),
-    porcentaje_confirmados: pct(turnos_confirmados),
-    porcentaje_cancelados: pct(turnos_cancelados),
-    porcentaje_atendidos: pct(turnos_atendidos),
-    porcentaje_ausentes: pct(turnos_ausentes),
+    ...sums,
     espera_promedio_dias:
-      total_turnos > 0 ? Math.round((esperaWeighted / total_turnos) * 100) / 100 : 0,
+      sums.total_turnos > 0 ? Math.round((esperaWeighted / sums.total_turnos) * 100) / 100 : 0,
+    pct_cancelados: pctOfTotal(sums.cancelados),
+    pct_ausentismo: pctOfTotal(sums.ausentes),
+    pct_cancel_paciente: pctOfCancel(sums.cancelados_paciente),
+    pct_cancel_otros: pctOfCancel(sums.cancelados_otros),
   };
 }
 
