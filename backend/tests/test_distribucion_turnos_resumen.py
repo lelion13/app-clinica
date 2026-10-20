@@ -30,8 +30,7 @@ def test_fetch_ok_array_root(monkeypatch):
     captured = {}
 
     class FakeResponse:
-        def raise_for_status(self):
-            return None
+        status_code = 200
 
         def json(self):
             return [
@@ -90,8 +89,7 @@ def test_fetch_ok_wrapped_detalle(monkeypatch):
     monkeypatch.setattr(service.settings, "novedades_prof_sync_token", "secret-token")
 
     class FakeResponse:
-        def raise_for_status(self):
-            return None
+        status_code = 200
 
         def json(self):
             return {
@@ -149,7 +147,94 @@ def test_fetch_upstream_error_hides_token(monkeypatch):
     assert "secret-token" not in str(exc.value.detail)
 
 
+def test_fetch_upstream_http_status(monkeypatch):
+    monkeypatch.setattr(
+        service.settings,
+        "distribucion_turnos_resumen_url",
+        "https://example.test/is/turnos/resumen",
+    )
+    monkeypatch.setattr(service.settings, "novedades_prof_sync_token", "secret-token")
+
+    class FakeResponse:
+        status_code = 403
+
+        def json(self):
+            return {"error": "forbidden"}
+
+    class FakeClient:
+        def __init__(self, *args, **kwargs):
+            pass
+
+        def __enter__(self):
+            return self
+
+        def __exit__(self, *args):
+            return False
+
+        def get(self, *args, **kwargs):
+            return FakeResponse()
+
+    monkeypatch.setattr(service.httpx, "Client", FakeClient)
+    with pytest.raises(HTTPException) as exc:
+        service.fetch_turnos_resumen(fecha_desde="2026-10-01", fecha_hasta="2026-10-01")
+    assert exc.value.status_code == 502
+    assert "HTTP 403" in str(exc.value.detail)
+    assert "secret-token" not in str(exc.value.detail)
+
+
 def test_fetch_invalid_date():
     with pytest.raises(HTTPException) as exc:
         service.fetch_turnos_resumen(fecha_desde="nope", fecha_hasta="2026-10-01")
     assert exc.value.status_code == 422
+
+
+def test_fetch_ok_null_pct_fields(monkeypatch):
+    """Upstream a veces manda null en pct_cancel_*; no debe romper validación."""
+    monkeypatch.setattr(
+        service.settings,
+        "distribucion_turnos_resumen_url",
+        "https://example.test/is/turnos/resumen",
+    )
+    monkeypatch.setattr(service.settings, "novedades_prof_sync_token", "secret-token")
+
+    class FakeResponse:
+        status_code = 200
+
+        def json(self):
+            return [
+                {
+                    "turno_horario_id": 146526,
+                    "total_turnos": 5,
+                    "espera_promedio_dias": 20.6,
+                    "asignados": 0,
+                    "en_espera": 0,
+                    "presentes": 2,
+                    "atendidos": 0,
+                    "ausentes": 2,
+                    "cancelados": 1,
+                    "pct_cancelados": 20.0,
+                    "pct_cancel_paciente": None,
+                    "pct_cancel_otros": None,
+                    "pct_ausentismo": 50.0,
+                }
+            ]
+
+    class FakeClient:
+        def __init__(self, *args, **kwargs):
+            pass
+
+        def __enter__(self):
+            return self
+
+        def __exit__(self, *args):
+            return False
+
+        def get(self, *args, **kwargs):
+            return FakeResponse()
+
+    monkeypatch.setattr(service.httpx, "Client", FakeClient)
+    result = service.fetch_turnos_resumen(fecha_desde="2026-10-20", fecha_hasta="2026-10-20")
+    assert len(result.detalle) == 1
+    assert result.detalle[0].pct_cancel_paciente == 0
+    assert result.detalle[0].pct_cancel_otros == 0
+    assert result.detalle[0].ausentes == 2

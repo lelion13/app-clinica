@@ -1,4 +1,4 @@
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import BaseModel, ConfigDict, Field, field_validator
 
 
 class HorarioActivoItem(BaseModel):
@@ -162,7 +162,10 @@ class TurnosCsvStatsResponse(BaseModel):
 
 
 class TurnosResumenDetalleItem(BaseModel):
-    """Fila del endpoint externo `/is/turnos/resumen` (shape real)."""
+    """Fila del endpoint externo `/is/turnos/resumen` (shape real).
+
+    El upstream a veces manda `null` en contadores/%; se coerciona a 0.
+    """
 
     model_config = ConfigDict(extra="ignore")
 
@@ -185,6 +188,31 @@ class TurnosResumenDetalleItem(BaseModel):
     pct_cancel_paciente: int | float = 0
     pct_cancel_otros: int | float = 0
     pct_ausentismo: int | float = 0
+
+    @field_validator(
+        "total_turnos",
+        "espera_promedio_dias",
+        "asignados",
+        "en_espera",
+        "presentes",
+        "atendidos",
+        "ausentes",
+        "cancelados",
+        "reserva_telefonico",
+        "reserva_persona",
+        "reserva_web",
+        "reserva_api",
+        "cancelados_paciente",
+        "cancelados_otros",
+        "pct_cancelados",
+        "pct_cancel_paciente",
+        "pct_cancel_otros",
+        "pct_ausentismo",
+        mode="before",
+    )
+    @classmethod
+    def _null_numeric_to_zero(cls, value):
+        return 0 if value is None else value
 
 
 class TurnosResumenResponse(BaseModel):

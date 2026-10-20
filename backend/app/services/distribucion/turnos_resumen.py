@@ -78,14 +78,32 @@ def fetch_turnos_resumen(*, fecha_desde: str, fecha_hasta: str) -> TurnosResumen
                 },
                 headers={"Authorization": f"Bearer {token}", "Accept": "application/json"},
             )
-            response.raise_for_status()
-            payload = response.json()
+    except httpx.TimeoutException as exc:
+        raise HTTPException(
+            status_code=status.HTTP_504_GATEWAY_TIMEOUT,
+            detail="Timeout al consultar API externa de resumen de turnos",
+        ) from exc
     except HTTPException:
         raise
     except Exception as exc:
         raise HTTPException(
             status_code=status.HTTP_502_BAD_GATEWAY,
-            detail="Error al consultar API externa de resumen de turnos",
+            detail="Error de red al consultar API externa de resumen de turnos",
+        ) from exc
+
+    if response.status_code >= 400:
+        # Sin body/token: solo status para diagnosticar (p. ej. 403 del upstream).
+        raise HTTPException(
+            status_code=status.HTTP_502_BAD_GATEWAY,
+            detail=f"API externa de resumen de turnos respondió HTTP {response.status_code}",
+        )
+
+    try:
+        payload = response.json()
+    except Exception as exc:
+        raise HTTPException(
+            status_code=status.HTTP_502_BAD_GATEWAY,
+            detail="API externa de resumen de turnos no devolvió JSON válido",
         ) from exc
 
     raw_rows = _rows_from_payload(payload)
