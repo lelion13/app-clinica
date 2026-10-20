@@ -1,6 +1,12 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Cell, Pie, PieChart, ResponsiveContainer, Tooltip } from "recharts";
 
+import {
+  aggregateTurnosResumen,
+  filterOccupancyForIndicadores,
+  monthDateRange,
+  occupancyHorarioIds,
+} from "../lib/ocupacionIndicators";
 import { apiRequestWithRefresh, apiUploadWithRefresh } from "../services/api";
 import { safeLoad } from "../lib/apiHelpers";
 import { uiStyles, uiTheme } from "../ui/theme";
@@ -40,6 +46,12 @@ const filterSelect = {
   maxWidth: 220,
   fontSize: 13,
   padding: "6px 8px",
+};
+
+const metricGrid = {
+  display: "grid",
+  gridTemplateColumns: "repeat(auto-fit, minmax(140px, 1fr))",
+  gap: 10,
 };
 
 function formatHours(h) {
@@ -147,6 +159,12 @@ export function IndicadoresOcupacionPage() {
   const [unmatchedModal, setUnmatchedModal] = useState(null);
   const fileRef = useRef(null);
 
+  const [occupancyItems, setOccupancyItems] = useState([]);
+  const [roomAgendaIds, setRoomAgendaIds] = useState(null);
+  const [resumenRaw, setResumenRaw] = useState(null);
+  const [resumenLoading, setResumenLoading] = useState(false);
+  const [resumenError, setResumenError] = useState("");
+
   useEffect(() => {
     safeLoad("/locations", setLocations, setError);
     safeLoad("/consulting-rooms", setRooms, setError);
@@ -159,6 +177,14 @@ export function IndicadoresOcupacionPage() {
         });
       } catch (err) {
         setError(err.message || "No se pudieron cargar opciones de filtro");
+      }
+    })();
+    (async () => {
+      try {
+        const occ = await apiRequestWithRefresh("/distribucion/ocupacion/horarios-activos");
+        setOccupancyItems(Array.isArray(occ?.items) ? occ.items : []);
+      } catch {
+        setOccupancyItems([]);
       }
     })();
   }, []);
@@ -218,6 +244,89 @@ export function IndicadoresOcupacionPage() {
       setRoomId("");
     }
   }, [roomsForSelect, roomId]);
+
+  useEffect(() => {
+    if (!roomId) {
+      setRoomAgendaIds(null);
+      return undefined;
+    }
+    let cancelled = false;
+    (async () => {
+      try {
+        const agendaData = await apiRequestWithRefresh(`/consulting-rooms/${roomId}/id-agendas`);
+        if (cancelled) return;
+        const ids = new Set(
+          (Array.isArray(agendaData?.items) ? agendaData.items : [])
+            .map((item) => Number(item.id_agenda))
+            .filter((id) => Number.isFinite(id) && id > 0)
+        );
+        setRoomAgendaIds(ids);
+      } catch {
+        if (!cancelled) setRoomAgendaIds(new Set());
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [roomId]);
+
+  const resumenRange = useMemo(() => {
+    if (period === "month") return monthDateRange(month);
+    if (!day) return null;
+    return { fecha_desde: day, fecha_hasta: day };
+  }, [period, day, month]);
+
+  useEffect(() => {
+    if (!resumenRange) return undefined;
+    let cancelled = false;
+    (async () => {
+      setResumenLoading(true);
+      setResumenError("");
+      try {
+        const params = new URLSearchParams({
+          fecha_desde: resumenRange.fecha_desde,
+          fecha_hasta: resumenRange.fecha_hasta,
+        });
+        const result = await apiRequestWithRefresh(
+          `/distribucion/ocupacion/indicadores/turnos-resumen?${params}`
+        );
+        if (!cancelled) setResumenRaw(result);
+      } catch (err) {
+        if (!cancelled) {
+          setResumenRaw(null);
+          setResumenError(err.message || "No se pudo cargar el resumen de turnos");
+        }
+      } finally {
+        if (!cancelled) setResumenLoading(false);
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [resumenRange]);
+
+  const selectedLocation = useMemo(
+    () => (locationId ? locations.find((loc) => String(loc.id) === String(locationId)) : null),
+    [locations, locationId]
+  );
+
+  const filteredOccupancy = useMemo(
+    () =>
+      filterOccupancyForIndicadores(occupancyItems, {
+        location: selectedLocation || null,
+        roomAgendaIds: roomId ? roomAgendaIds ?? new Set() : null,
+        especialidad: especialidad || null,
+        medico: medico || null,
+      }),
+    [occupancyItems, selectedLocation, roomId, roomAgendaIds, especialidad, medico]
+  );
+
+  const horarioIds = useMemo(() => occupancyHorarioIds(filteredOccupancy), [filteredOccupancy]);
+
+  const resumenAgg = useMemo(() => {
+    if (!resumenRaw) return null;
+    return aggregateTurnosResumen(resumenRaw.detalle, horarioIds);
+  }, [resumenRaw, horarioIds]);
 
   const onImportFile = async (event) => {
     const file = event.target.files?.[0];
@@ -629,6 +738,52 @@ export function IndicadoresOcupacionPage() {
             Todavía no hay CSV importados.
           </p>
         )}
+      </div>
+
+      <div
+        style={{
+          ...uiStyles.listCard,
+          padding: 14,
+          marginBottom: 16,
+        }}
+      >
+        <h3 style={{ margin: "0 0 4px", fontSize: 15 }}>Resumen de turnos</h3>
+        <p style={{ margin: "0 0 12px", fontSize: 12, color: uiTheme.colors.textMuted }}>
+          Join por <code>turno_horario_id</code> = <code>id</code> de ocupación. Se descarga al cambiar día/mes;
+          filtros solo reclasifican en memoria.
+          {resumenRange ? ` Rango: ${resumenRange.fecha_desde} → ${resumenRange.fecha_hasta}.` : ""}
+        </p>
+        {resumenLoading ? (
+          <p style={{ fontSize: 13, color: uiTheme.colors.textMuted, margin: 0 }}>Cargando resumen…</p>
+        ) : null}
+        {resumenError ? (
+          <p style={{ color: uiTheme.colors.danger, fontSize: 13, margin: 0 }}>{resumenError}</p>
+        ) : null}
+        {!resumenLoading && !resumenError && resumenAgg ? (
+          resumenAgg.matched_rows === 0 && resumenAgg.total_turnos === 0 ? (
+            <p style={{ fontSize: 13, color: uiTheme.colors.textMuted, margin: 0 }}>
+              Sin filas de resumen para el filtro actual (revisá ids en Ocupación tras Actualizar).
+            </p>
+          ) : (
+            <div style={metricGrid}>
+              {[
+                ["Total turnos", resumenAgg.total_turnos],
+                ["Pendientes", `${resumenAgg.turnos_pendientes} (${resumenAgg.porcentaje_pendientes}%)`],
+                ["Confirmados", `${resumenAgg.turnos_confirmados} (${resumenAgg.porcentaje_confirmados}%)`],
+                ["Cancelados", `${resumenAgg.turnos_cancelados} (${resumenAgg.porcentaje_cancelados}%)`],
+                ["Atendidos", `${resumenAgg.turnos_atendidos} (${resumenAgg.porcentaje_atendidos}%)`],
+                ["Ausentes", `${resumenAgg.turnos_ausentes} (${resumenAgg.porcentaje_ausentes}%)`],
+                ["Espera promedio (días)", resumenAgg.espera_promedio_dias],
+                ["Horarios matched", resumenAgg.matched_rows],
+              ].map(([label, value]) => (
+                <div key={label}>
+                  <div style={{ fontSize: 12, color: uiTheme.colors.textMuted }}>{label}</div>
+                  <div style={{ fontSize: 18, fontWeight: 700 }}>{value}</div>
+                </div>
+              ))}
+            </div>
+          )
+        ) : null}
       </div>
 
       {data?.rooms_without_hours?.length ? (

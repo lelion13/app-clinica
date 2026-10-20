@@ -159,3 +159,30 @@ class TurnosCsvStatsResponse(BaseModel):
     avg_presente_atendido_minutes: float | None = None
     avg_espera_dias: float | None = None
     imports: list[TurnosCsvImportInfo] = Field(default_factory=list)
+
+
+class TurnosResumenDetalleItem(BaseModel):
+    model_config = ConfigDict(extra="ignore")
+
+    turno_horario_id: int | None = None
+    total_turnos: int | float = 0
+    turnos_pendientes: int | float = 0
+    turnos_confirmados: int | float = 0
+    turnos_cancelados: int | float = 0
+    turnos_atendidos: int | float = 0
+    turnos_ausentes: int | float = 0
+    porcentaje_pendientes: int | float = 0
+    porcentaje_confirmados: int | float = 0
+    porcentaje_cancelados: int | float = 0
+    porcentaje_atendidos: int | float = 0
+    porcentaje_ausentes: int | float = 0
+    espera_promedio_dias: int | float = 0
+
+
+class TurnosResumenResponse(BaseModel):
+    model_config = ConfigDict(extra="ignore")
+
+    fecha_desde: str | None = None
+    fecha_hasta: str | None = None
+    total_turnos: int | float = 0
+    detalle: list[TurnosResumenDetalleItem] = Field(default_factory=list)
