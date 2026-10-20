@@ -4,10 +4,8 @@ import { BrowserRouter, Navigate, Route, Routes } from "react-router-dom";
 
 import { AuthProvider } from "./auth/AuthContext";
 import { AppLayout } from "./layouts/AppLayout";
-import { AgendaPage } from "./pages/AgendaPage";
 import { AgendaOcupacionPage } from "./pages/AgendaOcupacionPage";
 import { ConsultingRoomsPage } from "./pages/ConsultingRoomsPage";
-import { EstadisticasPage } from "./pages/EstadisticasPage";
 import { IndicadoresOcupacionPage } from "./pages/IndicadoresOcupacionPage";
 import { LocationsPage } from "./pages/LocationsPage";
 import { LoginPage } from "./pages/LoginPage";
@@ -18,8 +16,8 @@ import { UsersPage } from "./pages/UsersPage";
 import { SettingsBackupPage } from "./pages/SettingsBackupPage";
 import { HomePage } from "./pages/HomePage";
 import { OccupancyPage } from "./pages/OccupancyPage";
-import { WeeklyOccupancyPage } from "./pages/WeeklyOccupancyPage";
 import { NovedadesCargaPage } from "./pages/novedades/NovedadesCargaPage";
+import { NovedadesIndicesPage } from "./pages/novedades/NovedadesIndicesPage";
 import { NovedadesMisProfesionalesPage } from "./pages/novedades/NovedadesMisProfesionalesPage";
 import { NovedadesParamPage } from "./pages/novedades/NovedadesParamPage";
 import { NovedadesXlsPage } from "./pages/novedades/NovedadesXlsPage";
@@ -40,15 +38,16 @@ function AppRouter() {
         }
       >
         <Route index element={<HomePage />} />
-        <Route path="ocupacion-semanal" element={<WeeklyOccupancyPage />} />
         <Route path="ocupacion" element={<OccupancyPage />} />
         <Route path="agenda-ocupacion" element={<AgendaOcupacionPage />} />
         <Route path="indicadores-ocupacion" element={<IndicadoresOcupacionPage />} />
-        <Route path="agenda" element={<AgendaPage />} />
         <Route path="ubicaciones" element={<LocationsPage />} />
         <Route path="profesionales" element={<ProfessionalsPage />} />
         <Route path="consultorios" element={<ConsultingRoomsPage />} />
-        <Route path="estadisticas" element={<EstadisticasPage />} />
+        {/* Legacy: retiradas en limpiar-ui-obsoleta */}
+        <Route path="ocupacion-semanal" element={<Navigate to="/" replace />} />
+        <Route path="agenda" element={<Navigate to="/" replace />} />
+        <Route path="estadisticas" element={<Navigate to="/" replace />} />
         <Route
           path="novedades/carga"
           element={
@@ -78,6 +77,14 @@ function AppRouter() {
           element={
             <ProtectedRoute roles={["admin", "rrhh"]}>
               <NovedadesParamPage />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="novedades/indices"
+          element={
+            <ProtectedRoute adminOnly>
+              <NovedadesIndicesPage />
             </ProtectedRoute>
           }
         />

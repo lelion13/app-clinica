@@ -1,8 +1,8 @@
 import enum
-from datetime import date
+from datetime import date, datetime
 from decimal import Decimal
 
-from sqlalchemy import Boolean, Date, Enum, ForeignKey, Integer, Numeric, String, UniqueConstraint
+from sqlalchemy import Boolean, Date, DateTime, Enum, ForeignKey, Integer, Numeric, String, UniqueConstraint
 from sqlalchemy.orm import Mapped, mapped_column
 
 from app.models.base import Base
@@ -56,6 +56,8 @@ class NovedadesModulo(AuditMixin, Base):
     descripcion: Mapped[str] = mapped_column(String(200), nullable=False)
     comentario: Mapped[str | None] = mapped_column(String(500), nullable=True)
     valor: Mapped[Decimal] = mapped_column(Numeric(12, 2), nullable=False)
+    # Catalog duration in hours; NULL for legacy until edited. Create/update require ≥ 1.
+    horas: Mapped[int | None] = mapped_column(Integer, nullable=True)
     produccion: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
     tipo_dia: Mapped[str] = mapped_column(String(20), nullable=False, default="semana")
 
@@ -115,8 +117,40 @@ class NovedadesProfesional(AuditMixin, Base):
     full_name: Mapped[str] = mapped_column(String(200), nullable=False)
     codprov: Mapped[str | None] = mapped_column(String(40), nullable=True)
     legajo: Mapped[str | None] = mapped_column(String(40), nullable=True)
+    email: Mapped[str | None] = mapped_column(String(255), nullable=True)
     is_active: Mapped[bool] = mapped_column(Boolean, nullable=False, default=True)
     es_especialista: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
+
+
+class LiquidacionMailItemStatus(str, enum.Enum):
+    pending = "pending"
+    sent = "sent"
+    failed = "failed"
+
+
+class NovedadesLiquidacionMailLote(AuditMixin, Base):
+    """One mail lot per closed period (Capital Humano liquidación)."""
+
+    __tablename__ = "novedades_liquidacion_mail_lote"
+    __table_args__ = (UniqueConstraint("periodo_id", name="uq_liquidacion_mail_lote_periodo"),)
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    periodo_id: Mapped[int] = mapped_column(ForeignKey("novedades_periodo.id"), nullable=False)
+
+
+class NovedadesLiquidacionMailItem(AuditMixin, Base):
+    """Per-professional recipient row inside a liquidación mail lot."""
+
+    __tablename__ = "novedades_liquidacion_mail_item"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    lote_id: Mapped[int] = mapped_column(ForeignKey("novedades_liquidacion_mail_lote.id"), nullable=False)
+    professional_id: Mapped[int] = mapped_column(ForeignKey("novedades_profesional.id"), nullable=False)
+    email: Mapped[str] = mapped_column(String(255), nullable=False)
+    total_general: Mapped[Decimal] = mapped_column(Numeric(12, 2), nullable=False)
+    status: Mapped[str] = mapped_column(String(20), nullable=False, default=LiquidacionMailItemStatus.pending.value)
+    error_message: Mapped[str | None] = mapped_column(String(500), nullable=True)
+    sent_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
 
 
 class NovedadesAjusteCapital(AuditMixin, Base):

@@ -6,7 +6,7 @@ from pydantic import BaseModel
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
-from app.api.deps import require_admin_or_jefe, require_admin_or_rrhh, require_novedades_reader
+from app.api.deps import require_admin, require_admin_or_jefe, require_admin_or_rrhh, require_novedades_reader
 from app.db.session import get_db
 from app.models.novedades import NOVEDAD_TIPO_LABELS, NovedadTipo, PeriodoEstado
 from app.models.user import User, UserRole
@@ -21,6 +21,7 @@ from app.schemas.novedades import (
     BonoOpcionResponse,
     CapitalHumanoGridResponse,
     GridRowResponse,
+    IndicesResponse,
     SoloBonoRowResponse,
     JefeServicioCreateRequest,
     JefeServicioResponse,
@@ -33,6 +34,8 @@ from app.schemas.novedades import (
     AjusteMasMenosAnularResponse,
     AjusteMasMenosImportResponse,
     AjusteMasMenosStatusResponse,
+    LiquidacionMailStartResponse,
+    LiquidacionMailStatusResponse,
     ModuloCreateRequest,
     ModuloImportResponse,
     ModuloResponse,
@@ -62,8 +65,10 @@ from app.services.novedades import cargas as cargas_service
 from app.services.novedades import bonos_import as bonos_import_service
 from app.services.novedades import capital_humano as capital_humano_service
 from app.services.novedades import export_xls
+from app.services.novedades import indices as indices_service
 from app.services.novedades import importe_descontar as importe_descontar_service
 from app.services.novedades import ajuste_mas_menos as ajuste_mas_menos_service
+from app.services.novedades import liquidacion_mail as liquidacion_mail_service
 from app.services.novedades import masters as masters_service
 from app.services.novedades import modulos_import as modulos_import_service
 from app.services.novedades import produccion_tarifas as produccion_tarifas_service
@@ -101,6 +106,7 @@ def _modulo_response(db: Session, item) -> ModuloResponse:
         descripcion=item.descripcion,
         comentario=item.comentario,
         valor=item.valor,
+        horas=getattr(item, "horas", None),
         produccion=bool(getattr(item, "produccion", False)),
         tipo_dia=getattr(item, "tipo_dia", None) or "semana",
         servicio_ids=masters_service.list_modulo_servicio_ids(db, item.id),
@@ -262,6 +268,11 @@ def modulos_create(
     db: Session = Depends(get_db),
     user: User = Depends(require_admin_or_rrhh),
 ) -> ModuloResponse:
+    if payload.horas is None:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail=[{"type": "missing", "loc": ["body", "horas"], "msg": "Field required", "input": None}],
+        )
     item = masters_service.create_modulo(db, payload, actor_id=user.id)
     return _modulo_response(db, item)
 
@@ -719,6 +730,16 @@ def capital_humano_list(
     )
 
 
+@router.get("/indices", response_model=IndicesResponse)
+def indices_get(
+    periodo_id: int = Query(...),
+    db: Session = Depends(get_db),
+    user: User = Depends(require_admin),
+) -> IndicesResponse:
+    _ = user
+    return indices_service.build_indices(db, periodo_id=periodo_id)
+
+
 @router.post(
     "/capital-humano/bonos/import",
     response_model=BonosImportResponse,
@@ -832,6 +853,34 @@ def capital_humano_ajuste_mas_menos_anular(
     user: User = Depends(require_admin_or_rrhh),
 ) -> AjusteMasMenosAnularResponse:
     return ajuste_mas_menos_service.anular_ajuste_mas_menos(db, periodo_id, actor_id=user.id)
+
+
+@router.get("/capital-humano/mail-liquidacion/status", response_model=LiquidacionMailStatusResponse)
+def capital_humano_mail_liquidacion_status(
+    periodo_id: int = Query(...),
+    db: Session = Depends(get_db),
+    user: User = Depends(require_admin_or_rrhh),
+) -> LiquidacionMailStatusResponse:
+    _ = user
+    return liquidacion_mail_service.get_mail_status(db, periodo_id=periodo_id)
+
+
+@router.post("/capital-humano/mail-liquidacion", response_model=LiquidacionMailStartResponse)
+def capital_humano_mail_liquidacion_start(
+    periodo_id: int = Query(...),
+    db: Session = Depends(get_db),
+    user: User = Depends(require_admin_or_rrhh),
+) -> LiquidacionMailStartResponse:
+    return liquidacion_mail_service.start_mail_lot(db, periodo_id=periodo_id, user=user)
+
+
+@router.post("/capital-humano/mail-liquidacion/retry-failed", response_model=LiquidacionMailStatusResponse)
+def capital_humano_mail_liquidacion_retry_failed(
+    periodo_id: int = Query(...),
+    db: Session = Depends(get_db),
+    user: User = Depends(require_admin_or_rrhh),
+) -> LiquidacionMailStatusResponse:
+    return liquidacion_mail_service.retry_failed(db, periodo_id=periodo_id, user=user)
 
 
 @router.get("/export.xlsx")

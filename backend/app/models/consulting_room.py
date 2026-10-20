@@ -26,11 +26,12 @@ class RoomOperatingHour(AuditMixin, Base):
 
 
 class ConsultingRoomIdAgenda(Base):
-    """Mapeo N:1 — varios id_agenda del sync pueden apuntar al mismo consultorio."""
+    """Mapeo (id_agenda, weekday) → consultorio. weekday 0=domingo … 6=sábado (JS)."""
 
     __tablename__ = "consulting_room_id_agenda"
 
     id_agenda: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=False)
+    weekday: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=False)
     room_id: Mapped[int] = mapped_column(ForeignKey("consulting_rooms.id"), nullable=False, index=True)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
     updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)

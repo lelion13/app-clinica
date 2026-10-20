@@ -68,11 +68,13 @@ def _fecha_hasta_vigente(fecha_hasta: str | None, today: date | None = None) -> 
 
 
 def _split_nombre_agenda(nombre: str | None) -> tuple[str | None, str | None, str | None]:
-    """Parte nombre_agenda → tipo, especialidad_agenda, medico.
+    """Parte nombre_agenda → tipo, especialidad_agenda, resto (legacy; columna medico ya no usa el resto).
 
     Formatos soportados:
     - Con espacios: `ART - TRAUMATOLOGIA - APECECHEA`
     - Compacto: `CMG-ECOGRAFIA-DR. BARRERA ORO GABRIEL`
+
+    La columna `medico` de ocupación se completa con `medico_responsable_equipo` del payload.
     """
     text = _as_str(nombre)
     if not text:
@@ -140,7 +142,8 @@ def _fetch_remote_rows() -> list[dict]:
 def _raw_to_model(raw: dict, synced_at: datetime) -> OcupacionHorarioActivo:
     """Una fila del endpoint → una fila DB. `payload` = JSON exacto."""
     payload = copy.deepcopy(raw)
-    tipo, especialidad_agenda, medico = _split_nombre_agenda(payload.get("nombre_agenda"))
+    tipo, especialidad_agenda, _rest = _split_nombre_agenda(payload.get("nombre_agenda"))
+    medico = _as_str(payload.get("medico_responsable_equipo"))
     fecha_hasta = payload.get("fecha_hasta")
     fecha_hasta_str = None if fecha_hasta is None else str(fecha_hasta)
     id_dato = payload.get("id_dato")
@@ -166,7 +169,7 @@ def _model_to_item(row: OcupacionHorarioActivo) -> HorarioActivoItem:
         id_dominio=_as_int(raw.get("id_dominio")),
         tipo=row.tipo,
         especialidad_agenda=row.especialidad_agenda,
-        medico=row.medico,
+        medico=row.medico or _as_str(raw.get("medico_responsable_equipo")),
         especialidad=_as_str(raw.get("especialidad")),
         dia=_as_str(raw.get("dia")),
         fecha_desde=_as_str(raw.get("fecha_desde")),

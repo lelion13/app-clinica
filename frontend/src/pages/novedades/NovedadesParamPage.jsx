@@ -66,6 +66,7 @@ export function NovedadesParamPage() {
   const [moduloDesc, setModuloDesc] = useState("");
   const [moduloComentario, setModuloComentario] = useState("");
   const [moduloValor, setModuloValor] = useState("");
+  const [moduloHoras, setModuloHoras] = useState("");
   const [moduloProduccion, setModuloProduccion] = useState(false);
   const [moduloTipoDia, setModuloTipoDia] = useState("semana");
   const [moduloServicioIds, setModuloServicioIds] = useState([]);
@@ -75,6 +76,7 @@ export function NovedadesParamPage() {
   const [editDesc, setEditDesc] = useState("");
   const [editComentario, setEditComentario] = useState("");
   const [editValor, setEditValor] = useState("");
+  const [editHoras, setEditHoras] = useState("");
   const [editProduccion, setEditProduccion] = useState(false);
   const [editTipoDia, setEditTipoDia] = useState("semana");
   const [editSaving, setEditSaving] = useState(false);
@@ -304,9 +306,16 @@ export function NovedadesParamPage() {
     setModuloDesc("");
     setModuloComentario("");
     setModuloValor("");
+    setModuloHoras("");
     setModuloProduccion(false);
     setModuloTipoDia("semana");
     setModuloServicioIds([]);
+  };
+
+  const parseHorasModulo = (raw) => {
+    const n = Number(raw);
+    if (!Number.isInteger(n) || n < 1) return null;
+    return n;
   };
 
   const openCreateModulo = () => {
@@ -370,6 +379,11 @@ export function NovedadesParamPage() {
       setError("Completá descripción y valor del módulo");
       return;
     }
+    const horas = parseHorasModulo(moduloHoras);
+    if (horas == null) {
+      setError("Completá horas del módulo (entero ≥ 1)");
+      return;
+    }
     if (!moduloServicioIds.length) {
       setError("Seleccioná al menos un servicio para el módulo");
       return;
@@ -383,6 +397,7 @@ export function NovedadesParamPage() {
           descripcion: moduloDesc,
           comentario: moduloComentario || null,
           valor: Number(moduloValor),
+          horas,
           produccion: Boolean(moduloProduccion),
           tipo_dia: moduloTipoDia || "semana",
           servicio_ids: moduloServicioIds.map(Number),
@@ -403,6 +418,7 @@ export function NovedadesParamPage() {
     setEditDesc(item.descripcion || "");
     setEditComentario(item.comentario || "");
     setEditValor(String(item.valor ?? ""));
+    setEditHoras(item.horas != null ? String(item.horas) : "");
     setEditProduccion(Boolean(item.produccion));
     setEditTipoDia(item.tipo_dia || "semana");
   };
@@ -414,6 +430,11 @@ export function NovedadesParamPage() {
 
   const saveEditModulo = async () => {
     if (!editModulo) return;
+    const horas = parseHorasModulo(editHoras);
+    if (horas == null) {
+      setError("Completá horas del módulo (entero ≥ 1)");
+      return;
+    }
     setEditSaving(true);
     setError("");
     try {
@@ -423,6 +444,7 @@ export function NovedadesParamPage() {
           descripcion: editDesc,
           comentario: editComentario || null,
           valor: Number(editValor),
+          horas,
           produccion: Boolean(editProduccion),
           tipo_dia: editTipoDia || "semana",
         }),
@@ -1340,7 +1362,8 @@ export function NovedadesParamPage() {
                   <div style={{ flex: "1 1 200px" }}>
                     #{item.id} · {item.descripcion} · ${item.valor}
                     <div style={uiStyles.helpText}>
-                      Servicios: {(item.servicio_nombres || []).join(", ") || "sin asociar"}
+                      Horas: {item.horas != null ? item.horas : "—"} · Servicios:{" "}
+                      {(item.servicio_nombres || []).join(", ") || "sin asociar"}
                     </div>
                   </div>
                   <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
@@ -1431,6 +1454,19 @@ export function NovedadesParamPage() {
                       disabled={createModuloSaving}
                     />
                   </label>
+                  <label style={{ display: "grid", gap: 4 }}>
+                    <span style={{ fontSize: 12, color: uiTheme.colors.textMuted }}>Horas (obligatorio)</span>
+                    <input
+                      type="number"
+                      step="1"
+                      min="1"
+                      value={moduloHoras}
+                      onChange={(e) => setModuloHoras(e.target.value)}
+                      placeholder="Cantidad de horas del módulo"
+                      style={uiStyles.formControl}
+                      disabled={createModuloSaving}
+                    />
+                  </label>
                   <label style={{ display: "inline-flex", gap: 6, alignItems: "center" }}>
                     <input
                       type="checkbox"
@@ -1481,7 +1517,12 @@ export function NovedadesParamPage() {
                     type="button"
                     onClick={createModulo}
                     style={uiStyles.buttonPrimary}
-                    disabled={createModuloSaving || !moduloDesc.trim() || moduloValor === ""}
+                    disabled={
+                      createModuloSaving ||
+                      !moduloDesc.trim() ||
+                      moduloValor === "" ||
+                      parseHorasModulo(moduloHoras) == null
+                    }
                   >
                     {createModuloSaving ? "Cargando…" : "Cargar"}
                   </button>
@@ -1538,6 +1579,19 @@ export function NovedadesParamPage() {
                     <span style={{ fontSize: 12, color: uiTheme.colors.textMuted }}>Valor ARS</span>
                     <input type="number" step="0.01" min="0" value={editValor} onChange={(e) => setEditValor(e.target.value)} required style={uiStyles.formControl} disabled={editSaving} />
                   </label>
+                  <label style={{ display: "grid", gap: 4 }}>
+                    <span style={{ fontSize: 12, color: uiTheme.colors.textMuted }}>Horas (obligatorio)</span>
+                    <input
+                      type="number"
+                      step="1"
+                      min="1"
+                      value={editHoras}
+                      onChange={(e) => setEditHoras(e.target.value)}
+                      required
+                      style={uiStyles.formControl}
+                      disabled={editSaving}
+                    />
+                  </label>
                   <label style={{ display: "inline-flex", gap: 6, alignItems: "center" }}>
                     <input
                       type="checkbox"
@@ -1568,7 +1622,12 @@ export function NovedadesParamPage() {
                   <button type="button" onClick={closeEditModulo} style={uiStyles.buttonSecondary} disabled={editSaving}>
                     Cancelar
                   </button>
-                  <button type="button" onClick={saveEditModulo} style={uiStyles.buttonPrimary} disabled={editSaving || !editDesc || editValor === ""}>
+                  <button
+                    type="button"
+                    onClick={saveEditModulo}
+                    style={uiStyles.buttonPrimary}
+                    disabled={editSaving || !editDesc || editValor === "" || parseHorasModulo(editHoras) == null}
+                  >
                     {editSaving ? "Guardando…" : "Guardar"}
                   </button>
                 </div>

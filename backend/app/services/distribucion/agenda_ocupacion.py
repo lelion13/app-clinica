@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import re
 from datetime import date, datetime, time, timedelta
 from zoneinfo import ZoneInfo
 
@@ -162,7 +163,10 @@ def _payload_fields(row: OcupacionHorarioActivo) -> dict:
         "id_dominio": id_dominio_int,
         "tipo": row.tipo or _as_str(raw.get("tipo")),
         "especialidad_agenda": row.especialidad_agenda,
-        "medico": row.medico or _as_str(raw.get("medico")),
+        "medico": row.medico
+        or _as_str(raw.get("medico_responsable_equipo"))
+        or _as_str(raw.get("medico")),
+        "medico_payload": _as_str(raw.get("medico_responsable_equipo")) or _as_str(raw.get("medico")),
         "especialidad": _as_str(raw.get("especialidad")),
         "dia": _as_str(raw.get("dia")),
         "fecha_desde": _as_str(raw.get("fecha_desde")) or None,
@@ -175,18 +179,30 @@ def _payload_fields(row: OcupacionHorarioActivo) -> dict:
     }
 
 
+def _room_code_sort_key(code: str) -> tuple:
+    """Numeric order by number in code (C1, C2, C10); codes without digits last."""
+    text = (code or "").strip()
+    m = re.search(r"(\d+)", text)
+    if m:
+        return (0, int(m.group(1)), text.casefold())
+    return (1, 0, text.casefold())
+
+
 def _rooms_for_location(db: Session, location_id: int | None) -> list[ConsultingRoom]:
-    q = select(ConsultingRoom).where(ConsultingRoom.deleted_at.is_(None)).order_by(ConsultingRoom.code)
+    q = select(ConsultingRoom).where(ConsultingRoom.deleted_at.is_(None))
     if location_id is not None:
         q = q.where(ConsultingRoom.location_id == location_id)
-    return list(db.execute(q).scalars().all())
+    rooms = list(db.execute(q).scalars().all())
+    rooms.sort(key=lambda r: _room_code_sort_key(r.code))
+    return rooms
 
 
 def _build_resources(rooms: list[ConsultingRoom]) -> list[AgendaResourceColumn]:
-    cols = [
+    # Sin consultorio primero (sticky izq. en UI cuando tiene ítems)
+    cols = [AgendaResourceColumn(id="unassigned", title="Sin consultorio", room_id=None)]
+    cols.extend(
         AgendaResourceColumn(id=str(room.id), title=room.code, room_id=room.id) for room in rooms
-    ]
-    cols.append(AgendaResourceColumn(id="unassigned", title="Sin consultorio", room_id=None))
+    )
     return cols
 
 
@@ -205,9 +221,18 @@ def _match_multi(value: str | None, selected: list[str]) -> bool:
 
 
 def _match_especialidad(esp: str | None, esp_agenda: str | None, selected: list[str]) -> bool:
+    """Match filtro especialidad solo contra payload.especialidad (esp_agenda ignorado)."""
+    _ = esp_agenda
     if not selected:
         return True
-    return _match_multi(esp, selected) or _match_multi(esp_agenda, selected)
+    return _match_multi(esp, selected)
+
+
+def _match_medico_payload(medico_payload: str | None, selected: list[str]) -> bool:
+    """Match filtro médico contra payload.medico_responsable_equipo (o legado payload.medico)."""
+    if not selected:
+        return True
+    return _match_multi(medico_payload, selected)
 
 
 def _match_id_dominio(id_dominio: int | None, selected: list[str]) -> bool:
@@ -238,10 +263,8 @@ def list_filter_options(db: Session) -> AgendaFilterOptionsResponse:
             tipos.add(fields["tipo"])
         if fields["especialidad"]:
             especialidades.add(fields["especialidad"])
-        if fields["especialidad_agenda"]:
-            especialidades.add(fields["especialidad_agenda"])
-        if fields["medico"]:
-            medicos.add(fields["medico"])
+        if fields["medico_payload"]:
+            medicos.add(fields["medico_payload"])
         if fields["dia"] and _weekday_from_dia(fields["dia"]) is not None:
             dias.add(fields["dia"].strip().lower())
 
@@ -298,7 +321,7 @@ def list_agenda_events(
         location_tipo_required = _as_str(loc.tipo)
 
     labels = _location_labels(db)
-    agenda_rooms = room_agenda_map_service.agenda_to_room_map(db)
+    agenda_wd_rooms = room_agenda_map_service.agenda_weekday_to_room_map(db)
     rooms = _rooms_for_location(db, location_id)
     room_by_id = {r.id: r for r in rooms}
     room_code_by_id = _room_code_map(db)
@@ -332,13 +355,16 @@ def list_agenda_events(
             continue
         if not _match_especialidad(fields["especialidad"], fields["especialidad_agenda"], f_esp):
             continue
-        if not _match_multi(fields["medico"], f_med):
+        if not _match_medico_payload(fields["medico_payload"], f_med):
             continue
         if not _match_multi(fields["dia"], f_dia):
             continue
 
         id_agenda = fields["id_agenda"]
-        mapped_room_id = agenda_rooms.get(id_agenda) if id_agenda is not None else None
+        js_weekday = (weekday + 1) % 7
+        mapped_room_id = (
+            agenda_wd_rooms.get((id_agenda, js_weekday)) if id_agenda is not None else None
+        )
         # Si filtramos por location, solo eventos de rooms de esa location o unassigned
         if location_id is not None and mapped_room_id is not None and mapped_room_id not in room_by_id:
             continue

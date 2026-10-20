@@ -88,13 +88,37 @@ class AgendaFilterOptionsResponse(BaseModel):
     dia: list[AgendaFilterOption] = Field(default_factory=list)
 
 
+class AgendaReassignRequest(BaseModel):
+    id_agenda: int
+    weekday: int = Field(ge=0, le=6, description="0=domingo … 6=sábado (JS Date.getDay)")
+    target_room_id: int | None = None
+    confirm_move: bool = False
+    confirm_unassign: bool = False
+
+
+class AgendaReassignResponse(BaseModel):
+    id_agenda: int
+    weekday: int
+    room_id: int | None = None
+    room_code: str | None = None
+
+
 class IndicadoresRoomRef(BaseModel):
     id: int
     code: str
 
 
+class IndicadoresTopItem(BaseModel):
+    label: str
+    hours: float
+    percent_box: float | None = None
+    percent_occupied: float | None = None
+
+
 class IndicadoresOcupacionResponse(BaseModel):
-    date: str
+    period: str = "day"
+    date: str | None = None
+    month: str | None = None
     occupied_hours: float
     enabled_hours: float
     free_hours: float
@@ -103,6 +127,38 @@ class IndicadoresOcupacionResponse(BaseModel):
     rooms_in_pie: int = 0
     rooms_without_hours: list[IndicadoresRoomRef] = Field(default_factory=list)
     rooms_without_agenda: int = 0
+    top_especialidad: list[IndicadoresTopItem] = Field(default_factory=list)
+    top_medico: list[IndicadoresTopItem] = Field(default_factory=list)
+
+
+class TurnosCsvUnmatchedItem(BaseModel):
+    row: int
+    nombre: str
+
+
+class TurnosCsvImportResponse(BaseModel):
+    id: int
+    filename: str
+    period_start: str
+    period_end: str
+    row_count: int
+
+
+class TurnosCsvImportInfo(BaseModel):
+    id: int
+    filename: str
+    period_start: str
+    period_end: str
+    rows: int
+
+
+class TurnosCsvStatsResponse(BaseModel):
+    turnos: int = 0
+    ausentes: int = 0
+    ausentismo_percent: float | None = None
+    avg_presente_atendido_minutes: float | None = None
+    avg_espera_dias: float | None = None
+    imports: list[TurnosCsvImportInfo] = Field(default_factory=list)
 
 
 class TurnosResumenDetalleItem(BaseModel):

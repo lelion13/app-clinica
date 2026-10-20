@@ -1,4 +1,4 @@
-from fastapi import APIRouter, Depends, Query
+from fastapi import APIRouter, Depends, File, Query, UploadFile
 from sqlalchemy.orm import Session
 
 from app.api.deps import require_operator_or_admin
@@ -8,15 +8,21 @@ from app.schemas.consulting_room import AgendaLookupResponse
 from app.schemas.distribucion import (
     AgendaFilterOptionsResponse,
     AgendaOcupacionEventsResponse,
+    AgendaReassignRequest,
+    AgendaReassignResponse,
     HorariosActivosResponse,
     HorariosActivosSyncResponse,
     IndicadoresOcupacionResponse,
+    TurnosCsvImportResponse,
+    TurnosCsvStatsResponse,
     TurnosResumenResponse,
 )
 from app.services import room_agenda_map as room_agenda_map_service
 from app.services.distribucion import agenda_ocupacion as agenda_ocupacion_service
+from app.services.distribucion import agenda_reassign as agenda_reassign_service
 from app.services.distribucion import horarios_activos as horarios_activos_service
 from app.services.distribucion import indicadores_ocupacion as indicadores_ocupacion_service
+from app.services.distribucion import turnos_csv as turnos_csv_service
 from app.services.distribucion import turnos_resumen as turnos_resumen_service
 
 router = APIRouter()
@@ -49,6 +55,23 @@ def ocupacion_agenda_filter_options(
     return agenda_ocupacion_service.list_filter_options(db)
 
 
+@router.post("/ocupacion/agenda/reassign", response_model=AgendaReassignResponse)
+def ocupacion_agenda_reassign(
+    payload: AgendaReassignRequest,
+    db: Session = Depends(get_db),
+    user: User = Depends(require_operator_or_admin),
+) -> AgendaReassignResponse:
+    return agenda_reassign_service.reassign_agenda(
+        db,
+        id_agenda=payload.id_agenda,
+        weekday=payload.weekday,
+        target_room_id=payload.target_room_id,
+        actor_id=user.id,
+        confirm_move=payload.confirm_move,
+        confirm_unassign=payload.confirm_unassign,
+    )
+
+
 @router.get("/ocupacion/agenda-lookup", response_model=AgendaLookupResponse)
 def ocupacion_agenda_lookup(
     q: str = Query(default="", min_length=0),
@@ -61,7 +84,9 @@ def ocupacion_agenda_lookup(
 
 @router.get("/ocupacion/indicadores", response_model=IndicadoresOcupacionResponse)
 def ocupacion_indicadores(
-    date: str = Query(..., description="Día YYYY-MM-DD"),
+    period: str = Query(default="day", description="day | month"),
+    date: str | None = Query(default=None, description="Día YYYY-MM-DD (period=day)"),
+    month: str | None = Query(default=None, description="Mes YYYY-MM (period=month)"),
     location_id: int | None = Query(default=None),
     room_id: int | None = Query(default=None),
     especialidad: str | None = Query(default=None),
@@ -72,7 +97,49 @@ def ocupacion_indicadores(
     _ = user
     return indicadores_ocupacion_service.compute_indicadores(
         db,
+        period=period,
         date_str=date,
+        month_str=month,
+        location_id=location_id,
+        room_id=room_id,
+        especialidad=especialidad,
+        medico=medico,
+    )
+
+
+@router.post("/ocupacion/indicadores/turnos/import", response_model=TurnosCsvImportResponse)
+async def ocupacion_indicadores_turnos_import(
+    file: UploadFile = File(...),
+    db: Session = Depends(get_db),
+    user: User = Depends(require_operator_or_admin),
+) -> TurnosCsvImportResponse:
+    content = await file.read()
+    return turnos_csv_service.import_turnos_csv(
+        db,
+        filename=file.filename or "turnos.csv",
+        content=content,
+        actor_id=user.id,
+    )
+
+
+@router.get("/ocupacion/indicadores/turnos/stats", response_model=TurnosCsvStatsResponse)
+def ocupacion_indicadores_turnos_stats(
+    period: str = Query(default="day", description="day | month"),
+    date: str | None = Query(default=None),
+    month: str | None = Query(default=None),
+    location_id: int | None = Query(default=None),
+    room_id: int | None = Query(default=None),
+    especialidad: str | None = Query(default=None),
+    medico: str | None = Query(default=None),
+    db: Session = Depends(get_db),
+    user: User = Depends(require_operator_or_admin),
+) -> TurnosCsvStatsResponse:
+    _ = user
+    return turnos_csv_service.compute_turnos_stats(
+        db,
+        period=period,
+        date_str=date,
+        month_str=month,
         location_id=location_id,
         room_id=room_id,
         especialidad=especialidad,

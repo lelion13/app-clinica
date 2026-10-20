@@ -43,7 +43,7 @@ class Settings(BaseSettings):
     model_config = SettingsConfigDict(env_file=".env", extra="ignore")
 
     app_name: str = "app-clinica"
-    # Wall-clock for consulting rooms / bookings (must match how hours are entered in the UI).
+    # Wall-clock for consulting rooms / occupancy (must match how hours are entered in the UI).
     business_tz: str = Field(default="America/Argentina/Buenos_Aires", validation_alias="BUSINESS_TIMEZONE")
     database_url: str = "postgresql+psycopg://app_clinica:app_clinica@db:5432/app_clinica"
     jwt_secret: str = "change_me_super_secret"
@@ -151,6 +151,10 @@ class Settings(BaseSettings):
     # false = STARTTLS (typical 587); true = implicit TLS/SSL (typical 465).
     # Empty env value is treated as false (avoids crash on SMTP_SECURE=).
     smtp_secure: OptionalBool = Field(default=False, validation_alias="SMTP_SECURE")
+    # Delay between liquidación mails (spam / rate-limit mitigation).
+    mail_liquidacion_delay_seconds: float = Field(
+        default=3.0, validation_alias="MAIL_LIQUIDACION_DELAY_SECONDS"
+    )
     password_reset_ttl_minutes: int = Field(default=60, validation_alias="PASSWORD_RESET_TTL_MINUTES")
     password_reset_cooldown_seconds: int = Field(
         default=60, validation_alias="PASSWORD_RESET_COOLDOWN_SECONDS"

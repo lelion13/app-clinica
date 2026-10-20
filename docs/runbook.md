@@ -66,15 +66,18 @@
   - Menú Distribución → **Ocupación** (`/ocupacion`); convive con Ocupación semanal
   - Tabla `ocupacion_horario_activo` (rev `0013_ocupacion_serial`): PK serial local; `payload` JSONB = cada fila del endpoint tal cual
   - Importante: `id_dato` del API **no es único** → se guarda 1 fila DB por cada fila del JSON (no colapsar)
-  - Derivados `tipo`/`especialidad_agenda`/`medico` + `fecha_hasta` para filtro/UI
+  - Derivados `tipo`/`especialidad_agenda` desde `nombre_agenda`; columna `medico` desde `medico_responsable_equipo` del payload (+ `fecha_hasta` para filtro/UI). Tras cambiar fuente → **Actualizar** en Ocupación.
   - `GET .../horarios-activos` lee DB (`fecha_hasta >= hoy`); `POST .../sync` wipe+reload (botón Actualizar)
   - Env: `DISTRIBUCION_HORARIOS_ACTIVOS_URL` (+ timeout; default 120s); Bearer = `NOVEDADES_PROF_SYNC_TOKEN`
   - Tras deploy: set env en `.env.prod`, `alembic upgrade head`, redeploy backend+frontend, **Actualizar** en Ocupación (esperar synced ≈ miles de filas)
-  - **Agenda ocupación** (`/agenda-ocupacion`): grilla día × consultorios (+ **Sin consultorio**); viewport full-bleed + scroll interno; filtros en una fila (selects: ubicación/tipo/especialidad/médico + día); detalle en modal (Esc/overlay); sync solo desde Ocupación
-  - **Indicadores ocupación** (`/indicadores-ocupacion`): torta del día; % = horas sync mapeadas ÷ `room_operating_hours`; `GET .../ocupacion/indicadores` (archivado `2026-10-03-indicadores-ocupacion`)
-  - **Resumen de turnos** (mismo Indicadores): proxy `GET .../ocupacion/indicadores/turnos-resumen?fecha_desde&fecha_hasta` → `DISTRIBUCION_TURNOS_RESUMEN_URL` (+ timeout; default 60s) con Bearer `NOVEDADES_PROF_SYNC_TOKEN`. UI: período Día (misma fecha) o Mes (1º–último); fetch solo al cambiar día/mes; filtros ubicación/consultorio/especialidad/médico reclasifican en memoria (join `turno_horario_id` = `id` de ocupación). Columna `id` en grilla Ocupación; si faltan ids → **Actualizar** en Ocupación. Fallo del resumen no bloquea torta/KPIs.
-  - **Estadística** (`/estadisticas`): rango fechas; % = asignaciones semanales proyectadas ÷ horario box; `GET /stats/summary` — **no** es sync ni bookings puntuales (archivado `2026-10-03-dashboard-estadisticas`)
-  - Mapeo `id_agenda` → consultorio (rev `0015_room_id_agenda`): en ficha **Consultorios** (grilla + modales Editar/Agendas/Horarios); typeahead `GET .../ocupacion/agenda-lookup?q=` (incluye `current_room_id`/`current_room_code`); batch `PUT .../consulting-rooms/{id}/id-agendas` y `PUT .../hours`. Ya no hay menú/ruta **Horarios consultorio** (`/horarios-consultorio`)
+  - **Agenda ocupación** (`/agenda-ocupacion`): grilla día × consultorios (+ **Sin consultorio** sticky si tiene ítems); orden numérico C1…C10; scroll H + auto-scroll al drag; **DnD** solo el weekday del calendario (`POST .../reassign` + `weekday`); valida horario/solape ese día. Archivado `2026-10-19-agenda-ocupacion-segun-dia` (rev `0032_agenda_map_weekday`).
+  - **Lección Alembic `0032`:** al pasar de PK `id_agenda` a `(id_agenda, weekday)`, **dropear la PK vieja antes** de insertar varios weekdays del mismo agenda; si no → `UniqueViolation` (VPS 2026-10-18). La migración corregida hace drop PK → expand → PK compuesta. Tras deploy: `alembic upgrade head`.
+  - **Indicadores ocupación** (`/indicadores-ocupacion`): período Día|Mes; donut (horas+%); tops especialidad/médico (% box = ÷ horas habilitadas; % ocup. = ÷ horas ocupadas; solo agendas mapeadas); avisos rooms sin horario / sin agenda; % = sync mapeado ÷ `room_operating_hours`; filtros especialidad/médico = solo payload (mismo `filter-options` / match que Agenda); `GET .../ocupacion/indicadores?period=day|month` (archivado `2026-10-05-indicadores-ocupacion-ui`). **Importar datos de turnos** (CSV): match exacto normalizado `Nombre`↔`nombre_agenda`; KPIs AT/AU bajo la torta; `POST .../indicadores/turnos/import` + `GET .../turnos/stats` (change `indicadores-turnos-csv`, rev `0030_turnos_csv`). Nginx frontend: `client_max_body_size 32m` (CSV ~8MB).
+  - **Resumen de turnos** (mismo Indicadores, bajo CSV): proxy `GET .../ocupacion/indicadores/turnos-resumen?fecha_desde&fecha_hasta` → `DISTRIBUCION_TURNOS_RESUMEN_URL` (+ timeout; default 60s) con Bearer `NOVEDADES_PROF_SYNC_TOKEN`. Fetch solo al cambiar día/mes; filtros reclasifican en memoria (join `turno_horario_id` = `id` de ocupación). Columna `id` en grilla Ocupación; si faltan ids → **Actualizar**. Fallo del resumen no bloquea torta/CSV/KPIs.
+  - Futuro (backlog): Looker Studio turnos/ausentes — el CSV es la prueba de concepto local.
+  - **Retiro limpio** (`limpiar-ui-obsoleta`, rev `0033_drop_bookings_weekly`): sin menú/UI/API de Ocupación semanal, Agenda (`/agenda` bookings) ni Estadística. URLs legacy → Home. Tablas `bookings` + `room_weekly_assignments` dropeadas. **Backup antes de `alembic upgrade head`**. Profesionales se mantiene.
+  - Mapeo `(id_agenda, weekday)` → consultorio (rev `0032`; legado `0015`): **Consultorios → Agendas** asocia solo días aún Sin consultorio (todo-o-nada + conflicto); full = nombre; parcial = `nombre - día`. Typeahead lookup; `PUT .../id-agendas`. Sin menú **Horarios consultorio**.
+
   - `locations.id_dominio` (rev `0014`) + `locations.tipo` (rev `0016_locations_tipo`): vínculo con ocupación por par `(id_dominio, tipo)` único entre activas; `tipo` obligatorio al crear/editar; existentes migran con `PENDIENTE-{id}` hasta corregir en UI; Agenda ocupación filtra ubicación por dominio+tipo
   - Split `nombre_agenda`: `" - "` o fallback `-` (valores compactos); tras cambiar parser → **Actualizar** en Ocupación
   - OpenSpec Distribución (archivados 2026-08-06): `distribucion-ocupacion`, `agenda-ocupacion-sync`, `mapeo-agenda-consultorio`, `locations-tipo`, `agenda-ocupacion-ui` → spec estable `openspec/specs/distribucion/spec.md`
@@ -170,6 +173,17 @@
   - Mismo Excel/headers/roles/período cerrado/todo-o-nada/waterfill; lote independiente (`ajuste_mas_menos_lote_id`) — puede coexistir con descuento.
   - `Monto` negativo → descuenta (mismo tope que descontar); positivo/`+`/sin signo → suma (waterfill **sin** tope).
   - Comentario con importe firmado; Anular solo el lote Ajuste +/-.
+- Archivado `2026-10-14-novedades-indices-modulos` (rev `0031_modulo_horas`):
+  - Menú Novedades → **Índices** (solo `admin`) al final; ruta `/novedades/indices`; `GET /novedades/indices`.
+  - Contadores por período: por servicio/profesional — **Horas** = Σ `módulo.horas` por asignación (NULL→0) + novedades netas; monto (cargas+ajustes con servicio); módulos; producción CH en por-profesional.
+  - Catálogo módulos: campo **horas** (entero ≥ 1) obligatorio en alta/edición; migración deja existentes en NULL. Import Excel módulos sin columna horas (queda NULL).
+  - Tras deploy: `alembic upgrade head` (0031).
+- Cambio `novedades-capital-humano-mail-liquidacion` (rama `medicos`; rev `0034_liquidacion_mail`):
+  - Sync profesionales: campo Integrando **`MAIL`** → `novedades_profesional.email`.
+  - Capital Humano (período **cerrado**, `admin`/`rrhh`): **Enviar liquidaciones por mail** → modal N → lote + worker throttled (`MAIL_LIQUIDACION_DELAY_SECONDS`, default 3).
+  - Un mail por fila CH: Total general + detalle (cargas/producción/ajustes); sin PDF/CC. Bloquea si falta algún mail válido.
+  - Contadores pending/sent/failed; **Reintentar fallidos**; lote 100% OK bloquea reenvío del período.
+  - Tras deploy: `alembic upgrade head` (0034) + sync profesionales para cargar mails.
 
 ## Roles (panel)
 - `admin`: distribución + novedades (todo) + usuarios
@@ -188,6 +202,7 @@
   - `APP_PUBLIC_URL` (ej. `https://clinica.lionapp.cloud`)
   - `SMTP_HOST`, `SMTP_PORT`, `SMTP_USER`, `SMTP_PASS`, `SMTP_FROM`, `SMTP_SECURE`
   - `SMTP_SECURE=false` → STARTTLS (típico puerto 587); `true` → TLS implícito (típico 465)
+  - `MAIL_LIQUIDACION_DELAY_SECONDS` (default 3): pausa entre mails de liquidación CH
 - Migración: `0023_password_reset` (`alembic upgrade head` tras deploy).
 - Archive SDD: `openspec/changes/archive/2026-08-20-usuarios-abm-email-reset/`
 

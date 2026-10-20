@@ -57,6 +57,8 @@ class ModuloCreateRequest(BaseModel):
     descripcion: str = Field(min_length=2, max_length=200)
     comentario: str | None = Field(default=None, max_length=500)
     valor: Decimal = Field(ge=0)
+    # Required in Param UI; optional so Excel import (out of scope for horas) can leave NULL.
+    horas: int | None = Field(default=None, ge=1)
     produccion: bool = False
     tipo_dia: TipoDiaLiteral = "semana"
     servicio_ids: list[int] = Field(min_length=1)
@@ -66,6 +68,7 @@ class ModuloUpdateRequest(BaseModel):
     descripcion: str = Field(min_length=2, max_length=200)
     comentario: str | None = Field(default=None, max_length=500)
     valor: Decimal = Field(ge=0)
+    horas: int = Field(ge=1)
     produccion: bool = False
     tipo_dia: TipoDiaLiteral = "semana"
 
@@ -79,6 +82,7 @@ class ModuloResponse(BaseModel):
     descripcion: str
     comentario: str | None
     valor: Decimal
+    horas: int | None = None
     produccion: bool = False
     tipo_dia: TipoDiaLiteral = "semana"
     servicio_ids: list[int] = []
@@ -467,3 +471,55 @@ class AjusteMasMenosImportResponse(BaseModel):
 
 class AjusteMasMenosAnularResponse(BaseModel):
     deleted: int
+
+
+class IndicesServicioRow(BaseModel):
+    servicio_id: int
+    servicio_nombre: str
+    horas: Decimal
+    monto: Decimal
+    profesionales: int
+    modulos: int
+
+
+class IndicesProfesionalRow(BaseModel):
+    professional_id: int
+    legajo: str | None = None
+    professional_name: str
+    horas: Decimal
+    modulos: int
+    produccion_monto: Decimal
+    produccion_cantidad: int
+
+
+class IndicesResponse(BaseModel):
+    periodo_id: int
+    por_servicio: list[IndicesServicioRow] = Field(default_factory=list)
+    por_profesional: list[IndicesProfesionalRow] = Field(default_factory=list)
+
+
+class LiquidacionMailMissingProfessional(BaseModel):
+    professional_id: int
+    legajo: str | None = None
+    professional_name: str
+    email: str | None = None
+
+
+class LiquidacionMailStatusResponse(BaseModel):
+    periodo_id: int
+    lote_id: int | None = None
+    pending: int = 0
+    sent: int = 0
+    failed: int = 0
+    total: int = 0
+    locked: bool = False
+    can_start: bool = False
+    can_retry_failed: bool = False
+    worker_running: bool = False
+
+
+class LiquidacionMailStartResponse(BaseModel):
+    lote_id: int
+    periodo_id: int
+    total: int
+    status: LiquidacionMailStatusResponse

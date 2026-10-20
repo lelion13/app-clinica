@@ -1,4 +1,4 @@
-from fastapi import APIRouter, Depends, status
+from fastapi import APIRouter, Depends, Query, status
 from sqlalchemy.orm import Session
 
 from app.api.deps import require_operator_or_admin
@@ -108,6 +108,7 @@ def room_id_agendas_add(
         payload.id_agenda,
         actor_id=user.id,
         confirm_move=payload.confirm_move,
+        weekday=payload.weekday,
     )
 
 
@@ -115,11 +116,12 @@ def room_id_agendas_add(
 def room_id_agendas_remove(
     room_id: int,
     id_agenda: int,
+    weekday: int | None = Query(default=None, ge=0, le=6),
     db: Session = Depends(get_db),
     user: User = Depends(require_operator_or_admin),
 ) -> None:
     _ = user
-    room_agenda_map_service.remove_room_id_agenda(db, room_id, id_agenda)
+    room_agenda_map_service.remove_room_id_agenda(db, room_id, id_agenda, weekday=weekday)
 
 
 @router.put("/{room_id}/id-agendas", response_model=RoomIdAgendaListResponse)

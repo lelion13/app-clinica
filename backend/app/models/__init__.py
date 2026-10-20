@@ -1,9 +1,9 @@
-from app.models.booking import Booking
 from app.models.backup import SystemBackupConfig, SystemBackupLog
 from app.models.consulting_room import ConsultingRoom, ConsultingRoomIdAgenda, RoomOperatingHour
 from app.models.location import Location
 from app.models.ocupacion import OcupacionHorarioActivo
 from app.models.password_reset import PasswordResetToken
+from app.models.turnos_csv import TurnosCsvImport, TurnosCsvRow
 from app.models.novedades import (
     NovedadesAsignacionModulo,
     NovedadesConfig,
@@ -20,7 +20,6 @@ from app.models.novedades import (
 )
 from app.models.professional import Professional
 from app.models.user import User
-from app.models.weekly_assignment import RoomWeeklyAssignment
 
 __all__ = [
     "User",
@@ -29,8 +28,6 @@ __all__ = [
     "ConsultingRoomIdAgenda",
     "RoomOperatingHour",
     "Professional",
-    "Booking",
-    "RoomWeeklyAssignment",
     "NovedadesServicio",
     "NovedadesModulo",
     "NovedadesModuloServicio",
@@ -42,6 +39,8 @@ __all__ = [
     "NovedadesAsignacionModulo",
     "NovedadesNovedad",
     "OcupacionHorarioActivo",
+    "TurnosCsvImport",
+    "TurnosCsvRow",
     "PasswordResetToken",
     "SystemBackupConfig",
     "SystemBackupLog",

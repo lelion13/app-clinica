@@ -10,14 +10,12 @@ sys.path.append(str(Path(__file__).resolve().parents[1]))
 
 from app.core.config import settings
 from app.models import (
-    Booking,
     ConsultingRoom,
     Location,
     OcupacionHorarioActivo,
     PasswordResetToken,
     Professional,
     RoomOperatingHour,
-    RoomWeeklyAssignment,
     User,
 )
 from app.models.base import Base
