@@ -292,6 +292,8 @@ class NovedadesNovedad(AuditMixin, Base):
         nullable=False,
     )
     horas: Mapped[Decimal] = mapped_column(Numeric(10, 2), nullable=False)
+    # Snapshot of calculated importe at load/recalc time (hours × valor_hora, signed).
+    valor: Mapped[Decimal] = mapped_column(Numeric(12, 2), nullable=False, default=Decimal("0"))
     fecha_realizacion: Mapped[date] = mapped_column(Date, nullable=False)
     motivo_sin_produccion: Mapped[str | None] = mapped_column(String(40), nullable=True)
     observacion_sin_produccion: Mapped[str | None] = mapped_column(String(500), nullable=True)

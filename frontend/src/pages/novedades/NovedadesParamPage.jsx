@@ -14,7 +14,15 @@ const tabs = [
   { id: "profesionales", label: "Profesionales ↔ servicios" },
   { id: "periodos", label: "Períodos" },
   { id: "feriados", label: "Feriados" },
+  { id: "recalculo", label: "Recálculo" },
 ];
+
+function formatMoney(value) {
+  if (value == null || value === "") return "—";
+  const n = Number(value);
+  if (Number.isNaN(n)) return String(value);
+  return `$${n.toLocaleString("es-AR", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+}
 
 const TIPO_DIA_OPTIONS = [
   { value: "semana", label: "Semana" },
@@ -29,6 +37,11 @@ function tipoDiaLabel(value) {
 export function NovedadesParamPage() {
   const [tab, setTab] = useState("servicios");
   const [error, setError] = useState("");
+  const [recalcPeriodoId, setRecalcPeriodoId] = useState("");
+  const [recalcModo, setRecalcModo] = useState("ambos");
+  const [recalcPreview, setRecalcPreview] = useState(null);
+  const [recalcPreviewLoading, setRecalcPreviewLoading] = useState(false);
+  const [recalcApplyLoading, setRecalcApplyLoading] = useState(false);
   const [servicios, setServicios] = useState([]);
   const [modulos, setModulos] = useState([]);
   const [jefes, setJefes] = useState([]);
@@ -582,6 +595,50 @@ export function NovedadesParamPage() {
   const closeDeleteFeriado = () => {
     if (deleteFeriadoSaving) return;
     setDeleteFeriado(null);
+  };
+
+  const runRecalcPreview = async () => {
+    if (!recalcPeriodoId) {
+      setError("Seleccioná un período");
+      return;
+    }
+    setRecalcPreviewLoading(true);
+    setError("");
+    setRecalcPreview(null);
+    try {
+      const res = await apiRequestWithRefresh("/novedades/recalculo/preview", {
+        method: "POST",
+        body: JSON.stringify({ periodo_id: Number(recalcPeriodoId), modo: recalcModo }),
+      });
+      setRecalcPreview(res);
+      if (!res?.has_changes) {
+        setError("No hay cambios: los importes ya coinciden con el catálogo actual");
+      }
+    } catch (err) {
+      setError(err.message || "Error al generar vista previa");
+    } finally {
+      setRecalcPreviewLoading(false);
+    }
+  };
+
+  const runRecalcApply = async () => {
+    if (!recalcPeriodoId || !recalcPreview?.has_changes) return;
+    setRecalcApplyLoading(true);
+    setError("");
+    try {
+      const res = await apiRequestWithRefresh("/novedades/recalculo/apply", {
+        method: "POST",
+        body: JSON.stringify({ periodo_id: Number(recalcPeriodoId), modo: recalcModo }),
+      });
+      setInfoMessage(
+        `Actualizado: ${res?.updated_modulos ?? 0} módulos, ${res?.updated_horas ?? 0} novedades de horas`
+      );
+      setRecalcPreview(null);
+    } catch (err) {
+      setError(err.message || "Error al aplicar recálculo");
+    } finally {
+      setRecalcApplyLoading(false);
+    }
   };
 
   const confirmDeleteFeriado = async () => {
@@ -2627,6 +2684,138 @@ export function NovedadesParamPage() {
               </div>
             </div>
           ) : null}
+        </>
+      ) : null}
+
+      {tab === "recalculo" ? (
+        <>
+          <p style={uiStyles.helpText}>
+            Actualiza importes ya cargados con el valor de catálogo / valor hora actuales. Primero
+            generá la vista previa; solo se puede confirmar si hay diferencias.
+          </p>
+          <div style={{ display: "flex", gap: 12, flexWrap: "wrap", alignItems: "flex-end", marginBottom: 16 }}>
+            <label style={{ display: "grid", gap: 4 }}>
+              <span style={{ fontSize: 12, color: uiTheme.colors.textMuted }}>Período</span>
+              <select
+                value={recalcPeriodoId}
+                onChange={(e) => {
+                  setRecalcPeriodoId(e.target.value);
+                  setRecalcPreview(null);
+                }}
+                style={uiStyles.formControl}
+              >
+                <option value="">Seleccioná…</option>
+                {periodos.map((p) => (
+                  <option key={p.id} value={p.id}>
+                    {p.nombre || `Período #${p.id}`} ({p.estado === "closed" ? "cerrado" : "abierto"})
+                  </option>
+                ))}
+              </select>
+            </label>
+            <label style={{ display: "grid", gap: 4 }}>
+              <span style={{ fontSize: 12, color: uiTheme.colors.textMuted }}>Qué actualizar</span>
+              <select
+                value={recalcModo}
+                onChange={(e) => {
+                  setRecalcModo(e.target.value);
+                  setRecalcPreview(null);
+                }}
+                style={uiStyles.formControl}
+              >
+                <option value="ambos">Módulos y horas</option>
+                <option value="modulos">Solo módulos</option>
+                <option value="horas">Solo horas</option>
+              </select>
+            </label>
+            <button
+              type="button"
+              style={uiStyles.buttonSecondary}
+              onClick={runRecalcPreview}
+              disabled={recalcPreviewLoading || !recalcPeriodoId}
+            >
+              {recalcPreviewLoading ? "Calculando…" : "Vista previa"}
+            </button>
+            <button
+              type="button"
+              style={uiStyles.buttonPrimary}
+              onClick={runRecalcApply}
+              disabled={recalcApplyLoading || !recalcPreview?.has_changes}
+            >
+              {recalcApplyLoading ? "Actualizando…" : "Confirmar actualización"}
+            </button>
+          </div>
+
+          {recalcPreview ? (
+            <div style={{ display: "grid", gap: 16 }}>
+              {recalcPreview.modulos?.length ? (
+                <div>
+                  <h3 style={{ margin: "0 0 8px", fontSize: "1rem" }}>Módulos</h3>
+                  <div style={{ overflowX: "auto" }}>
+                    <table style={{ width: "100%", borderCollapse: "collapse", fontSize: "0.9rem" }}>
+                      <thead>
+                        <tr>
+                          <th style={{ textAlign: "left", padding: 8, borderBottom: `1px solid ${uiTheme.colors.border}` }}>
+                            Módulo
+                          </th>
+                          <th style={{ textAlign: "right", padding: 8, borderBottom: `1px solid ${uiTheme.colors.border}` }}>
+                            Filas
+                          </th>
+                          <th style={{ textAlign: "right", padding: 8, borderBottom: `1px solid ${uiTheme.colors.border}` }}>
+                            Cambian
+                          </th>
+                          <th style={{ textAlign: "right", padding: 8, borderBottom: `1px solid ${uiTheme.colors.border}` }}>
+                            Actual
+                          </th>
+                          <th style={{ textAlign: "right", padding: 8, borderBottom: `1px solid ${uiTheme.colors.border}` }}>
+                            Nuevo
+                          </th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {recalcPreview.modulos.map((row) => (
+                          <tr key={row.modulo_id}>
+                            <td style={{ padding: 8, borderBottom: `1px solid ${uiTheme.colors.border}` }}>
+                              {row.descripcion}
+                            </td>
+                            <td style={{ padding: 8, textAlign: "right", borderBottom: `1px solid ${uiTheme.colors.border}` }}>
+                              {row.filas}
+                            </td>
+                            <td style={{ padding: 8, textAlign: "right", borderBottom: `1px solid ${uiTheme.colors.border}` }}>
+                              {row.filas_cambio}
+                            </td>
+                            <td style={{ padding: 8, textAlign: "right", borderBottom: `1px solid ${uiTheme.colors.border}` }}>
+                              {formatMoney(row.importe_actual)}
+                            </td>
+                            <td style={{ padding: 8, textAlign: "right", borderBottom: `1px solid ${uiTheme.colors.border}` }}>
+                              {formatMoney(row.importe_nuevo)}
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
+              ) : null}
+
+              {recalcPreview.horas ? (
+                <div>
+                  <h3 style={{ margin: "0 0 8px", fontSize: "1rem" }}>Horas (novedades)</h3>
+                  <p style={uiStyles.helpText}>
+                    Filas: {recalcPreview.horas.filas} · Cambian: {recalcPreview.horas.filas_cambio}
+                    <br />
+                    Actual: {formatMoney(recalcPreview.horas.importe_actual)} → Nuevo:{" "}
+                    {formatMoney(recalcPreview.horas.importe_nuevo)}
+                  </p>
+                </div>
+              ) : null}
+
+              {!recalcPreview.has_changes ? (
+                <p style={uiStyles.helpText}>Sin diferencias respecto al catálogo actual.</p>
+              ) : null}
+            </div>
+          ) : (
+            <p style={uiStyles.helpText}>Elegí período y modo, luego Vista previa.</p>
+          )}
         </>
       ) : null}
     </section>

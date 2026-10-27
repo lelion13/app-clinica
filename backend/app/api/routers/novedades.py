@@ -1,4 +1,5 @@
 from datetime import date
+from decimal import Decimal
 
 from fastapi import APIRouter, Depends, File, HTTPException, Query, UploadFile, status
 from fastapi.responses import Response
@@ -36,6 +37,9 @@ from app.schemas.novedades import (
     AjusteMasMenosStatusResponse,
     LiquidacionMailStartResponse,
     LiquidacionMailStatusResponse,
+    RecalculoApplyResponse,
+    RecalculoPreviewResponse,
+    RecalculoRequest,
     ModuloCreateRequest,
     ModuloImportResponse,
     ModuloResponse,
@@ -70,6 +74,7 @@ from app.services.novedades import importe_descontar as importe_descontar_servic
 from app.services.novedades import ajuste_mas_menos as ajuste_mas_menos_service
 from app.services.novedades import liquidacion_mail as liquidacion_mail_service
 from app.services.novedades import masters as masters_service
+from app.services.novedades import recalculo as recalculo_service
 from app.services.novedades import modulos_import as modulos_import_service
 from app.services.novedades import produccion_tarifas as produccion_tarifas_service
 from app.services.novedades import prof_sync as prof_sync_service
@@ -153,7 +158,11 @@ def _novedad_response(db: Session, item) -> NovedadResponse:
         tipo=tipo.value,
         tipo_label=NOVEDAD_TIPO_LABELS.get(tipo, tipo.value),
         horas=item.horas,
-        valor_calculado=novedad_valor_calculado(tipo, item.horas, valor_hora),
+        valor_calculado=(
+            Decimal(item.valor)
+            if getattr(item, "valor", None) is not None
+            else novedad_valor_calculado(tipo, item.horas, valor_hora)
+        ),
         fecha_realizacion=item.fecha_realizacion,
         motivo_sin_produccion=item.motivo_sin_produccion,
         observacion_sin_produccion=item.observacion_sin_produccion,
@@ -881,6 +890,24 @@ def capital_humano_mail_liquidacion_retry_failed(
     user: User = Depends(require_admin_or_rrhh),
 ) -> LiquidacionMailStatusResponse:
     return liquidacion_mail_service.retry_failed(db, periodo_id=periodo_id, user=user)
+
+
+@router.post("/recalculo/preview", response_model=RecalculoPreviewResponse)
+def recalculo_preview(
+    payload: RecalculoRequest,
+    db: Session = Depends(get_db),
+    user: User = Depends(require_admin_or_rrhh),
+) -> RecalculoPreviewResponse:
+    return recalculo_service.preview_recalculo(db, payload, user=user)
+
+
+@router.post("/recalculo/apply", response_model=RecalculoApplyResponse)
+def recalculo_apply(
+    payload: RecalculoRequest,
+    db: Session = Depends(get_db),
+    user: User = Depends(require_admin_or_rrhh),
+) -> RecalculoApplyResponse:
+    return recalculo_service.apply_recalculo(db, payload, user=user)
 
 
 @router.get("/export.xlsx")

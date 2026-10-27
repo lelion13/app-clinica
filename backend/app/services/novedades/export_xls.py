@@ -243,6 +243,8 @@ def _novedad_row(db: Session, item: NovedadesNovedad) -> GridRowResponse | None:
     label = NOVEDAD_TIPO_LABELS.get(tipo, str(item.tipo))
     horas = Decimal(item.horas)
     valor_hora = Decimal(servicio.valor_hora or 0)
+    persisted = getattr(item, "valor", None)
+    valor = Decimal(persisted) if persisted is not None else novedad_valor_calculado(tipo, horas, valor_hora)
     return GridRowResponse(
         tipo=tipo.value,
         id=item.id,
@@ -255,7 +257,7 @@ def _novedad_row(db: Session, item: NovedadesNovedad) -> GridRowResponse | None:
         legajo=professional.legajo,
         concepto=label,
         horas=horas,
-        valor=novedad_valor_calculado(tipo, horas, valor_hora),
+        valor=valor,
         valor_hora=valor_hora,
         cargado_por=actor.name if actor else None,
         fecha_realizacion=item.fecha_realizacion,

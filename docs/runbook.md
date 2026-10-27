@@ -184,6 +184,11 @@
   - Un mail por fila CH: Total general + detalle (cargas/producción/ajustes); sin PDF/CC. Bloquea si falta algún mail válido.
   - Contadores pending/sent/failed; **Reintentar fallidos**; lote 100% OK bloquea reenvío del período.
   - Tras deploy: `alembic upgrade head` (0034) + sync profesionales para cargar mails.
+- Cambio `novedades-param-recalculo` (rama `medicos`; rev `0035_novedad_valor`):
+  - Parametrización → pestaña **Recálculo** (después de Feriados): período abierto/cerrado; modo horas / módulos / ambos.
+  - Vista previa (por módulo + bloque horas) → Confirmar; bloquea si no hay diferencias vs catálogo/`valor_hora`.
+  - Módulos: misma regla de carga (plus ×1.20 si aplica). Horas: persiste `novedades_novedad.valor` (snapshot); no cambia cantidad de horas.
+  - Tras deploy: `alembic upgrade head` (0035).
 
 ## Roles (panel)
 - `admin`: distribución + novedades (todo) + usuarios
