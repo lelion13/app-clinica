@@ -8,16 +8,16 @@
 - [x] 2.1 Schemas + service preview/apply
 - [x] 2.2 Router endpoints
 
-## 3. UI
+## 3. UI Recálculo
 - [x] 3.1 Tab Recálculo after Feriados
 
-## 4. Quality
-- [x] 4.1 Unit tests
-- [x] 4.2 Runbook
+## 4. Quality (recalculo)
+- [x] 4.1 Unit tests recalculo
+- [x] 4.2 Runbook recalculo
 
 ## 5. Add-on: Valores Extras (Índices)
 - [x] 5.1 API `GET /novedades/indices/valores-extras`
 - [x] 5.2 Botón + modal expandible en Índices
 - [x] 5.3 Unit tests filtros
 - [x] 5.4 Selección + Exportar PDF (chrome recepción, 1 PDF / N páginas)
-- [ ] 5.5 Actualizar delta spec + archive (pendiente, una sola vez)
+- [x] 5.5 Actualizar delta/proposal/design + merge specs + archive

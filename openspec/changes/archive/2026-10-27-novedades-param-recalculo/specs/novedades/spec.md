@@ -49,14 +49,14 @@ The UI MUST follow: filtros → **Vista previa** → resumen → **Confirmar act
 
 The preview MUST show:
 
-- **Por cada módulo de catálogo** involucrado: importe total actual (suma de valores persistidos de asignaciones de ese módulo) vs importe total nuevo (suma de valores recalculados)
-- **Bloque horas** (si el modo incluye horas): importe total actual vs importe total nuevo de todas las novedades de horas del período
+- **Por cada módulo de catálogo** involucrado: importe total actual vs importe total nuevo
+- **Bloque horas** (si el modo incluye horas): importe total actual vs nuevo
 
 A row “changes” when the recalculated importe differs from the persisted importe.
 
 If the preview finds **zero** changing rows, **Confirmar actualización** MUST be blocked (or reject apply) with a clear message that there are no changes.
 
-Confirm MUST persist the new importes only on rows that change. Rows already equal to the recalculated value MUST NOT be rewritten unnecessarily (MAY no-op).
+Confirm MUST persist the new importes only on rows that change.
 
 #### Scenario: Preview con cambios
 
@@ -98,6 +98,70 @@ Confirm MUST persist the new importes only on rows that change. Rows already equ
 - THEN horas MUST seguir siendo 3
 - AND el importe MUST pasar de 3000 a 3300
 
+### Requirement: Valor persistido en novedades de horas
+
+Each `novedades_novedad` row MUST persist a numeric **`valor`** (importe snapshot) set on create/update and used by grid/export/CH/recalc. Migration `0035_novedad_valor` MUST backfill existing rows from the then-current formula and enforce NOT NULL thereafter.
+
+#### Scenario: Alta setea valor
+
+- GIVEN create de novedad hora_extra 2h con valor_hora 1000
+- WHEN se persiste
+- THEN `valor` MUST ser 2000 (o el signo/regla del tipo)
+
+### Requirement: Valores Extras en Índices
+
+The Índices screen (`admin` only) MUST expose a **Valores Extras** button that is **disabled** until a período is selected. The button MUST open a modal scoped to that selected period.
+
+The modal MUST allow:
+
+1. **Filtro tipo**: `ambos` (default) | `modulos` | `novedades` | `novedad_extra`
+2. **Búsqueda** por nombre o legajo de profesional
+3. A **grid** with one row per professional that has matching cargas, showing: cant. módulos, cant. novedades, importe módulos, importe novedades, importe total
+4. **Expand** a professional row to show detalle columns: fecha, tipo, concepto, cant/horas, valor, importe, motivo, observación(es), servicio
+5. **Checkboxes** per professional plus select-all in the header
+6. Buttons **Exportar** (left of **Cerrar**)
+
+Universe: all non-soft-deleted module assignments and hour novedades of the period; filters only narrow. Filter **novedad_extra** MUST include rows that have **any non-empty observation field** (currently `observacion_sin_produccion`); motivo alone without observation MUST NOT qualify.
+
+Backend: `GET /novedades/indices/valores-extras` MUST require `admin`.
+
+#### Scenario: Botón sin período
+
+- GIVEN admin en Índices sin período
+- THEN Valores Extras MUST estar deshabilitado
+
+#### Scenario: Filtro novedad extra
+
+- GIVEN carga con observación y carga solo con motivo sin observación
+- WHEN filtro = novedad_extra
+- THEN MUST incluir solo la que tiene observación
+
+#### Scenario: Expand detalle
+
+- GIVEN profesional con módulo y novedad en el período (filtro ambos)
+- WHEN admin expande la fila
+- THEN MUST ver el detalle de ambas cargas con las columnas definidas
+
+### Requirement: Export PDF Valores Extras
+
+From the Valores Extras modal, **Exportar** MUST download **one** PDF containing the detalle of **selected** professionals (at least one required). Multiple professionals MUST appear as separate pages/sections in the same PDF (page break between professionals).
+
+The PDF visual chrome MUST match Clínica Monte Grande / app-recepcion signature PDFs: navy header band asset, gray title band with document title **Valores Extras**, footer label + page number.
+
+Export MUST respect the current filtro (and applied search) and the selected `professional_ids`. Endpoint: `POST /novedades/indices/valores-extras/pdf` (`admin` only). If none of the selected professionals have cargas under the filter, the API MUST reject with a clear error (no empty fake PDF of “success”).
+
+#### Scenario: Export selección
+
+- GIVEN dos profesionales visibles y solo uno tildado
+- WHEN Exportar
+- THEN el PDF MUST incluir solo el seleccionado
+
+#### Scenario: Sin selección
+
+- GIVEN modal abierto sin checkboxes
+- WHEN Exportar
+- THEN MUST NOT descargar (UI o API bloquea)
+
 ## MODIFIED Requirements
 
 ### Requirement: Servicios y módulos (Param tabs)
@@ -111,3 +175,15 @@ In addition to existing Parametrización tabs, the tab list MUST include **Recá
 - GIVEN admin en Parametrización
 - WHEN lista tabs
 - THEN MUST incluir Recálculo después de Feriados
+
+### Requirement: Pantalla Índices por período
+
+(Previously: two stacked sections; export out of scope.)
+
+In addition to **Por servicio** and **Por profesional**, the screen MUST provide **Valores Extras** (modal) as defined in Requirements “Valores Extras en Índices” and “Export PDF Valores Extras”. Metric grids remain unchanged. Excel/CSV export of Índices metrics remains out of scope; PDF export applies only to Valores Extras.
+
+#### Scenario: Valores Extras disponible con período
+
+- GIVEN admin con período seleccionado en Índices
+- WHEN pulsa Valores Extras
+- THEN MUST abrirse el modal del período seleccionado

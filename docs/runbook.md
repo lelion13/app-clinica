@@ -186,7 +186,9 @@
   - Parametrización → pestaña **Recálculo** (después de Feriados): período abierto/cerrado; modo horas / módulos / ambos.
   - Vista previa (por módulo + bloque horas) → Confirmar; bloquea si no hay diferencias vs catálogo/`valor_hora`.
   - Módulos: misma regla de carga (plus ×1.20 si aplica). Horas: persiste `novedades_novedad.valor` (snapshot); no cambia cantidad de horas.
-  - Tras deploy: `alembic upgrade head` (0035).
+  - Índices (`admin`) → **Valores Extras**: modal del período seleccionado; filtro ambos/módulos/novedades/novedad extra (con observación); búsqueda nombre/legajo; grilla expandible; selección + **Exportar** PDF (chrome recepción, una página por profesional).
+  - Deps imagen: `reportlab` + `backend/app/assets/pdf-header-band.png`.
+  - Tras deploy: `alembic upgrade head` (0035) + rebuild backend (reportlab/asset).
 
 ## Roles (panel)
 - `admin`: distribución + novedades (todo) + usuarios
