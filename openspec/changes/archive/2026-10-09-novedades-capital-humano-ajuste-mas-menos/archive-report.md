@@ -23,3 +23,6 @@ Implementation matched delta (service/API/UI/migration/runbook). No code/doc gap
 
 ## Verification
 Implemented (2026-10-02); documented and archived 2026-10-09. Unit tests for signed waterfill passed at implementation time.
+
+## Follow-up (2026-10-27)
+Stable `openspec/specs/novedades/spec.md` was missing the merged Ajuste +/- requirements (archive existed; active folder leftover). Re-synced ADDED/MODIFIED into stable and removed active `openspec/changes/novedades-capital-humano-ajuste-mas-menos/`.

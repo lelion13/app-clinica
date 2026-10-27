@@ -168,7 +168,7 @@
   - Comentario: `Legajo - Nombre - Sector - MontoNeg` (truncado a 500).
   - Waterfill multi-servicio (mayor cargas primero; resto tras cargas al último servicio); tope cargas+producción.
   - Todo-o-nada; modal con todos los errores. Anular soft-delete solo del lote (`descuento_lote_id`).
-- Cambio `novedades-capital-humano-ajuste-mas-menos` (rev `0029_ajuste_mas_menos_lote`):
+- Archivado `2026-10-09-novedades-capital-humano-ajuste-mas-menos` (rev `0029_ajuste_mas_menos_lote`; spec sync catch-up 2026-10-27):
   - Botón **Ajuste +/-** / **Anular Ajuste +/-** inmediatamente a la derecha de Importe a descontar.
   - Mismo Excel/headers/roles/período cerrado/todo-o-nada/waterfill; lote independiente (`ajuste_mas_menos_lote_id`) — puede coexistir con descuento.
   - `Monto` negativo → descuenta (mismo tope que descontar); positivo/`+`/sin signo → suma (waterfill **sin** tope).
@@ -178,7 +178,7 @@
   - Contadores por período: por servicio/profesional — **Horas** = Σ `módulo.horas` por asignación (NULL→0) + novedades netas; monto (cargas+ajustes con servicio); módulos; producción CH en por-profesional.
   - Catálogo módulos: campo **horas** (entero ≥ 1) obligatorio en alta/edición; migración deja existentes en NULL. Import Excel módulos sin columna horas (queda NULL).
   - Tras deploy: `alembic upgrade head` (0031).
-- Cambio `novedades-capital-humano-mail-liquidacion` (rama `medicos`; rev `0034_liquidacion_mail`):
+- Archivado `2026-10-27-novedades-capital-humano-mail-liquidacion` (rev `0034_liquidacion_mail`):
   - Sync profesionales: campo Integrando **`MAIL`** → `novedades_profesional.email`.
   - Capital Humano (período **cerrado**, `admin`/`rrhh`): **Enviar liquidaciones por mail** → modal N → lote + worker throttled (`MAIL_LIQUIDACION_DELAY_SECONDS`, default 3).
   - Un mail por fila CH: Total general + detalle (cargas/producción/ajustes); sin PDF/CC. Bloquea si falta algún mail válido.
