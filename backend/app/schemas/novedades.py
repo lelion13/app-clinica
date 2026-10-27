@@ -498,6 +498,44 @@ class IndicesResponse(BaseModel):
     por_profesional: list[IndicesProfesionalRow] = Field(default_factory=list)
 
 
+ValoresExtrasFiltroLiteral = Literal["modulos", "novedades", "ambos", "novedad_extra"]
+
+
+class ValoresExtrasDetalleRow(BaseModel):
+    kind: Literal["modulo", "novedad"]
+    id: int
+    fecha_realizacion: date | None = None
+    tipo: str
+    concepto: str
+    cantidad_horas: Decimal | None = None
+    valor_unitario: Decimal | None = None
+    importe: Decimal
+    motivo_sin_produccion: str | None = None
+    motivo_label: str | None = None
+    observacion_sin_produccion: str | None = None
+    observaciones: list[str] = Field(default_factory=list)
+    servicio_nombre: str
+
+
+class ValoresExtrasProfesionalRow(BaseModel):
+    professional_id: int
+    legajo: str | None = None
+    professional_name: str
+    cant_modulos: int
+    cant_novedades: int
+    importe_modulos: Decimal
+    importe_novedades: Decimal
+    importe_total: Decimal
+    detalle: list[ValoresExtrasDetalleRow] = Field(default_factory=list)
+
+
+class ValoresExtrasResponse(BaseModel):
+    periodo_id: int
+    filtro: ValoresExtrasFiltroLiteral
+    q: str | None = None
+    profesionales: list[ValoresExtrasProfesionalRow] = Field(default_factory=list)
+
+
 class LiquidacionMailMissingProfessional(BaseModel):
     professional_id: int
     legajo: str | None = None
