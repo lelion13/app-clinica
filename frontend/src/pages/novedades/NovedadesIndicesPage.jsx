@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { Fragment, useCallback, useEffect, useState } from "react";
 
 import { AlertModal } from "../../components/AlertModal";
 import { apiRequestWithRefresh } from "../../services/api";
@@ -13,6 +13,22 @@ function formatNumber(value) {
   const n = Number(value ?? 0);
   return n.toLocaleString("es-AR", { maximumFractionDigits: 2 });
 }
+
+function formatDate(value) {
+  if (!value) return "—";
+  try {
+    return new Date(`${value}T12:00:00`).toLocaleDateString("es-AR");
+  } catch {
+    return String(value);
+  }
+}
+
+const FILTRO_OPTIONS = [
+  { value: "ambos", label: "Ambos" },
+  { value: "modulos", label: "Módulos" },
+  { value: "novedades", label: "Novedades" },
+  { value: "novedad_extra", label: "Novedad extra" },
+];
 
 const thStyle = {
   textAlign: "left",
@@ -30,12 +46,23 @@ const tdStyle = {
   verticalAlign: "top",
 };
 
+const thDetail = { ...thStyle, fontSize: 12, padding: "6px 8px" };
+const tdDetail = { ...tdStyle, fontSize: 13, padding: "6px 8px" };
+
 export function NovedadesIndicesPage() {
   const [error, setError] = useState("");
   const [periodos, setPeriodos] = useState([]);
   const [periodoId, setPeriodoId] = useState("");
   const [loading, setLoading] = useState(false);
   const [data, setData] = useState(null);
+
+  const [extrasOpen, setExtrasOpen] = useState(false);
+  const [extrasFiltro, setExtrasFiltro] = useState("ambos");
+  const [extrasQ, setExtrasQ] = useState("");
+  const [extrasQApplied, setExtrasQApplied] = useState("");
+  const [extrasLoading, setExtrasLoading] = useState(false);
+  const [extrasData, setExtrasData] = useState(null);
+  const [expanded, setExpanded] = useState(() => new Set());
 
   useEffect(() => {
     const boot = async () => {
@@ -71,8 +98,66 @@ export function NovedadesIndicesPage() {
     load();
   }, [periodoId]);
 
+  const loadExtras = useCallback(async () => {
+    if (!periodoId) return;
+    setExtrasLoading(true);
+    setError("");
+    try {
+      const params = new URLSearchParams({
+        periodo_id: String(periodoId),
+        filtro: extrasFiltro,
+      });
+      if (extrasQApplied.trim()) params.set("q", extrasQApplied.trim());
+      const result = await apiRequestWithRefresh(`/novedades/indices/valores-extras?${params}`);
+      setExtrasData(result);
+      setExpanded(new Set());
+    } catch (err) {
+      setExtrasData(null);
+      setError(err.message || "No se pudieron cargar Valores Extras");
+    } finally {
+      setExtrasLoading(false);
+    }
+  }, [periodoId, extrasFiltro, extrasQApplied]);
+
+  useEffect(() => {
+    if (!extrasOpen || !periodoId) return;
+    loadExtras();
+  }, [extrasOpen, periodoId, loadExtras]);
+
+  const openExtras = () => {
+    if (!periodoId) return;
+    setExtrasFiltro("ambos");
+    setExtrasQ("");
+    setExtrasQApplied("");
+    setExtrasData(null);
+    setExpanded(new Set());
+    setExtrasOpen(true);
+  };
+
+  const closeExtras = () => {
+    setExtrasOpen(false);
+  };
+
+  const toggleExpand = (pid) => {
+    setExpanded((prev) => {
+      const next = new Set(prev);
+      if (next.has(pid)) next.delete(pid);
+      else next.add(pid);
+      return next;
+    });
+  };
+
+  const applySearch = (e) => {
+    e.preventDefault();
+    setExtrasQApplied(extrasQ);
+  };
+
   const porServicio = data?.por_servicio || [];
   const porProfesional = data?.por_profesional || [];
+  const extrasRows = extrasData?.profesionales || [];
+  const periodoLabel =
+    periodos.find((p) => String(p.id) === String(periodoId))?.nombre ||
+    (periodoId ? `#${periodoId}` : "");
 
   return (
     <section style={{ display: "grid", gap: 16 }}>
@@ -95,6 +180,14 @@ export function NovedadesIndicesPage() {
               </option>
             ))}
           </select>
+          <button
+            type="button"
+            style={uiStyles.buttonSecondary}
+            disabled={!periodoId || loading}
+            onClick={openExtras}
+          >
+            Valores Extras
+          </button>
           {loading ? <span style={uiStyles.helpText}>Cargando…</span> : null}
         </div>
       </div>
@@ -170,6 +263,201 @@ export function NovedadesIndicesPage() {
           </div>
         )}
       </div>
+
+      {extrasOpen ? (
+        <div
+          role="presentation"
+          style={{
+            position: "fixed",
+            inset: 0,
+            zIndex: 1000,
+            background: "rgba(15, 43, 39, 0.45)",
+            display: "flex",
+            alignItems: "flex-start",
+            justifyContent: "center",
+            padding: "max(12px, 3vh) 12px",
+            overflowY: "auto",
+          }}
+          onClick={closeExtras}
+        >
+          <div
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="valores-extras-title"
+            onClick={(e) => e.stopPropagation()}
+            style={{
+              background: "#fff",
+              borderRadius: uiTheme.radius.md,
+              maxWidth: 1100,
+              width: "100%",
+              marginBottom: 24,
+              padding: 20,
+              boxShadow: uiTheme.shadow.md,
+              border: `1px solid ${uiTheme.colors.border}`,
+              maxHeight: "92vh",
+              overflow: "auto",
+            }}
+          >
+            <div
+              style={{
+                display: "flex",
+                flexWrap: "wrap",
+                gap: 10,
+                alignItems: "center",
+                justifyContent: "space-between",
+                marginBottom: 12,
+              }}
+            >
+              <div>
+                <h2 id="valores-extras-title" style={{ margin: 0, fontSize: "1.15rem" }}>
+                  Valores Extras
+                </h2>
+                <p style={{ ...uiStyles.helpText, margin: "4px 0 0" }}>
+                  Período: {periodoLabel}. Cargas del período (control).
+                </p>
+              </div>
+              <button type="button" style={uiStyles.buttonSecondary} onClick={closeExtras}>
+                Cerrar
+              </button>
+            </div>
+
+            <form
+              onSubmit={applySearch}
+              style={{ display: "flex", flexWrap: "wrap", gap: 8, alignItems: "center", marginBottom: 14 }}
+            >
+              <label style={{ display: "flex", flexDirection: "column", gap: 4, fontSize: 13 }}>
+                Tipo
+                <select
+                  value={extrasFiltro}
+                  onChange={(e) => setExtrasFiltro(e.target.value)}
+                  style={{ ...uiStyles.formControl, minWidth: 160 }}
+                >
+                  {FILTRO_OPTIONS.map((opt) => (
+                    <option key={opt.value} value={opt.value}>
+                      {opt.label}
+                    </option>
+                  ))}
+                </select>
+              </label>
+              <label style={{ display: "flex", flexDirection: "column", gap: 4, fontSize: 13, flex: "1 1 180px" }}>
+                Profesional
+                <input
+                  value={extrasQ}
+                  onChange={(e) => setExtrasQ(e.target.value)}
+                  placeholder="Nombre o legajo…"
+                  style={uiStyles.formControl}
+                />
+              </label>
+              <button type="submit" style={{ ...uiStyles.buttonPrimary, alignSelf: "flex-end" }} disabled={extrasLoading}>
+                Buscar
+              </button>
+              {extrasLoading ? <span style={{ ...uiStyles.helpText, alignSelf: "flex-end" }}>Cargando…</span> : null}
+            </form>
+
+            {!extrasRows.length && !extrasLoading ? (
+              <p style={uiStyles.helpText}>Sin cargas para el filtro.</p>
+            ) : (
+              <div style={{ overflowX: "auto" }}>
+                <table style={{ width: "100%", borderCollapse: "collapse", minWidth: 720 }}>
+                  <thead>
+                    <tr>
+                      <th style={thStyle} />
+                      <th style={thStyle}>Legajo</th>
+                      <th style={thStyle}>Profesional</th>
+                      <th style={thStyle}>Cant. mód.</th>
+                      <th style={thStyle}>Cant. nov.</th>
+                      <th style={thStyle}>Imp. mód.</th>
+                      <th style={thStyle}>Imp. nov.</th>
+                      <th style={thStyle}>Total</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {extrasRows.map((row) => {
+                      const open = expanded.has(row.professional_id);
+                      return (
+                        <Fragment key={row.professional_id}>
+                          <tr>
+                            <td style={tdStyle}>
+                              <button
+                                type="button"
+                                style={{ ...uiStyles.buttonSecondary, padding: "4px 8px", fontSize: 12 }}
+                                onClick={() => toggleExpand(row.professional_id)}
+                                aria-expanded={open}
+                              >
+                                {open ? "−" : "+"}
+                              </button>
+                            </td>
+                            <td style={tdStyle}>{row.legajo || "—"}</td>
+                            <td style={tdStyle}>{row.professional_name}</td>
+                            <td style={tdStyle}>{row.cant_modulos}</td>
+                            <td style={tdStyle}>{row.cant_novedades}</td>
+                            <td style={tdStyle}>{formatMoney(row.importe_modulos)}</td>
+                            <td style={tdStyle}>{formatMoney(row.importe_novedades)}</td>
+                            <td style={tdStyle}>{formatMoney(row.importe_total)}</td>
+                          </tr>
+                          {open ? (
+                            <tr>
+                              <td style={{ ...tdStyle, borderBottom: "none" }} colSpan={8}>
+                                <div
+                                  style={{
+                                    overflowX: "auto",
+                                    background: "#f7faf9",
+                                    borderRadius: 8,
+                                    padding: 8,
+                                  }}
+                                >
+                                  <table style={{ width: "100%", borderCollapse: "collapse", minWidth: 900 }}>
+                                    <thead>
+                                      <tr>
+                                        <th style={thDetail}>Fecha</th>
+                                        <th style={thDetail}>Tipo</th>
+                                        <th style={thDetail}>Concepto</th>
+                                        <th style={thDetail}>Cant./horas</th>
+                                        <th style={thDetail}>Valor</th>
+                                        <th style={thDetail}>Importe</th>
+                                        <th style={thDetail}>Motivo</th>
+                                        <th style={thDetail}>Observación(es)</th>
+                                        <th style={thDetail}>Servicio</th>
+                                      </tr>
+                                    </thead>
+                                    <tbody>
+                                      {(row.detalle || []).map((d) => (
+                                        <tr key={`${d.kind}-${d.id}`}>
+                                          <td style={tdDetail}>{formatDate(d.fecha_realizacion)}</td>
+                                          <td style={tdDetail}>{d.tipo}</td>
+                                          <td style={tdDetail}>{d.concepto}</td>
+                                          <td style={tdDetail}>
+                                            {d.cantidad_horas != null ? formatNumber(d.cantidad_horas) : "—"}
+                                          </td>
+                                          <td style={tdDetail}>
+                                            {d.valor_unitario != null ? formatMoney(d.valor_unitario) : "—"}
+                                          </td>
+                                          <td style={tdDetail}>{formatMoney(d.importe)}</td>
+                                          <td style={tdDetail}>{d.motivo_label || "—"}</td>
+                                          <td style={tdDetail}>
+                                            {(d.observaciones || []).length
+                                              ? (d.observaciones || []).join(" · ")
+                                              : "—"}
+                                          </td>
+                                          <td style={tdDetail}>{d.servicio_nombre}</td>
+                                        </tr>
+                                      ))}
+                                    </tbody>
+                                  </table>
+                                </div>
+                              </td>
+                            </tr>
+                          ) : null}
+                        </Fragment>
+                      );
+                    })}
+                  </tbody>
+                </table>
+              </div>
+            )}
+          </div>
+        </div>
+      ) : null}
     </section>
   );
 }

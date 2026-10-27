@@ -14,3 +14,9 @@
 ## 4. Quality
 - [x] 4.1 Unit tests
 - [x] 4.2 Runbook
+
+## 5. Add-on: Valores Extras (Índices)
+- [x] 5.1 API `GET /novedades/indices/valores-extras`
+- [x] 5.2 Botón + modal expandible en Índices
+- [x] 5.3 Unit tests filtros
+- [ ] 5.4 Actualizar delta spec + archive (pendiente, una sola vez)

@@ -40,6 +40,8 @@ from app.schemas.novedades import (
     RecalculoApplyResponse,
     RecalculoPreviewResponse,
     RecalculoRequest,
+    ValoresExtrasFiltroLiteral,
+    ValoresExtrasResponse,
     ModuloCreateRequest,
     ModuloImportResponse,
     ModuloResponse,
@@ -70,6 +72,7 @@ from app.services.novedades import bonos_import as bonos_import_service
 from app.services.novedades import capital_humano as capital_humano_service
 from app.services.novedades import export_xls
 from app.services.novedades import indices as indices_service
+from app.services.novedades import valores_extras as valores_extras_service
 from app.services.novedades import importe_descontar as importe_descontar_service
 from app.services.novedades import ajuste_mas_menos as ajuste_mas_menos_service
 from app.services.novedades import liquidacion_mail as liquidacion_mail_service
@@ -747,6 +750,20 @@ def indices_get(
 ) -> IndicesResponse:
     _ = user
     return indices_service.build_indices(db, periodo_id=periodo_id)
+
+
+@router.get("/indices/valores-extras", response_model=ValoresExtrasResponse)
+def indices_valores_extras(
+    periodo_id: int = Query(...),
+    filtro: ValoresExtrasFiltroLiteral = Query(default="ambos"),
+    q: str | None = Query(default=None),
+    db: Session = Depends(get_db),
+    user: User = Depends(require_admin),
+) -> ValoresExtrasResponse:
+    _ = user
+    return valores_extras_service.build_valores_extras(
+        db, periodo_id=periodo_id, filtro=filtro, q=q
+    )
 
 
 @router.post(

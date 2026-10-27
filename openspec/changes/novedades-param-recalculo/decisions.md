@@ -29,3 +29,18 @@
 ## Survey status
 
 **Closed** (Q1–Q9).
+
+## Add-on: Índices → Valores Extras (pre-archive)
+
+| # | Topic | Choice |
+|---|--------|--------|
+| VE-Q1 | Universo | Todas las cargas del período (módulos + novedades); filtros recortan |
+| VE-Q2/3 | Filtro “novedad extra” | Módulo o novedad **con alguna observación** (hoy `observacion_sin_produccion`) |
+| VE-Q4 | Grilla | Fila por profesional con totales → expandir detalle |
+| VE-Q5 | Columnas detalle | fecha, tipo, concepto, cant/horas, valor, importe, motivo, observación(es), servicio |
+| VE-Q6 | Totales fila | cant. módulos, cant. novedades, importe módulos, importe novedades, total |
+| VE-Q7 | Export | Solo pantalla |
+| VE-Q8 | Default filtro | Ambos |
+| VE-Q9 | Búsqueda | Nombre o legajo de profesional |
+| VE-Q10 | Sin período | Botón deshabilitado |
+| Scope | Change | Sobre `novedades-param-recalculo`; spec/archive una sola vez al final |
