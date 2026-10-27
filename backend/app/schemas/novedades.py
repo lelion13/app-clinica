@@ -523,3 +523,45 @@ class LiquidacionMailStartResponse(BaseModel):
     periodo_id: int
     total: int
     status: LiquidacionMailStatusResponse
+
+
+RecalculoModoLiteral = Literal["horas", "modulos", "ambos"]
+
+
+class RecalculoRequest(BaseModel):
+    periodo_id: int
+    modo: RecalculoModoLiteral
+
+
+class RecalculoModuloRow(BaseModel):
+    modulo_id: int
+    descripcion: str
+    filas: int
+    filas_cambio: int
+    importe_actual: Decimal
+    importe_nuevo: Decimal
+
+
+class RecalculoHorasBlock(BaseModel):
+    importe_actual: Decimal
+    importe_nuevo: Decimal
+    filas: int
+    filas_cambio: int
+
+
+class RecalculoPreviewResponse(BaseModel):
+    periodo_id: int
+    modo: RecalculoModoLiteral
+    has_changes: bool
+    modulos: list[RecalculoModuloRow] = Field(default_factory=list)
+    horas: RecalculoHorasBlock | None = None
+    filas_cambio_modulos: int = 0
+    filas_cambio_horas: int = 0
+
+
+class RecalculoApplyResponse(BaseModel):
+    periodo_id: int
+    modo: RecalculoModoLiteral
+    updated_modulos: int
+    updated_horas: int
+    preview: RecalculoPreviewResponse

@@ -35,6 +35,7 @@ from app.services.novedades.helpers import (
     get_professional_or_404,
     get_servicio_or_404,
     normalize_motivo_sin_produccion,
+    novedad_valor_calculado,
     require_periodo_open,
     require_profesional_en_servicio,
     scoped_servicio_ids,
@@ -501,20 +502,23 @@ def create_novedad(db: Session, payload: NovedadCreateRequest, user: User) -> No
 
     periodo = require_periodo_open(db, payload.periodo_id)
     validate_fecha_realizacion(periodo, payload.fecha_realizacion)
-    get_servicio_or_404(db, payload.servicio_id)
+    servicio = get_servicio_or_404(db, payload.servicio_id)
     get_professional_or_404(db, payload.professional_id, require_active=True)
     assert_can_load_servicio(db, user, payload.servicio_id)
     require_profesional_en_servicio(db, payload.professional_id, payload.servicio_id)
     motivo, observacion = normalize_motivo_sin_produccion(
         payload.motivo_sin_produccion, payload.observacion_sin_produccion
     )
+    tipo = NovedadTipo(payload.tipo)
+    valor = novedad_valor_calculado(tipo, payload.horas, servicio.valor_hora or 0)
     now = datetime.utcnow()
     item = NovedadesNovedad(
         periodo_id=payload.periodo_id,
         servicio_id=payload.servicio_id,
         professional_id=payload.professional_id,
-        tipo=NovedadTipo(payload.tipo),
+        tipo=tipo,
         horas=payload.horas,
+        valor=valor,
         fecha_realizacion=payload.fecha_realizacion,
         motivo_sin_produccion=motivo,
         observacion_sin_produccion=observacion,
@@ -549,6 +553,8 @@ def update_novedad(db: Session, item_id: int, payload: NovedadUpdateRequest, use
     if payload.fecha_realizacion is not None:
         validate_fecha_realizacion(periodo, payload.fecha_realizacion)
         item.fecha_realizacion = payload.fecha_realizacion
+    servicio = get_servicio_or_404(db, item.servicio_id)
+    item.valor = novedad_valor_calculado(item.tipo, item.horas, servicio.valor_hora or 0)
     item.updated_at = datetime.utcnow()
     item.updated_by = user.id
     db.commit()
