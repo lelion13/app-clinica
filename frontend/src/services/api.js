@@ -100,10 +100,18 @@ export async function apiUploadWithRefresh(path, formData) {
   }
 }
 
-export async function apiDownloadWithRefresh(path) {
+export async function apiDownloadWithRefresh(path, options = {}) {
+  const { method = "GET", body, headers, ...rest } = options;
   const doFetch = async () => {
     const response = await fetch(`${API_BASE_URL}${path}`, {
+      method,
       credentials: "include",
+      headers: {
+        ...(body != null ? { "Content-Type": "application/json" } : {}),
+        ...(headers || {}),
+      },
+      body: body != null ? (typeof body === "string" ? body : JSON.stringify(body)) : undefined,
+      ...rest,
     });
     if (!response.ok) {
       throw await parseError(response);
@@ -111,7 +119,7 @@ export async function apiDownloadWithRefresh(path) {
     const blob = await response.blob();
     const disposition = response.headers.get("Content-Disposition") || "";
     const match = /filename="?([^"]+)"?/i.exec(disposition);
-    return { blob, filename: match?.[1] || "download.xlsx" };
+    return { blob, filename: match?.[1] || "download.bin" };
   };
 
   try {

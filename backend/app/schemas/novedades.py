@@ -536,6 +536,13 @@ class ValoresExtrasResponse(BaseModel):
     profesionales: list[ValoresExtrasProfesionalRow] = Field(default_factory=list)
 
 
+class ValoresExtrasPdfRequest(BaseModel):
+    periodo_id: int
+    filtro: ValoresExtrasFiltroLiteral = "ambos"
+    q: str | None = None
+    professional_ids: list[int] = Field(min_length=1)
+
+
 class LiquidacionMailMissingProfessional(BaseModel):
     professional_id: int
     legajo: str | None = None
