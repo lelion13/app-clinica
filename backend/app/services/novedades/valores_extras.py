@@ -113,14 +113,20 @@ def build_valores_extras(
     periodo_id: int,
     filtro: ValoresExtrasFiltroLiteral = "ambos",
     q: str | None = None,
+    professional_ids: list[int] | None = None,
 ) -> ValoresExtrasResponse:
-    _require_periodo(db, periodo_id)
+    periodo = _require_periodo(db, periodo_id)
+    _ = periodo
     detail = build_grid_rows(db, periodo_id=periodo_id, servicio_id=None, q=None, concepto_q=None)
     filtered = [r for r in detail if row_matches_filtro(r, filtro)]
+
+    allow = set(professional_ids) if professional_ids is not None else None
 
     by_pid: dict[int, list[GridRowResponse]] = defaultdict(list)
     meta: dict[int, tuple[str, str | None]] = {}
     for row in filtered:
+        if allow is not None and row.professional_id not in allow:
+            continue
         by_pid[row.professional_id].append(row)
         meta[row.professional_id] = (row.professional_name, row.legajo)
 
@@ -162,10 +168,20 @@ def build_valores_extras(
             )
         )
 
-    profesionales.sort(key=lambda r: (r.professional_name or "").casefold())
+    # Preserve selection order when ids provided; else name sort
+    if professional_ids is not None:
+        order = {pid: i for i, pid in enumerate(professional_ids)}
+        profesionales.sort(key=lambda r: order.get(r.professional_id, 10_000))
+    else:
+        profesionales.sort(key=lambda r: (r.professional_name or "").casefold())
     return ValoresExtrasResponse(
         periodo_id=periodo_id,
         filtro=filtro,
         q=q,
         profesionales=profesionales,
     )
+
+
+def periodo_nombre(db: Session, periodo_id: int) -> str | None:
+    periodo = _require_periodo(db, periodo_id)
+    return periodo.nombre

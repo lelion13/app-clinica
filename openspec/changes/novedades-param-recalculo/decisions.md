@@ -39,8 +39,9 @@
 | VE-Q4 | Grilla | Fila por profesional con totales → expandir detalle |
 | VE-Q5 | Columnas detalle | fecha, tipo, concepto, cant/horas, valor, importe, motivo, observación(es), servicio |
 | VE-Q6 | Totales fila | cant. módulos, cant. novedades, importe módulos, importe novedades, total |
-| VE-Q7 | Export | Solo pantalla |
+| VE-Q7 | Export | Solo pantalla → **ampliado**: PDF (chrome app-recepcion) |
 | VE-Q8 | Default filtro | Ambos |
 | VE-Q9 | Búsqueda | Nombre o legajo de profesional |
 | VE-Q10 | Sin período | Botón deshabilitado |
+| VE-Q12 | PDF multi | **A** — un solo PDF; página/sección por profesional seleccionado |
 | Scope | Change | Sobre `novedades-param-recalculo`; spec/archive una sola vez al final |

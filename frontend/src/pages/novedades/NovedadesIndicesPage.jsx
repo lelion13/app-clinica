@@ -1,7 +1,7 @@
 import { Fragment, useCallback, useEffect, useState } from "react";
 
 import { AlertModal } from "../../components/AlertModal";
-import { apiRequestWithRefresh } from "../../services/api";
+import { apiDownloadWithRefresh, apiRequestWithRefresh } from "../../services/api";
 import { uiStyles, uiTheme } from "../../ui/theme";
 
 function formatMoney(value) {
@@ -63,6 +63,8 @@ export function NovedadesIndicesPage() {
   const [extrasLoading, setExtrasLoading] = useState(false);
   const [extrasData, setExtrasData] = useState(null);
   const [expanded, setExpanded] = useState(() => new Set());
+  const [selected, setSelected] = useState(() => new Set());
+  const [exporting, setExporting] = useState(false);
 
   useEffect(() => {
     const boot = async () => {
@@ -111,6 +113,7 @@ export function NovedadesIndicesPage() {
       const result = await apiRequestWithRefresh(`/novedades/indices/valores-extras?${params}`);
       setExtrasData(result);
       setExpanded(new Set());
+      setSelected(new Set());
     } catch (err) {
       setExtrasData(null);
       setError(err.message || "No se pudieron cargar Valores Extras");
@@ -131,6 +134,7 @@ export function NovedadesIndicesPage() {
     setExtrasQApplied("");
     setExtrasData(null);
     setExpanded(new Set());
+    setSelected(new Set());
     setExtrasOpen(true);
   };
 
@@ -147,6 +151,15 @@ export function NovedadesIndicesPage() {
     });
   };
 
+  const toggleSelect = (pid) => {
+    setSelected((prev) => {
+      const next = new Set(prev);
+      if (next.has(pid)) next.delete(pid);
+      else next.add(pid);
+      return next;
+    });
+  };
+
   const applySearch = (e) => {
     e.preventDefault();
     setExtrasQApplied(extrasQ);
@@ -155,9 +168,49 @@ export function NovedadesIndicesPage() {
   const porServicio = data?.por_servicio || [];
   const porProfesional = data?.por_profesional || [];
   const extrasRows = extrasData?.profesionales || [];
+  const allSelected = extrasRows.length > 0 && extrasRows.every((r) => selected.has(r.professional_id));
+  const someSelected = extrasRows.some((r) => selected.has(r.professional_id));
   const periodoLabel =
     periodos.find((p) => String(p.id) === String(periodoId))?.nombre ||
     (periodoId ? `#${periodoId}` : "");
+
+  const toggleSelectAll = () => {
+    if (allSelected) {
+      setSelected(new Set());
+      return;
+    }
+    setSelected(new Set(extrasRows.map((r) => r.professional_id)));
+  };
+
+  const exportPdf = async () => {
+    if (!periodoId || !selected.size) {
+      setError("Seleccioná al menos un profesional para exportar");
+      return;
+    }
+    setExporting(true);
+    setError("");
+    try {
+      const { blob, filename } = await apiDownloadWithRefresh("/novedades/indices/valores-extras/pdf", {
+        method: "POST",
+        body: {
+          periodo_id: Number(periodoId),
+          filtro: extrasFiltro,
+          q: extrasQApplied.trim() || null,
+          professional_ids: Array.from(selected),
+        },
+      });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = filename || "Valores_Extras.pdf";
+      a.click();
+      URL.revokeObjectURL(url);
+    } catch (err) {
+      setError(err.message || "No se pudo exportar el PDF");
+    } finally {
+      setExporting(false);
+    }
+  };
 
   return (
     <section style={{ display: "grid", gap: 16 }}>
@@ -316,9 +369,19 @@ export function NovedadesIndicesPage() {
                   Período: {periodoLabel}. Cargas del período (control).
                 </p>
               </div>
-              <button type="button" style={uiStyles.buttonSecondary} onClick={closeExtras}>
-                Cerrar
-              </button>
+              <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+                <button
+                  type="button"
+                  style={uiStyles.buttonPrimary}
+                  onClick={exportPdf}
+                  disabled={exporting || !someSelected || extrasLoading}
+                >
+                  {exporting ? "Exportando…" : "Exportar"}
+                </button>
+                <button type="button" style={uiStyles.buttonSecondary} onClick={closeExtras}>
+                  Cerrar
+                </button>
+              </div>
             </div>
 
             <form
@@ -358,9 +421,19 @@ export function NovedadesIndicesPage() {
               <p style={uiStyles.helpText}>Sin cargas para el filtro.</p>
             ) : (
               <div style={{ overflowX: "auto" }}>
-                <table style={{ width: "100%", borderCollapse: "collapse", minWidth: 720 }}>
+                <table style={{ width: "100%", borderCollapse: "collapse", minWidth: 760 }}>
                   <thead>
                     <tr>
+                      <th style={thStyle}>
+                        <input
+                          type="checkbox"
+                          checked={allSelected}
+                          onChange={toggleSelectAll}
+                          disabled={!extrasRows.length}
+                          aria-label="Seleccionar todos"
+                          title="Seleccionar todos"
+                        />
+                      </th>
                       <th style={thStyle} />
                       <th style={thStyle}>Legajo</th>
                       <th style={thStyle}>Profesional</th>
@@ -374,9 +447,18 @@ export function NovedadesIndicesPage() {
                   <tbody>
                     {extrasRows.map((row) => {
                       const open = expanded.has(row.professional_id);
+                      const isChecked = selected.has(row.professional_id);
                       return (
                         <Fragment key={row.professional_id}>
                           <tr>
+                            <td style={tdStyle}>
+                              <input
+                                type="checkbox"
+                                checked={isChecked}
+                                onChange={() => toggleSelect(row.professional_id)}
+                                aria-label={`Seleccionar ${row.professional_name}`}
+                              />
+                            </td>
                             <td style={tdStyle}>
                               <button
                                 type="button"
@@ -397,7 +479,7 @@ export function NovedadesIndicesPage() {
                           </tr>
                           {open ? (
                             <tr>
-                              <td style={{ ...tdStyle, borderBottom: "none" }} colSpan={8}>
+                              <td style={{ ...tdStyle, borderBottom: "none" }} colSpan={9}>
                                 <div
                                   style={{
                                     overflowX: "auto",

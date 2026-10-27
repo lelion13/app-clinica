@@ -41,6 +41,7 @@ from app.schemas.novedades import (
     RecalculoPreviewResponse,
     RecalculoRequest,
     ValoresExtrasFiltroLiteral,
+    ValoresExtrasPdfRequest,
     ValoresExtrasResponse,
     ModuloCreateRequest,
     ModuloImportResponse,
@@ -73,6 +74,7 @@ from app.services.novedades import capital_humano as capital_humano_service
 from app.services.novedades import export_xls
 from app.services.novedades import indices as indices_service
 from app.services.novedades import valores_extras as valores_extras_service
+from app.services.novedades import valores_extras_pdf as valores_extras_pdf_service
 from app.services.novedades import importe_descontar as importe_descontar_service
 from app.services.novedades import ajuste_mas_menos as ajuste_mas_menos_service
 from app.services.novedades import liquidacion_mail as liquidacion_mail_service
@@ -763,6 +765,42 @@ def indices_valores_extras(
     _ = user
     return valores_extras_service.build_valores_extras(
         db, periodo_id=periodo_id, filtro=filtro, q=q
+    )
+
+
+@router.post("/indices/valores-extras/pdf")
+def indices_valores_extras_pdf(
+    payload: ValoresExtrasPdfRequest,
+    db: Session = Depends(get_db),
+    user: User = Depends(require_admin),
+) -> Response:
+    _ = user
+    data = valores_extras_service.build_valores_extras(
+        db,
+        periodo_id=payload.periodo_id,
+        filtro=payload.filtro,
+        q=payload.q,
+        professional_ids=payload.professional_ids,
+    )
+    if not data.profesionales:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="No hay cargas para los profesionales seleccionados con el filtro actual",
+        )
+    missing = set(payload.professional_ids) - {p.professional_id for p in data.profesionales}
+    if missing:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Algunos profesionales seleccionados no tienen cargas con el filtro actual",
+        )
+    pdf_bytes, filename = valores_extras_pdf_service.build_valores_extras_pdf(
+        data=data,
+        periodo_nombre=valores_extras_service.periodo_nombre(db, payload.periodo_id),
+    )
+    return Response(
+        content=pdf_bytes,
+        media_type="application/pdf",
+        headers={"Content-Disposition": f'attachment; filename="{filename}"'},
     )
 
 
